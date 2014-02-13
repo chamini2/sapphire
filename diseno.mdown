@@ -1,34 +1,32 @@
 #Diseño
 
 ##Palabras reservadas
-* Comentarios: -- | // | #
-* instrucciones
-    * for
-    * in
-    * while
-    * do
-    * if
-    * else
-
-    * print
-    * read
-* union
-* ;
-* +
-* -
-* *
-* /
-* ^
-* <
-* >
-* <=
-* >=
-* ==
-* /=
-*
-* { }
-* ( )
-* [ ]
+* *Comentarios* --
+* *instrucciones*
+    * `for`
+    * `in`
+    * `while`
+    * `do`
+    * `if`
+    * `else`
+    * `print`
+    * `read`
+* `union`
+* `;`
+* `+`
+* `-`
+* `*`
+* `/`
+* `^`
+* `<`
+* `>`
+* `<=`
+* `>=`
+* `==`
+* `/=`
+* `{ }`
+* `( )`
+* `[ ]`
 
 ##Decisiones
 * existe la instruccion vacía
@@ -53,7 +51,7 @@ SUPERCOOL es un lenguaje de programación de uso general desarrollado para la ca
 
 Un programa en SUPERCOOL tiene la siguiente estructura:
 
-    [<instrucciones>]
+    [<instrucción>]
 
 Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un programa básico en SUPERCOOL es:
 
@@ -82,3 +80,12 @@ Se dispone de los siguientes tipos de datos:
 ###Asignación
 
     <variable> = <expresión>
+
+Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado derecho y almacenarla en la variable del lado izquierdo. La variable tiene que haber sido declarada previamente y su tipo debe coincidir con el tipo de la expresión, en caso contrario debe arrojarse un error.
+
+###Bloque??
+
+    { [<instrucción>] }
+
+Permite colocar una lista de instrucciones donde se requiera una (1) instrucción.
+

@@ -2,9 +2,9 @@ Int x = 10;
 
 ----------------------------
 
-Int[10][10] a;
+Int[3][3] a;
 [[Int]] a;
-[[Int|10] |10] a;
+[[Int|3]|3] a;
 
 a = {{1,2,3},{1,2,3},{1,2,3}};
 
@@ -22,11 +22,11 @@ while (x%13 /= 0) {
 
 ----------------------------
 
-Void nothing() {}
-Void nada() { print "hola";;;;;;; print "chao" }
-
-----------------------------
-
 mas(Int a, Int b) :: Int { return a + b; }
 def sum(Int a, Int b) :: Int { return a + b; }
 Int sumar(Int a, Int b) { return a + b; }
+
+----------------------------
+
+Void nothing() {}
+Void nada() { print "hola";;;;;;; print "chao" }
