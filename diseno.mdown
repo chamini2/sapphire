@@ -88,7 +88,7 @@ Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado der
 
 ###Bloque??
 
-Permite colocar una secuencia de instrucciones donde se requiera una (1) instrucción. Su sintaxis es:
+Permite colocar una secuencia de instrucciones donde se requiera *una* instrucción. Su sintaxis es:
 
     {
         <intrucción1>;
