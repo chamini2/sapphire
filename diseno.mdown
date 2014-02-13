@@ -127,4 +127,37 @@ Se escribe primero el `tipo` de la variable a declarar y luego el identificador 
 
 ###Condicional
 
-Condicional típico `if then else`
+    if <expresión Bool> then
+        <instrucción>
+    else
+        <instrucción>
+
+    if <expresión Bool> then
+        <instrucción>
+
+---
+
+    if <expresión Bool>
+        <instrucción>
+    else
+        <instrucción>
+
+    if <expresión Bool>
+        <instrucción>
+
+***PENSAR BIEN***: Palabra `then` es innecesaria, trayendo discrepancia con el resto del lenguaje.
+
+Condicional típicio `if then else`. La condición debe ser del tipo `Bool` y en caso de ser cierta, se ejecuta la instrucción siguiente al `then`, sino se ejecuta la instrucción siguiente al `else` (en caso de haber).
+
+###Condicional por casos
+
+Condicinal por casos, *case*.
+
+    case <expresión> of
+      <expresión1> -> <instrucción1>
+      <expresión2> -> <instrucción2>
+      ...
+      <expresiónN> -> <instrucciónN>
+    end
+
+***PENSAR BIEN***: Palabra `end` es **necesaria** trae discrepancia con el resto del lenguaje.
