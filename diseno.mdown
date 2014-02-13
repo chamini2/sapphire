@@ -31,7 +31,7 @@
 * `and`
 
 ##Decisiones
-* existe la instruccion vacía
+*
 
 ###Tipos
 * `Int`
@@ -106,3 +106,25 @@ Permite colocar una secuencia de instrucciones donde se requiera *una* instrucci
     }
 
 Una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, puede gracias a la *instrucción vacía*.
+
+Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del estilo: `x = 2; { y = x;; } x = 3` sin tener que colocar `;` despues de cerrar el bloque.
+
+###Declaración
+
+Declara una variable para el *alcance* actual.
+
+    Tipo id;
+
+Se escribe primero el `tipo` de la variable a declarar y luego el identificador de esta.
+
+###Entrada
+
+    read/scan ???
+
+###Salida
+
+    write/print ???
+
+###Condicional
+
+Condicional típico `if then else`
