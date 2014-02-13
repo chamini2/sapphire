@@ -1,0 +1,32 @@
+#Diseño
+
+##Palabras reservadas
+* instrucciones
+    * for
+    * in
+    * while
+    * do
+    * if
+    * else
+* union
+* print
+* read
+* ;
+* +
+* -
+* *
+* /
+* ^
+* <
+* >
+* <=
+* >=
+* ==
+* /=
+*
+* { }
+* ( )
+* [ ]
+
+##Decisiones
+* existe la instruccion vacía

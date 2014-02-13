@@ -1,0 +1,25 @@
+for x in [1..100] {
+    x = 2;
+}
+
+Int x, y, z;
+x = 10;
+Int[10][10] a;
+[[Int]] a;
+a = {{1,2,3},{1,2,3},{1,2,3}};
+
+
+for x in [x..20]
+    print "hola"
+
+while (x%13 /= 0) {
+    print x;
+    x = x+3
+}
+
+Void nothing() {}
+Void nada() { print "hola";;;;;;; print "chao" }
+
+mas(Int a, Int b) :: Int { return a + b; }
+def sum(Int a, Int b) :: Int { return a + b; }
+Int sumar(Int a, Int b) { return a + b; }
