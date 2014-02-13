@@ -78,7 +78,7 @@ Se dispone de los siguientes tipos de datos:
 ##Instrucciones
 
 ###Instrucción vacia
-Instrucción que no hace nada (NoOp). No tiene sintaxis.
+Instrucción que no hace nada, *noop*. No tiene sintaxis.
 
 ###Asignación
 
