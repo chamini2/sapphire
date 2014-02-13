@@ -22,9 +22,12 @@ while (x%13 /= 0) {
 
 ----------------------------
 
+def plus(a, b) :: Int -> Int -> Int { return a + b }
 mas(Int a, Int b) :: Int { return a + b; }
+
 def sum(Int a, Int b) :: Int { return a + b; }
-Int sumar(Int a, Int b) { return a + b; }
+Int sumar(Int a, Int b) { return a + b }
+
 
 ----------------------------
 

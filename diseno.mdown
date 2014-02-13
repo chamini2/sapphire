@@ -61,6 +61,8 @@ Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un program
         print("numero: " ++ string(i) ++ "\n")
     }
 
+    def plus(a, b) :: Int -> Int -> Int { return a + b }
+
 ##Identificadores
 
 Un identificador en SUPERCOOL consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (a-z), y es seguido por letras minúsculas (a-z), letras mayúscula (A-Z), dígitos (0-9) o el caracter guión bajo (_).
@@ -145,7 +147,7 @@ Se escribe primero el `tipo` de la variable a declarar y luego el identificador 
     if <expresión Bool>
         <instrucción>
 
-***PENSAR BIEN***: Palabra `then` es innecesaria, trayendo discrepancia con el resto del lenguaje.
+***PENSAR BIEN***: Palabra `then` es **innecesaria**, trae discrepancia con el resto del lenguaje.
 
 Condicional típicio `if then else`. La condición debe ser del tipo `Bool` y en caso de ser cierta, se ejecuta la instrucción siguiente al `then`, sino se ejecuta la instrucción siguiente al `else` (en caso de haber).
 
@@ -160,4 +162,9 @@ Condicinal por casos, *case*.
       <expresiónN> -> <instrucciónN>
     end
 
-***PENSAR BIEN***: Palabra `end` es **necesaria** trae discrepancia con el resto del lenguaje.
+***PENSAR BIEN***: Palabra `end` es **necesaria**, trae discrepancia con el resto del lenguaje.
+
+###Iteración determinada
+
+    for <identificador> in <rango>
+        <instrucción>
