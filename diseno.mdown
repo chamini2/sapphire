@@ -32,11 +32,11 @@
 * existe la instruccion vacía
 
 ###Tipos
-* Int
-* Float
-* Char
-* String -- [Char]
-* Array
+* `Int`
+* `Float`
+* `Char`
+* `String -- [Char]`
+* `Array`
 
 
 
@@ -77,6 +77,9 @@ Se dispone de los siguientes tipos de datos:
 
 ##Instrucciones
 
+###Instrucción vacia
+Instrucción que no hace nada (NoOp). No tiene sintaxis.
+
 ###Asignación
 
     <variable> = <expresión>
@@ -85,7 +88,18 @@ Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado der
 
 ###Bloque??
 
-    { [<instrucción>] }
+Permite colocar una secuencia de instrucciones donde se requiera una (1) instrucción. Su sintaxis es:
 
-Permite colocar una lista de instrucciones donde se requiera una (1) instrucción.
+    {
+        <intrucción1>;
+        <intrucción2>;
+        ...
+        {
+            <intrucción3>;
+            <intrucción4>;
+        }
+        ...
+        <intrucciónN>
+    }
 
+Una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, puede gracias a la *instrucción vacía*.
