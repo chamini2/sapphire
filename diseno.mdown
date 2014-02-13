@@ -81,4 +81,4 @@ Se dispone de los siguientes tipos de datos:
 
 ###Asignación
 
-<variable> = <expresión>
+    <variable> = <expresión>
