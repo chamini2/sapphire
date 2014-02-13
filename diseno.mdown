@@ -57,11 +57,14 @@ Un programa en SUPERCOOL tiene la siguiente estructura:
 
 Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un programa básico en SUPERCOOL es:
 
-    for i in [1..10] {
-        print("numero: " ++ string(i) ++ "\n")
+    def plus(a, b) :: Int -> Int -> Int {
+        return a + b
     }
 
-    def plus(a, b) :: Int -> Int -> Int { return a + b }
+    for i in [1..10] do {
+        print("numero: " ++ string(plus(1,i)) ++ "\n");
+    }
+
 
 ##Identificadores
 
@@ -166,5 +169,42 @@ Condicinal por casos, *case*.
 
 ###Iteración determinada
 
+    for <identificador> in <rango> do
+        <instrucción>
+
+---
+
     for <identificador> in <rango>
         <instrucción>
+
+***PENSAR BIEN***: Palabra `do` es **innecesaria**, trae discrepancia con el resto del lenguaje.
+
+El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identificadores. El `<identificador>` puede ser modificado dentro del for.
+
+###Iteración indeterminada
+
+    while <expresión Bool> do
+        <instrucción>
+
+---
+
+    while <expresión Bool>
+        <instrucción>
+
+***PENSAR BIEN***: Palabra `do` es **innecesaria**, trae discrepancia con el resto del lenguaje.
+
+##Reglas de alcance de variables
+
+Para utilizar una variable primero debe ser declarada o ser parte de la variable de iteración de una instrucción `for`.
+Es posible anidar `bloques` e instrucciones `for` y también es posible declarar variables con el mismo nombre que otra variable en un `bloque` o `for` exterior.
+En este caso se dice que la variable interior esconde a la variable exterior y cualquier instrucción del `bloque` será incapaz de acceder a la variable exterior.
+
+Dada una instrucción o expresión en un punto particular del programa, para determinar si existe una variable y a qué `bloque` pertenece, el interpretador debe partir del `bloque` o `for` más cercano que contenga a la instrucción y revisar las variables que haya declarado, si no la encuentra debe proceder a revisar el siguiente `bloque` que lo contenga, y así sucesivamente hasta encontrar un acierto o llegar al tope.
+
+##Expresiones
+
+Las expresiones consisten de variables, constantes numéricas y booleanas, y operadores. Al momento de evaluar una variable ésta debe buscarse utilizando las reglas de alcance descritas, y debe haber sido inicializada. Es un error utilizar una variable que no haya sido declarada ni inicializada.
+
+Los operadores poseen reglas de precedencia que determinan el orden de evaluación de una expresión dada. Es posible alterar el orden de evaluación utilizando paréntesis, de la misma manera que se hace en otros lenguajes de programación.
+
+###Expresiones con enteros
