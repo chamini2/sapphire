@@ -27,6 +27,8 @@
 * `{ }`
 * `( )`
 * `[ ]`
+* `or`
+* `and`
 
 ##Decisiones
 * existe la instruccion vacía
