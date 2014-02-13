@@ -76,3 +76,9 @@ Se dispone de los siguientes tipos de datos:
 * `String`: cadenas de caracteres, escencialmente `[Char]`
 * `[Array]`: arreglos de los otros tipos, no se permiten `[Void]`
 * `def(Int,Bool) :: Void`: funciones, debe especificarse los tipos de entrada y salida.
+
+##Instrucciones
+
+###Asignación
+
+<variable> = <expresión>
