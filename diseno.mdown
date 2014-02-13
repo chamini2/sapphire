@@ -29,6 +29,7 @@
 * `[ ]`
 * `or`
 * `and`
+* `not`
 
 ##Decisiones
 *
@@ -208,3 +209,12 @@ Las expresiones consisten de variables, constantes numéricas y booleanas, y ope
 Los operadores poseen reglas de precedencia que determinan el orden de evaluación de una expresión dada. Es posible alterar el orden de evaluación utilizando paréntesis, de la misma manera que se hace en otros lenguajes de programación.
 
 ###Expresiones con enteros
+Una expresión aritmética estará formada por números naturales (secuencias de dígitos del 0 al 9), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma (+), la resta (-), la multiplicación (*), la división entera (/), módulo (%) y el inverso (- unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
+
+La precedencia de los operadores (ordenados comenzando por la menor prece- dencia) son:
+
+* +, - binario
+* *, /, %
+* - unario
+
+Para los operadores binarios +, -, *, / y % sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
