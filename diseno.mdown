@@ -32,6 +32,7 @@
 * `not`
 * `::`
 * `union`
+* `struct` -- ***CUAL NOMBRE*** (creo que esto tambien lo pedian)
 
 
 ##Decisiones
@@ -99,6 +100,8 @@ Se dispone de los siguientes tipos de datos:
 * **`def(id, id,...) :: Firma`** funciones, debe especificarse los tipos de entrada y salida.
 
 * **`union`** TODO
+
+* **`struct`** TODO
 
 El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, ademas todos los tipos de datos empiezan por una letra mayuscula.
 
