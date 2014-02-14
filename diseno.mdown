@@ -30,6 +30,7 @@
 * `or`
 * `and`
 * `not`
+* ::
 
 ##Decisiones
 *
@@ -41,10 +42,9 @@
 * `String -- [Char]`
 * `Array`
 
-
-
-
 ***
+
+\pagebreak
 
 #Lenguaje de programación SUPERCOOL
 
@@ -119,9 +119,26 @@ Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del esti
 
 Declara una variable para el *alcance* actual.
 
-    Tipo id;
+    <Tipo> <identificador>;
 
 Se escribe primero el `tipo` de la variable a declarar y luego el identificador de esta.
+
+###Declaración de funciones
+
+Declara una función, especificando parametros de entrada y de salida.
+
+    def <identificador>(<lista de entradas>) :: <firma>
+
+    def <identificador>(<lista de entradas>) :: <firma>
+        <instrucción>
+
+Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida. Un ejemplo es:
+
+    def iguales(a, b) :: Int -> Int -> Bool {
+        return a == b
+    }
+
+Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`
 
 ###Entrada
 
@@ -209,29 +226,29 @@ Las expresiones consisten de variables, constantes numéricas y booleanas, y ope
 Los operadores poseen reglas de precedencia que determinan el orden de evaluación de una expresión dada. Es posible alterar el orden de evaluación utilizando paréntesis, de la misma manera que se hace en otros lenguajes de programación.
 
 ###Expresiones con enteros
-Una expresión aritmética estará formada por números naturales (secuencias de dígitos del 0 al 9), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma (+), la resta (-), la multiplicación (*), la división entera (/), módulo (%) y el inverso (- unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
+Una expresión aritmética estará formada por números naturales (secuencias de dígitos del 0 al 9), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma `+), la resta `-), la multiplicación `*), la división entera `/), módulo `%) y el inverso (- unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
 
 La precedencia de los operadores (ordenados comenzando por la menor prece- dencia) son:
 
-* +, - binario
-* *, /, %
-* - unario
+* `+`, `-` binario
+* `*`, `/`, `%`
+* `-` unario
 
 Para los operadores binarios +, -, *, / y % sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
 
 ###Expresiones con booleanos
 Una expresión booleana estará formada por constantes booleanas (`true` y `false`), variables, llamadas a funciones y operadores booleanos. Se considerarán los operadores `and`, `or` y `not`. También se utilizará notación infija para el `and` y el `or`, y notación prefija para el `not`. Las precedencias son las siguientes:
 
-* or
-* and
-* not
+* `or`
+* `and`
+* `not`
 
-Los operandos de and, or y not deben tener tipo bool, y su resultado también será de tipo bool.
+Los operandos de `and`, `or` y `not` deben tener tipo `Bool`, y su resultado también será de tipo `Bool`.
 
-Además RangeX cuenta con operadores relacionales capaces de comparar enteros y rangos. Los operadores relacionales disponibles son menor (<), menor o igual (<=), igual (==), mayor o igual (>=), mayor (>), y desigual (/=). Ambos operandos deben ser del mismo tipo y el resultado será de tipo bool.
-También es posible comparar expresiones de tipo bool utilizando los operadores == y /=.
-Adicionalmente se provee el operador binario pertenece (a >> b) el cual devueve true si la expresión a, de tipo int, está dentro del rango b (incluyendo sus cotas).
-Los operadores relacionales no son asociativos, a excepción de los operadores == y /= cuando se comparan expresiones de tipo bool.
+También hay operadores relacionales capaces de comparar enteros. Los operadores relacionales disponibles son menor `<`, menor o igual `<=`, igual `==`, mayor o igual `>=`, mayor `>)` y desigual `/=`. Ambos operandos deben ser del mismo tipo y el resultado será de tipo `Bool`.
+También es posible comparar expresiones de tipo `Bool` utilizando los operadores `==` y `/=`.
+Los operadores relacionales no son asociativos, a excepción de los operadores == y /= cuando se comparan expresiones de tipo `Bool`.
 La precedencia de los operadores relacionales son las siguientes:
-• <,<=,>=,> • ==, /=
-• >>
+
+* `<`, `<=`, `>=`, `>`
+* `==`, `/=`
