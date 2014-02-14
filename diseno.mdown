@@ -160,7 +160,7 @@ Declara una variable para el *alcance* actual.
     <Tipo> <identificador>
 ~~~
 
-Se escribe primero el `tipo` de la variable a declarar y luego el identificador de esta.
+Se escribe primero el `Tipo` de la variable a declarar y luego el identificador de esta.
 
 ###Declaración de funciones
 
