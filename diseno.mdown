@@ -12,7 +12,6 @@
     + `else`
     + `print`
     + `read`
-* `union`
 * `;`
 * `+`
 * `-`
@@ -32,6 +31,7 @@
 * `and`
 * `not`
 * ::
+* `union`
 
 
 ##Decisiones
@@ -90,13 +90,17 @@ Se dispone de los siguientes tipos de datos:
 
 * **`Float`** números flotantes de N bits, precisión y tal...
 
-* **`Char`** caracteres, UTF-8.
+* **`Char`** caracteres, UTF-8. 
 
-* **`String`** cadenas de caracteres, escencialmente `[Char]`
+* **`String`** cadenas de caracteres, esencialmente `[Char]`
 
-* **`[Array]`** arreglos de los otros tipos, no se permiten `[Void]`
+* **`[Array]`** arreglos de los otros tipos, no se permiten `[Void]`. Se permiten arreglos de arreglos
 
 * **`def(id, id,...) :: Firma`** funciones, debe especificarse los tipos de entrada y salida.
+
+* **`union`** TODO
+
+El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, ademas todos los tipos de datos empiezan por una letra mayuscula.
 
 
 ##Instrucciones
@@ -125,7 +129,6 @@ Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado der
 
 Permite colocar una secuencia de instrucciones donde se requiera *una* instrucción. Su sintaxis es:
 
-
 ~~~
     {
         <instrucción1>;
@@ -150,9 +153,8 @@ Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del esti
 
 Declara una variable para el *alcance* actual.
 
-
 ~~~
-    <Tipo> <identificador>;
+    <Tipo> <identificador>
 ~~~
 
 Se escribe primero el `tipo` de la variable a declarar y luego el identificador de esta.
@@ -162,13 +164,13 @@ Se escribe primero el `tipo` de la variable a declarar y luego el identificador 
 Declara una función, especificando parametros de entrada y de salida.
 
 ~~~
-    def <identificador>(<lista de entradas>) :: <firma>
+    def <identificador> :: <firma>
 
     def <identificador>(<lista de entradas>) :: <firma>
         <instrucción>
 ~~~
 
-Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida. Un ejemplo es:
+Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego, en caso de no hacerlo se lanzaria un error si intenta hacerse una llamada a dicha funcion. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida. Un ejemplo es:
 
 ~~~
     def iguales(a, b) :: Int -> Int -> Bool {
@@ -181,30 +183,22 @@ Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`
 ###Entrada
 
 ~~~
-    read/scan ???
+    read/scan <id>
 ~~~
+
+Instruccion encargada de la lectura de datos. id seria un identificador de una variable previamente declarada. Dicha variable solo puede ser de alguno de los tipos de datos primitivos del sistema (Char, Int, Float, Bool). 
 
 ###Salida
 
 ~~~
-    write/print ???
+    write/print <Expr>
 ~~~
+
+Instruccion encargada de la escritura de datos hacia la salida estandar. Expr se evalua completamente antes de imprimir el valor de dicha expresion.
 
 ###Condicional
 
 ~~~
-    if <expresión Bool> then
-        <instrucción>
-    else
-        <instrucción>
-
-    if <expresión Bool> then
-        <instrucción>
-~~~
-
----
-
-~~~
     if <expresión Bool>
         <instrucción>
     else
@@ -214,17 +208,13 @@ Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`
         <instrucción>
 ~~~
 
-***PENSAR BIEN***: Palabra `then` es **innecesaria**, trae discrepancia con el resto del lenguaje.
-
-
-Condicional típicio `if then else`. La condición debe ser del tipo `Bool` y
-en caso de ser cierta, se ejecuta la instrucción siguiente al `then`, sino
+Condicional típico `if E I1 else I2`. La condición E debe ser una expresion de tipo `Bool` y
+en caso de ser cierta, se ejecuta la instrucción `I1` , sino
 se ejecuta la instrucción siguiente al `else` (en caso de haber).
 
 ###Condicional por casos
 
 Condicinal por casos, *case*.
-
 
 ~~~
     case <expresión> of
@@ -237,42 +227,23 @@ Condicinal por casos, *case*.
 
 ***PENSAR BIEN***: Palabra `end` es **necesaria**, trae discrepancia con el resto del lenguaje.
 
-
 ###Iteración determinada
-
-~~~
-    for <identificador> in <rango> do
-        <instrucción>
-~~~
-
----
 
 ~~~
     for <identificador> in <rango>
         <instrucción>
 ~~~
 
-***PENSAR BIEN***: Palabra `do` es **innecesaria**, trae discrepancia con el resto del lenguaje.
-
-
-El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identificadores. El `<identificador>` puede ser modificado dentro del for.
+El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identificadores. El `<identificador>` puede ser modificado dentro del for. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteracion, al finalizar la iteracion deja de existir.
 
 ###Iteración indeterminada
-
-~~~
-    while <expresión Bool> do
-        <instrucción>
-~~~
-
----
 
 ~~~
     while <expresión Bool>
         <instrucción>
 ~~~
 
-***PENSAR BIEN***: Palabra `do` es **innecesaria**, trae discrepancia con el resto del lenguaje.
-
+Esta instruccion equivale a evaluar la expresion E la cual debe ser de tipo `Bool`, en caso de que evalue a true se ejecuta el cuerpo de la instruccion en caso contrario se 
 
 ##Reglas de alcance de variables
 
@@ -293,7 +264,7 @@ Los operadores poseen reglas de precedencia que determinan el orden de evaluaci�
 Una expresión aritmética estará formada por números naturales (secuencias de dígitos del 0 al 9), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma `+), la resta `-), la multiplicación `*), la división entera `/), módulo `%) y el inverso (- unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
 
 
-La precedencia de los operadores (ordenados comenzando por la menor prece- dencia) son:
+La precedencia de los operadores (ordenados comenzando por la menor precedencia) son:
 
 * `+`, `-` binario
 
@@ -315,7 +286,6 @@ Una expresión booleana estará formada por constantes booleanas (`true` y `fals
 
 * `not`
 
-
 Los operandos de `and`, `or` y `not` deben tener tipo `Bool`, y su resultado también será de tipo `Bool`.
 
 También hay operadores relacionales capaces de comparar enteros. Los operadores relacionales disponibles son menor `<`, menor o igual `<=`, igual `==`, mayor o igual `>=`, mayor `>)` y desigual `/=`. Ambos operandos deben ser del mismo tipo y el resultado será de tipo `Bool`.
@@ -332,12 +302,9 @@ La precedencia de los operadores relacionales son las siguientes:
 
 Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
-* toInt :: Float -> Int
+* def toInt :: Float -> Int
 
-* toFloat :: Int -> Float
-
-
-Ambas funciones tienen una sola entrada y una salida.
+* def toFloat :: Int -> Float
 
 ##Comentarios y espacios en blanco
 
