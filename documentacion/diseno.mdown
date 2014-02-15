@@ -33,7 +33,8 @@
 * `::`
 * `union`
 * `struct` -- ***CUAL NOMBRE*** (creo que esto tambien lo pedian)
-
+* `break`
+* `continue`
 
 ##Decisiones
 
@@ -45,7 +46,7 @@
 * `String -- [Char]`
 * `Array -- [Tipo] or Tipo[n] or [Tipo|n]`
 
----
+-------------------------------------------------------------------------------
 
 \pagebreak
 
@@ -83,25 +84,25 @@ Un identificador en SUPERCOOL consiste de una cadena de caracteres de cualquier 
 
 Se dispone de los siguientes tipos de datos:
 
-* **`Void`** para funciones que no devuelven valores (aka. procedimientos).
+* **`Void`** para funciones que no devuelven valores *(aka. procedimientos)*.
 
-* **`Int`** números enteros con signo de *N(32/64)* bits.
+* **`Int`** números enteros con signo de `N(32/64) bits`.
 
 * **`Bool`** representa un valor booleano o lógico, es decir `true` o `false`.
 
-* **`Float`** números flotantes de N bits, precisión y tal...
+* **`Float`** números flotantes de `N bits`, precisión y tal...
 
-* **`Char`** caracteres, UTF-8. 
+* **`Char`** caracteres, `UTF-8`.
 
 * **`String`** cadenas de caracteres, esencialmente `[Char]`
 
-* **`[Array]`** arreglos de los otros tipos, no se permiten `[Void]`. Se permiten arreglos de arreglos
+* **`[Array]`** arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
 
-* **`def(id, id,...) :: Firma`** funciones, debe especificarse los tipos de entrada y salida.
+* **`def id (id, id,...) :: firma`** funciones, debe especificarse los tipos de entrada y salida.
 
-* **`union`** TODO
+* **`union`** ***TODO***
 
-* **`struct`** TODO
+* **`struct`** ***TODO***
 
 El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, ademas todos los tipos de datos empiezan por una letra mayuscula.
 
@@ -117,7 +118,7 @@ Instrucción que no hace nada, *noop*. No tiene sintaxis. Un ejemplo para ilustr
     ;;
 ~~~
 
-En el ejemplo hay dos operaciones *noop*.
+En el ejemplo hay dos operaciones *noop*, una al principio y la otra entre los dos caracteres punto y coma `;`.
 
 
 ###Asignación
@@ -150,7 +151,15 @@ Permite colocar una secuencia de instrucciones donde se requiera *una* instrucci
 Una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, pero puede gracias a la *instrucción vacía*.
 
 
-Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del estilo: `x = 2; { y = x;; } x = 3` sin tener que colocar `;` despues de cerrar el bloque.
+Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del estilo:
+
+~~~
+    x = 2; {
+        y = x
+    }
+    x = 3
+~~~
+sin tener que colocar `;` despues de cerrar el bloque.
 
 ###Declaración
 
@@ -181,39 +190,57 @@ Nótese que la definir una función no obliga la implementación inmediata, pero
     }
 ~~~
 
-Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`
+Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`. Este ejemplo es equivalente al anterior:
+
+~~~
+    -- definición
+    def iguales :: Int -> Int -> Bool
+
+        -- ...código...
+
+    -- implementación
+    def iguales(a, b) {
+        return a == b;
+    }
+~~~
 
 ###Entrada
 
 ~~~
-    read/scan <id>
+    read/scan <identificador>
 ~~~
 
-Instruccion encargada de la lectura de datos. id seria un identificador de una variable previamente declarada. Dicha variable solo puede ser de alguno de los tipos de datos primitivos del sistema (Char, Int, Float, Bool). 
+***PENSAR BIEN:*** elegir palabra y manera de lectura.
+
+Instruccion encargada de la lectura de datos. El `<identificador>` sería una variable previamente declarada. Dicha variable solo puede ser de alguno de los tipos de datos primitivos del sistema (`Char`, `Int`, `Float`, `Bool`).
 
 ###Salida
 
 ~~~
-    write/print <Expr>
+    write/print <expresión>
 ~~~
 
-Instruccion encargada de la escritura de datos hacia la salida estandar. Expr se evalua completamente antes de imprimir el valor de dicha expresion.
+***PENSAR BIEN:*** elegir palabra y manera de escritura.
+
+Instruccion encargada de la escritura de datos hacia la salida estandar. La `<expresión>` se evalua completamente antes de imprimir el valor por pantalla.
 
 ###Condicional
 
 ~~~
     if <expresión Bool>
-        <instrucción>
+        <instrucción1>
     else
-        <instrucción>
+        <instrucción2>
+
+    --
 
     if <expresión Bool>
         <instrucción>
 ~~~
 
-Condicional típico `if E I1 else I2`. La condición E debe ser una expresion de tipo `Bool` y
-en caso de ser cierta, se ejecuta la instrucción `I1` , sino
-se ejecuta la instrucción siguiente al `else` (en caso de haber).
+Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y
+en caso de ser cierta, se ejecuta la `<instrucción1>` , sino
+se ejecuta la `<instrucción2>`  al `else` (en caso de haber).
 
 ###Condicional por casos
 
@@ -237,7 +264,7 @@ Condicinal por casos, *case*.
         <instrucción>
 ~~~
 
-El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identificadores. El `<identificador>` puede ser modificado dentro del for. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteracion, al finalizar la iteracion deja de existir.
+El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identificadores o expresiones. El `<identificador>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración deja de existir.
 
 ###Iteración indeterminada
 
@@ -246,7 +273,7 @@ El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identifi
         <instrucción>
 ~~~
 
-Esta instruccion equivale a evaluar la expresion E la cual debe ser de tipo `Bool`, en caso de que evalue a true se ejecuta el cuerpo de la instruccion en caso contrario se 
+Esta instrucción equivale a evaluar la `<expresion>`, la cual debe ser de tipo `Bool`, en caso de que evalue a `true` se ejecuta el cuerpo de la instrucción en caso contrario se ejecuta la instrucción que esté justo después del `while`.
 
 ##Reglas de alcance de variables
 
@@ -305,9 +332,9 @@ La precedencia de los operadores relacionales son las siguientes:
 
 Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
-* def toInt :: Float -> Int
+* `def toInt :: Float -> Int`
 
-* def toFloat :: Int -> Float
+* `def toFloat :: Int -> Float`
 
 ##Comentarios y espacios en blanco
 
