@@ -30,6 +30,7 @@ tokens :-
 
     -- Language
     \;              { mkLex TkSemicolon }
+    \,              { mkLex TkComma }
 
     -- -- Brackets
     \(              { mkLex TkLParen }
@@ -52,7 +53,6 @@ tokens :-
     -- -- Declarations
     \=              { mkLex TkAssign }
     def             { mkLex TkDef }
-    \,              { mkLex TkComma }
     "::"            { mkLex TkSignature }
     "->"            { mkLex TkArrow }
     union           { mkLex TkUnion }
@@ -74,7 +74,7 @@ tokens :-
     -- -- Loops
     for             { mkLex TkFor }
     in              { mkLex TkIn }
-    ".."
+    ".."            { mkLex TkRange }
 
     while           { mkLex TkWhile }
 
@@ -131,7 +131,7 @@ data Token
     | TkUnion | TkStruct
     | TkRead | TkWrite
     | TkIf | TkElse | TkCase | TkOf | TkEnd | TkColon
-    | TkFor | TkIn | TkWhile | TkBreak | TkContinue
+    | TkFor | TkIn | TkRange | TkWhile | TkBreak | TkContinue
     | TkVarId | TkStructId
     | TkInt | TkTrue | TkFalse | TkFloat | TkString
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
@@ -160,8 +160,8 @@ scanner str = runAlex str $ do
         if tok == TkEOF
             then return [lex]
             else do
-                lexemes <- loop
-                return (lex:lexemes)
+                lexs <- loop
+                return (lex:lexs)
     loop
 
 -- TEMPORAL
@@ -175,6 +175,8 @@ showPosn (AlexPn _ line col) = show line ++ ':': show col
 -- luego escribir codigo de SUPERCOOL en la consola
 -- al finalizar, hacer <ctrl+D>
 main = do
-  str <- getContents
-  print (scanner str)
+    str <- getContents
+    case scanner str of
+        Right lexs -> mapM_ print lexs
+        Left error   -> print error
 }
