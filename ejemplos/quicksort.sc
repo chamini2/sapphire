@@ -1,8 +1,11 @@
-def quicksort (a) :: [Int] -> [Int] {
-    -- TODO
-    return a
-}
+def quicksort :: [Int] -> [Int]
 
 --    Main
 [Int] a = [10]x[20];
-print quicksort(a)
+write quicksort(a)
+
+
+def quicksort (a) {
+    -- TODO
+    return a
+}

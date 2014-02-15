@@ -11,12 +11,12 @@ a = {{1,2,3},{1,2,3},{1,2,3}};
 ----------------------------
 
 for x in [x..20]
-    print "hola"
+    write "hola"
 
 ----------------------------
 
 while (x%13 /= 0) {
-    print x;
+    write x;
     x = x+3
 }
 
@@ -32,4 +32,4 @@ Int sumar(Int a, Int b) { return a + b }
 ----------------------------
 
 Void nothing() {}
-Void nada() { print "hola";;;;;;; print "chao" }
+Void nada() { write "hola";;;;;;; write "chao" }

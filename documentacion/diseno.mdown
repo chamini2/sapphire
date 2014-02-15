@@ -1,5 +1,6 @@
 #Diseño
 
+
 ##Palabras reservadas
 
 * *Comentarios* `--`
@@ -11,7 +12,7 @@
     + `if`
     + `else`
     + `print`
-    + `read`
+    + `scan`
 * `;`
 * `+`
 * `-`
@@ -36,11 +37,14 @@
 * `break`
 * `continue`
 
+
 ##Decisiones
 
 ###Tipos
 
+* `Void`
 * `Int`
+* `Bool`
 * `Float`
 * `Char`
 * `String -- [Char]`
@@ -53,6 +57,7 @@
 #Lenguaje de programación SUPERCOOL
 
 SUPERCOOL es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje es imperativo, con funciones, recursividad, comentarios, y de más.
+
 
 ##Estructura de un programa
 
@@ -76,9 +81,11 @@ Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un program
     }
 ~~~
 
+
 ##Identificadores
 
-Un identificador en SUPERCOOL consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
+Un identificador en SUPERCOOL consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
+
 
 ##Tipos de datos
 
@@ -120,7 +127,6 @@ Instrucción que no hace nada, *noop*. No tiene sintaxis. Un ejemplo para ilustr
 
 En el ejemplo hay dos operaciones *noop*, una al principio y la otra entre los dos caracteres punto y coma `;`.
 
-
 ###Asignación
 
 ~~~
@@ -149,7 +155,6 @@ Permite colocar una secuencia de instrucciones donde se requiera *una* instrucci
 ~~~
 
 Una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, pero puede gracias a la *instrucción vacía*.
-
 
 Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del estilo:
 
@@ -248,10 +253,10 @@ Condicinal por casos, *case*.
 
 ~~~
     case <expresión> of
-      <expresión1> -> <instrucción1>
-      <expresión2> -> <instrucción2>
+      <expresión1> : <instrucción1>
+      <expresión2> : <instrucción2>
       ...
-      <expresiónN> -> <instrucciónN>
+      <expresiónN> : <instrucciónN>
     end
 ~~~
 
@@ -275,6 +280,23 @@ El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identifi
 
 Esta instrucción equivale a evaluar la `<expresion>`, la cual debe ser de tipo `Bool`, en caso de que evalue a `true` se ejecuta el cuerpo de la instrucción en caso contrario se ejecuta la instrucción que esté justo después del `while`.
 
+###Terminación de iteración
+
+~~~
+    break
+~~~
+
+Instrucción `break` típica.
+
+###Continuación de iteración
+
+~~~
+    continue
+~~~
+
+Instrucción `continue` típica.
+
+
 ##Reglas de alcance de variables
 
 Para utilizar una variable primero debe ser declarada o ser parte de la variable de iteración de una instrucción `for`.
@@ -282,6 +304,7 @@ Es posible anidar `bloques` e instrucciones `for` y también es posible declarar
 En este caso se dice que la variable interior esconde a la variable exterior y cualquier instrucción del `bloque` será incapaz de acceder a la variable exterior.
 
 Dada una instrucción o expresión en un punto particular del programa, para determinar si existe una variable y a qué `bloque` pertenece, el interpretador debe partir del `bloque` o `for` más cercano que contenga a la instrucción y revisar las variables que haya declarado, si no la encuentra debe proceder a revisar el siguiente `bloque` que lo contenga, y así sucesivamente hasta encontrar un acierto o llegar al tope.
+
 
 ##Expresiones
 
@@ -305,7 +328,6 @@ La precedencia de los operadores (ordenados comenzando por la menor precedencia)
 
 Para los operadores binarios +, -, *, / y % sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
 
-
 ###Expresiones con booleanos
 
 Una expresión booleana estará formada por constantes booleanas (`true` y `false`), variables, llamadas a funciones y operadores booleanos. Se considerarán los operadores `and`, `or` y `not`. También se utilizará notación infija para el `and` y el `or`, y notación prefija para el `not`. Las precedencias son las siguientes:
@@ -327,7 +349,6 @@ La precedencia de los operadores relacionales son las siguientes:
 
 * `==`, `/=`
 
-
 ###Conversiones de tipos
 
 Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
@@ -335,6 +356,11 @@ Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 * `def toInt :: Float -> Int`
 
 * `def toFloat :: Int -> Float`
+
+* `def toString :: _ -> String`
+
+* `def length :: [_] -> Int`
+
 
 ##Comentarios y espacios en blanco
 
