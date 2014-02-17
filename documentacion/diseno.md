@@ -212,22 +212,18 @@ Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`. Est
 ###Entrada
 
 ~~~
-    read/scan <identificador>
+    read [<identificadores>]
 ~~~
 
-***PENSAR BIEN:*** elegir palabra y manera de lectura.
-
-Instruccion encargada de la lectura de datos. El `<identificador>` sería una variable previamente declarada. Dicha variable solo puede ser de alguno de los tipos de datos primitivos del sistema (`Char`, `Int`, `Float`, `Bool`).
+Instruccion encargada de la lectura de datos. Los `[<identificadores>]` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`Char`, `Int`, `Float`, `Bool`).
 
 ###Salida
 
 ~~~
-    write/print <expresión>
+    write/print [<expresines>]
 ~~~
 
-***PENSAR BIEN:*** elegir palabra y manera de escritura.
-
-Instruccion encargada de la escritura de datos hacia la salida estandar. La `<expresión>` se evalua completamente antes de imprimir el valor por pantalla.
+Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<expresiones>` se evalúan completamente antes de imprimir los valores por pantalla.
 
 ###Condicional
 

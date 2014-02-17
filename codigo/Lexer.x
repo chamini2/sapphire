@@ -3,6 +3,9 @@
 -}
 
 module Lexer where
+
+import System.IO (readFile)
+import System.Environment (getArgs)
 }
 
 %wrapper "monad"
@@ -49,7 +52,7 @@ tokens :-
     Char            { mkLex TkCharType }
     String          { mkLex TkStringType }
 
-    -- Instructions
+    -- Statements
     -- -- Declarations
     \=              { mkLex TkAssign }
     def             { mkLex TkDef }
@@ -74,7 +77,7 @@ tokens :-
     -- -- Loops
     for             { mkLex TkFor }
     in              { mkLex TkIn }
-    ".."            { mkLex TkRange }
+    ".."            { mkLex TkFromTo }
 
     while           { mkLex TkWhile }
 
@@ -82,10 +85,6 @@ tokens :-
     continue        { mkLex TkContinue }
 
     -- Expressions/Operators
-    -- -- Identifiers
-    @varid          { mkLex TkVarId }
-    @structid       { mkLex TkStructId }
-
     -- -- Literals
     @int            { mkLex TkInt }
     true            { mkLex TkTrue }
@@ -119,6 +118,10 @@ tokens :-
     toFloat         { mkLex TkToFloat }
     toString        { mkLex TkToString }
 
+    -- -- Identifiers
+    @varid          { mkLex TkVarId }
+    @structid       { mkLex TkStructId }
+
 {
 data Lexeme = Lex AlexPosn Token String deriving Show
 
@@ -131,14 +134,14 @@ data Token
     | TkUnion | TkStruct
     | TkRead | TkWrite
     | TkIf | TkElse | TkCase | TkOf | TkEnd | TkColon
-    | TkFor | TkIn | TkRange | TkWhile | TkBreak | TkContinue
-    | TkVarId | TkStructId
+    | TkFor | TkIn | TkFromTo | TkWhile | TkBreak | TkContinue
     | TkInt | TkTrue | TkFalse | TkFloat | TkString
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
     | TkOr | TkAnd | TkNot
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
     | TkToInt | TkToFloat | TkToString
+    | TkVarId | TkStructId
     | TkEOF             -- TEMPORAL
     deriving (Eq, Show)
 
@@ -175,8 +178,11 @@ showPosn (AlexPn _ line col) = show line ++ ':': show col
 -- luego escribir codigo de SUPERCOOL en la consola
 -- al finalizar, hacer <ctrl+D>
 main = do
-    str <- getContents
+    args <- getArgs
+    str <- if null args
+        then getContents
+        else readFile (head args)
     case scanner str of
         Right lexs -> mapM_ print lexs
-        Left error   -> print error
+        Left error -> print error
 }
