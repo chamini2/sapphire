@@ -111,9 +111,9 @@ Se dispone de los siguientes tipos de datos:
 
 * **`def id :: firma`** funciones, debe especificarse los tipos de entrada y salida.
 
-* **`Union`** unions arbitrarimente anidados, equivalentes a los unions de C
+* **`Union`** unions arbitrarimente anidados, equivalentes a los unions de `C`
 
-* **`Struct`** structs arbitrarimente anidados, equivalentes a los structs de C
+* **`Struct`** structs arbitrarimente anidados, equivalentes a los structs de `C`
 
 * **`Range`** rangos de enteros.
 
