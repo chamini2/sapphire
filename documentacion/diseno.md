@@ -61,9 +61,9 @@
 
 SUPERCOOL es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje es imperativo, fuertemente tipado, con funciones, iteraciones indeterminadas y acotadas, recursividad, comentarios, con soporte para bloques anidados de instrucciones, unions y structs arbitrariamente anidados y más.
 
-Adicionalmente tiene un tipo de datos que representa un rango de enteros, selector n-ario (case) y arreglos multidimensionales 
+Adicionalmente tiene un tipo de datos que representa un rango de enteros, selector n-ario (case) y arreglos multidimensionales
 
--- A CONSIDERAR  Potencialmente funciones de segunda clase por medio de apuntadores
+***A CONSIDERAR:***  Potencialmente funciones de segunda clase por medio de apuntadores
 
 ##Estructura de un programa
 
@@ -78,12 +78,10 @@ Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un program
 ~~~
     def plus(a, b) :: Int -> Int -> Int {
         return a + b
-
     }
 
     for i in [1..10] do {
         print("numero: " ++ string(plus(1,i)) ++ "\n");
-
     }
 ~~~
 
@@ -111,13 +109,13 @@ Se dispone de los siguientes tipos de datos:
 
 * **`[Array]`** arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
 
-* **`def id (id, id,...) :: firma`** funciones, debe especificarse los tipos de entrada y salida.
+* **`def id :: firma`** funciones, debe especificarse los tipos de entrada y salida.
 
 * **`Union`** unions arbitrarimente anidados, equivalentes a los unions de C
 
 * **`Struct`** structs arbitrarimente anidados, equivalentes a los structs de C
 
-* **`Range`**
+* **`Range`** rangos de enteros.
 
 El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, ademas todos los tipos de datos empiezan por una letra mayuscula.
 
@@ -162,12 +160,13 @@ Permite colocar una secuencia de instrucciones donde se requiera *una* instrucci
     }
 ~~~
 
-Una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, pero puede gracias a la *instrucción vacía*.
+Podemos ver dos bloques anidados, son una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, pero puede gracias a la *instrucción vacía*.
 
 Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del estilo:
 
 ~~~
-    x = 2; {
+    x = 2;
+    {
         y = x
     }
     x = 3
@@ -223,7 +222,7 @@ Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`. Est
     read [<identificadores>]
 ~~~
 
-Instruccion encargada de la lectura de datos. Los `[<identificadores>]` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`Char`, `Int`, `Float`, `Bool`).
+Instruccion encargada de la lectura de datos. Los `[<identificadores>]` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range????`).
 
 ###Salida
 
@@ -247,9 +246,7 @@ Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<e
         <instrucción>
 ~~~
 
-Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y
-en caso de ser cierta, se ejecuta la `<instrucción1>` , sino
-se ejecuta la `<instrucción2>`  al `else` (en caso de haber).
+Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y en caso de ser cierta, se ejecuta la `<instrucción1>` , sino se ejecuta la `<instrucción2>`  al `else` (en caso de haber).
 
 ###Condicional por casos
 
@@ -318,7 +315,7 @@ Los operadores poseen reglas de precedencia que determinan el orden de evaluaci�
 
 ###Expresiones con enteros
 
-Una expresión aritmética estará formada por números naturales (secuencias de dígitos del 0 al 9), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma `+), la resta `-), la multiplicación `*), la división entera `/), módulo `%) y el inverso (- unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
+Una expresión aritmética estará formada por números naturales (secuencias de dígitos del `0` al `9`), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma (`+`), la resta (`-`), la multiplicación (`*`), la división entera (`/`), módulo (`%`) y el inverso (`-` unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
 
 
 La precedencia de los operadores (ordenados comenzando por la menor precedencia) son:
@@ -330,7 +327,7 @@ La precedencia de los operadores (ordenados comenzando por la menor precedencia)
 * `-` unario
 
 
-Para los operadores binarios +, -, *, / y % sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
+Para los operadores binarios `+`, `-`, `*`, `/` y `%` sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
 
 ###Expresiones con booleanos
 
