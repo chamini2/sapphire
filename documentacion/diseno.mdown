@@ -33,7 +33,7 @@
 * `not`
 * `::`
 * `union`
-* `struct` -- ***CUAL NOMBRE*** (creo que esto tambien lo pedian)
+* `struct`
 * `break`
 * `continue`
 
@@ -49,6 +49,9 @@
 * `Char`
 * `String -- [Char]`
 * `Array -- [Tipo] or Tipo[n] or [Tipo|n]`
+* `Range`
+* `Union`
+* `Struct`
 
 -------------------------------------------------------------------------------
 
@@ -56,8 +59,11 @@
 
 #Lenguaje de programación SUPERCOOL
 
-SUPERCOOL es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje es imperativo, con funciones, recursividad, comentarios, y de más.
+SUPERCOOL es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje es imperativo, fuertemente tipado, con funciones, iteraciones indeterminadas y acotadas, recursividad, comentarios, con soporte para bloques anidados de instrucciones, unions y structs arbitrariamente anidados y más.
 
+Adicionalmente tiene un tipo de datos que representa un rango de enteros, selector n-ario (case) y arreglos multidimensionales 
+
+-- A CONSIDERAR  Potencialmente funciones de segunda clase por medio de apuntadores
 
 ##Estructura de un programa
 
@@ -107,9 +113,11 @@ Se dispone de los siguientes tipos de datos:
 
 * **`def id (id, id,...) :: firma`** funciones, debe especificarse los tipos de entrada y salida.
 
-* **`union`** ***TODO***
+* **`Union`** unions arbitrarimente anidados, equivalentes a los unions de C
 
-* **`struct`** ***TODO***
+* **`Struct`** structs arbitrarimente anidados, equivalentes a los structs de C
+
+* **`Range`**
 
 El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, ademas todos los tipos de datos empiezan por una letra mayuscula.
 

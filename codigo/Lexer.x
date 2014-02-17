@@ -1,5 +1,5 @@
 {
-{- | Lexer for programming language SUPERCOOL.
+{-| Lexer for programming language SUPERCOOL.
 -}
 
 module Lexer where
@@ -47,6 +47,9 @@ tokens :-
     Float           { mkLex TkFloatType }
     Char            { mkLex TkCharType }
     String          { mkLex TkStringType }
+    Union           { mkLex TkUnion }
+    Struct          { mkLex TkStruct }
+    Range           { mkLex TkStruct }
 
     -- Instructions
     -- -- Declarations
@@ -55,8 +58,6 @@ tokens :-
     \,              { mkLex TkComma }
     "::"            { mkLex TkSignature }
     "->"            { mkLex TkArrow }
-    union           { mkLex TkUnion }
-    struct          { mkLex TkStruct }
 
     -- -- In/Out
     read            { mkLex TkRead }
@@ -125,10 +126,10 @@ data Lexeme = Lex AlexPosn Token String deriving Show
 data Token
     = TkSemicolon
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets | TkLBraces | TkRBraces
-    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType | TkStringType
+    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType 
+    | TkStringType | TkRangeType | TkUnion | TkStruct
     | TkAssign
     | TkDef | TkComma | TkSignature | TkArrow
-    | TkUnion | TkStruct
     | TkRead | TkWrite
     | TkIf | TkElse | TkCase | TkOf | TkEnd | TkColon
     | TkFor | TkIn | TkWhile | TkBreak | TkContinue
