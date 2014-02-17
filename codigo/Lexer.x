@@ -3,6 +3,9 @@
 -}
 
 module Lexer where
+
+import System.IO (readFile)
+import System.Environment (getArgs)
 }
 
 %wrapper "monad"
@@ -30,6 +33,7 @@ tokens :-
 
     -- Language
     \;              { mkLex TkSemicolon }
+    \,              { mkLex TkComma }
 
     -- -- Brackets
     \(              { mkLex TkLParen }
@@ -51,11 +55,10 @@ tokens :-
     Struct          { mkLex TkStruct }
     Range           { mkLex TkStruct }
 
-    -- Instructions
+    -- Statements
     -- -- Declarations
     \=              { mkLex TkAssign }
     def             { mkLex TkDef }
-    \,              { mkLex TkComma }
     "::"            { mkLex TkSignature }
     "->"            { mkLex TkArrow }
 
@@ -75,7 +78,7 @@ tokens :-
     -- -- Loops
     for             { mkLex TkFor }
     in              { mkLex TkIn }
-    ".."
+    ".."            { mkLex TkFromTo }
 
     while           { mkLex TkWhile }
 
@@ -83,10 +86,6 @@ tokens :-
     continue        { mkLex TkContinue }
 
     -- Expressions/Operators
-    -- -- Identifiers
-    @varid          { mkLex TkVarId }
-    @structid       { mkLex TkStructId }
-
     -- -- Literals
     @int            { mkLex TkInt }
     true            { mkLex TkTrue }
@@ -120,6 +119,10 @@ tokens :-
     toFloat         { mkLex TkToFloat }
     toString        { mkLex TkToString }
 
+    -- -- Identifiers
+    @varid          { mkLex TkVarId }
+    @structid       { mkLex TkStructId }
+
 {
 data Lexeme = Lex AlexPosn Token String deriving Show
 
@@ -132,14 +135,14 @@ data Token
     | TkDef | TkComma | TkSignature | TkArrow
     | TkRead | TkWrite
     | TkIf | TkElse | TkCase | TkOf | TkEnd | TkColon
-    | TkFor | TkIn | TkWhile | TkBreak | TkContinue
-    | TkVarId | TkStructId
+    | TkFor | TkIn | TkFromTo | TkWhile | TkBreak | TkContinue
     | TkInt | TkTrue | TkFalse | TkFloat | TkString
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
     | TkOr | TkAnd | TkNot
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
     | TkToInt | TkToFloat | TkToString
+    | TkVarId | TkStructId
     | TkEOF             -- TEMPORAL
     deriving (Eq, Show)
 
@@ -161,8 +164,8 @@ scanner str = runAlex str $ do
         if tok == TkEOF
             then return [lex]
             else do
-                lexemes <- loop
-                return (lex:lexemes)
+                lexs <- loop
+                return (lex:lexs)
     loop
 
 -- TEMPORAL
@@ -176,6 +179,11 @@ showPosn (AlexPn _ line col) = show line ++ ':': show col
 -- luego escribir codigo de SUPERCOOL en la consola
 -- al finalizar, hacer <ctrl+D>
 main = do
-  str <- getContents
-  print (scanner str)
+    args <- getArgs
+    str <- if null args
+        then getContents
+        else readFile (head args)
+    case scanner str of
+        Right lexs -> mapM_ print lexs
+        Left error -> print error
 }
