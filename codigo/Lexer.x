@@ -53,7 +53,7 @@ tokens :-
     String          { mkLex TkStringType }
     Union           { mkLex TkUnion }
     Struct          { mkLex TkStruct }
-    Range           { mkLex TkStruct }
+    Range           { mkLex TkRangeType }
 
     -- Statements
     -- -- Declarations
