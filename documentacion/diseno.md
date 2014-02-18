@@ -70,19 +70,55 @@ Adicionalmente tiene un tipo de datos que representa un rango de enteros, select
 Un programa en SUPERCOOL tiene la siguiente estructura:
 
 ~~~
-    [<instrucción>]
+    <instrucción>
+    <instrucción>
+    ...
+    <instrucción>
+    <instrucción>
+~~~
+
+---
+
+~~~
+    <función>
+    <función>
+    ...
+    main
+        <instrucción>
+        <instrucción>
+        ...
+        <instrucción>
+        <instrucción>
+    end
+    ...
+    <función>
+    <función>
 ~~~
 
 Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un programa básico en SUPERCOOL es:
 
 ~~~
-    def plus(a, b) :: Int -> Int -> Int {
+    def map(a, b) :: (Int, Int) -> Int {
         return a + b
     }
 
     for i in [1..10] do {
         print("numero: " ++ string(plus(1,i)) ++ "\n");
     }
+~~~
+
+---
+
+~~~
+    def map(a, b) :: (Int, Int) -> Int {
+        return a + b
+    }
+
+    main
+        for i in [1..10] do {
+            print("numero: " ++ string(plus(1,i)) ++ "\n");
+        }
+    end
 ~~~
 
 
@@ -197,7 +233,7 @@ Declara una función, especificando parametros de entrada y de salida.
 Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego, en caso de no hacerlo se lanzaria un error si intenta hacerse una llamada a dicha funcion. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida. Un ejemplo es:
 
 ~~~
-    def iguales(a, b) :: Int -> Int -> Bool {
+    def iguales(a, b) :: (Int, Int) -> Bool {
         return a == b
     }
 ~~~
@@ -206,7 +242,7 @@ Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`. Est
 
 ~~~
     -- definición
-    def iguales :: Int -> Int -> Bool
+    def iguales :: (Int, Int) -> Bool
 
         -- ...código...
 

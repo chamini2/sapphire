@@ -15,10 +15,12 @@ for i in [0..n-1] {
 write "value to find:";
 read n;
 
-def binarySearch(array, elem) :: [Int] -> Int -> Int { -- posicion
+binarySearch(array, n)
+
+def binarySearch(array, elem) :: ([Int], Int) -> Int { -- posicion
 
     Int first = 0;
-    Int last = n-1;
+    Int last = elem-1;
     Int middle = (first + last)/2;
 
     while (first <= last) {
