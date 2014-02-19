@@ -141,21 +141,37 @@ tokens :-
 data Lexeme = Lex AlexPosn Token String deriving Show
 
 data Token
-    = TkSemicolon
-    | TkLParen | TkRParen | TkLBrackets | TkRBrackets | TkLBraces | TkRBraces
-    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType
-    | TkStringType | TkRangeType | TkUnion | TkStruct
-    | TkAssign
-    | TkDef | TkComma | TkSignature | TkArrow
+    -- Language
+    = TkNewLine | TkMain | TkBegin | TkEnd | TkReturn | TkSemicolon | TkComma
+    -- -- Brackets
+    | TkLParen | TkRParen | TkLBrackets | TkRBrackets
+    -- Types
+    | TkVoidType | TkIntType | TkBoolTyp | TkFloatType | TkCharType | TkStringType | TkRangeType | TkUnion | TkStruct
+    -- Statements
+    -- -- Declarations
+    | TkAssign | TkDef | TkA | TkSignature | TkArrow
+    -- -- In/Out
     | TkRead | TkPrint
-    | TkIf | TkElse | TkCase | TkWhen | TkEnd | TkColon
-    | TkFor | TkIn | TkFromTo | TkWhile | TkBreak | TkContinue
+    -- -- Conditionals
+    | TkIf | TkThen | TkElse
+    | TkUnless
+    | TkCase | TkWhen
+    -- -- Loops
+    | TkFor | TkIn | TkFromTo | TkDo
+    | TkWhile | TkUnti
+    | TkBreak | TkContinue
+    -- Expressions/Operators
+    -- -- Literals
     | TkInt | TkTrue | TkFalse | TkFloat | TkString
+    -- -- Num
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
+    -- -- Bool
     | TkOr | TkAnd | TkNot
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
-    | TkToInt | TkToFloat | TkToString
+    -- -- Functions
+    | TkToInt | TkToFloat | TkToString | TkLength
+    -- -- Identifiers
     | TkVarId | TkStructId
     | TkEOF             -- TEMPORAL
     deriving (Eq, Show)
