@@ -10,6 +10,9 @@ import System.Environment (getArgs)
 
 %wrapper "monad"
 
+$white   = [ \t]
+$newline = [\n\r\f\v]
+
 $digit = 0-9
 
 $large = [A-Z \xc0-\xd6 \xd8-\xde]
@@ -32,6 +35,11 @@ tokens :-
     "--".*          ;
 
     -- Language
+    $newline        { mkLex TkNewLine }
+    main            { mkLex TkMain }
+    begin           { mkLex TkBegin }
+    end             { mkLex TkEnd }
+    return          { mkLex TkReturn }
     \;              { mkLex TkSemicolon }
     \,              { mkLex TkComma }
 
@@ -40,8 +48,8 @@ tokens :-
     \)              { mkLex TkRParen }
     \[              { mkLex TkLBrackets }
     \]              { mkLex TkRBrackets }
-    \{              { mkLex TkLBraces }
-    \}              { mkLex TkRBraces }
+    --\{              { mkLex TkLBraces }
+    --\}              { mkLex TkRBraces }
 
 
     -- Types
@@ -51,36 +59,41 @@ tokens :-
     Float           { mkLex TkFloatType }
     Char            { mkLex TkCharType }
     String          { mkLex TkStringType }
+    Range           { mkLex TkRangeType }
     Union           { mkLex TkUnion }
     Struct          { mkLex TkStruct }
-    Range           { mkLex TkRangeType }
 
     -- Statements
     -- -- Declarations
     \=              { mkLex TkAssign }
     def             { mkLex TkDef }
+    as              { mkLex TkAs}
     "::"            { mkLex TkSignature }
     "->"            { mkLex TkArrow }
 
     -- -- In/Out
     read            { mkLex TkRead }
-    write           { mkLex TkWrite }
+    print           { mkLex TkPrint }
 
     -- -- Conditionals
     if              { mkLex TkIf }
+    then            { mkLex TkThen }
     else            { mkLex TkElse }
 
+    unless          { mkLex TkUnless }
+
     case            { mkLex TkCase }
-    of              { mkLex TkOf }
-    end             { mkLex TkEnd }
-    ":"             { mkLex TkColon }
+    when            { mkLex TkWhen }
+    --":"             { mkLex TkColon }
 
     -- -- Loops
     for             { mkLex TkFor }
     in              { mkLex TkIn }
     ".."            { mkLex TkFromTo }
+    do              { mkLex TkDo }
 
     while           { mkLex TkWhile }
+    until           { mkLex TkUntil}
 
     break           { mkLex TkBreak }
     continue        { mkLex TkContinue }
@@ -118,6 +131,7 @@ tokens :-
     toInt           { mkLex TkToInt }
     toFloat         { mkLex TkToFloat }
     toString        { mkLex TkToString }
+    length          { mkLex TkLength }
 
     -- -- Identifiers
     @varid          { mkLex TkVarId }
@@ -129,12 +143,12 @@ data Lexeme = Lex AlexPosn Token String deriving Show
 data Token
     = TkSemicolon
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets | TkLBraces | TkRBraces
-    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType 
+    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType
     | TkStringType | TkRangeType | TkUnion | TkStruct
     | TkAssign
     | TkDef | TkComma | TkSignature | TkArrow
-    | TkRead | TkWrite
-    | TkIf | TkElse | TkCase | TkOf | TkEnd | TkColon
+    | TkRead | TkPrint
+    | TkIf | TkElse | TkCase | TkWhen | TkEnd | TkColon
     | TkFor | TkIn | TkFromTo | TkWhile | TkBreak | TkContinue
     | TkInt | TkTrue | TkFalse | TkFloat | TkString
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower

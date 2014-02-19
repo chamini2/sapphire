@@ -1,133 +1,98 @@
-#Diseño
+Lenguaje de programación SAPPHIRE
+=================================
 
+SAPPHIRE es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje está parcialmente inspirado en [Ruby](https://www.ruby-lang.org).
 
-##Palabras reservadas
+SAPPHIRE es imperativo, fuertemente tipado, con funciones, iteraciones indeterminadas y acotadas, recursividad, comentarios, con soporte para bloques anidados de instrucciones, unioness y estructuras arbitrariamente anidadas y más.
 
-* *Comentarios* `--`
-* *instrucciones*
-    + `for`
-    + `in`
-    + `while`
-    + `do`
-    + `if`
-    + `else`
-    + `print`
-    + `scan`
-* `;`
-* `+`
-* `-`
-* `*`
-* `/`
-* `^`
-* `<`
-* `>`
-* `<=`
-* `>=`
-* `==`
-* `/=`
-* `{ }`
-* `( )`
-* `[ ]`
-* `or`
-* `and`
-* `not`
-* `::`
-* `union`
-* `struct`
-* `break`
-* `continue`
-
-
-##Decisiones
-
-###Tipos
-
-* `Void`
-* `Int`
-* `Bool`
-* `Float`
-* `Char`
-* `String -- [Char]`
-* `Array -- [Tipo] or Tipo[n] or [Tipo|n]`
-* `Range`
-* `Union`
-* `Struct`
-
--------------------------------------------------------------------------------
-
-\pagebreak
-
-#Lenguaje de programación SUPERCOOL
-
-SUPERCOOL es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje es imperativo, fuertemente tipado, con funciones, iteraciones indeterminadas y acotadas, recursividad, comentarios, con soporte para bloques anidados de instrucciones, unions y structs arbitrariamente anidados y más.
-
-Adicionalmente tiene un tipo de datos que representa un rango de enteros, selector n-ario (case) y arreglos multidimensionales
+Adicionalmente tiene un tipo de datos que representa un rango de enteros, selector n-ario (case) y arreglos multidimensionales de segunda clase.
 
 ***A CONSIDERAR:***  Potencialmente funciones de segunda clase por medio de apuntadores
 
-##Estructura de un programa
 
-Un programa en SUPERCOOL tiene la siguiente estructura:
+Programa
+--------
 
-~~~
-    <instrucción>
-    <instrucción>
-    ...
-    <instrucción>
-    <instrucción>
-~~~
+Ejemplos:
 
----
+        write "hello world!\n"
 
-~~~
-    <función>
-    <función>
-    ...
-    main
-        <instrucción>
-        <instrucción>
-        ...
-        <instrucción>
-        <instrucción>
-    end
-    ...
-    <función>
-    <función>
-~~~
+***
 
-Es una lista de instrucciones a ejecutar una tras otra. Un ejemplo de un programa básico en SUPERCOOL es:
+        main
+            write "hello world!\n"
+        end
 
-~~~
-    def map(a, b) :: (Int, Int) -> Int {
-        return a + b
-    }
+Sintaxis:
 
-    for i in [1..10] do {
-        print("numero: " ++ string(plus(1,i)) ++ "\n");
-    }
-~~~
+        <stats..>
 
----
+***
 
-~~~
-    def map(a, b) :: (Int, Int) -> Int {
-        return a + b
-    }
+        [<funcs..>]
 
-    main
-        for i in [1..10] do {
-            print("numero: " ++ string(plus(1,i)) ++ "\n");
-        }
-    end
-~~~
+        main
+            <stats..>
+        end
+
+        [<funcs..>]
+
+Es una lista de instrucciones a ejecutar una tras otra. Cada instrucción está terminada por punto y comas (`;`) o saltos de línea, *newlines*.  **Qué pasa si ponemos *backslash* al final de una línea?**
+
+Estructura lexicográfica
+------------------------
+
+### Identificadores
+
+Ejemplos:
+
+        foo
+        fooBar_baz
+
+Un identificador en SAPPHIRE consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
 
 
-##Identificadores
+### Comentarios
 
-Un identificador en SUPERCOOL consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
+Ejemplos:
+
+        -- esto es un comentario
+
+En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Haskell. Al escribir `--` se ignorarán todos los caracteres que lo proceden en la línea.
 
 
-##Tipos de datos
+### Palabras reservadas y Símbolos
+
+Las palabras reservadas son las siguientes
+
+        main, begin, def, as, end, return
+        true, false, or, and, not
+        if, then, else, unless, case, when
+        for, in, while, do, until, break, continue
+        print, read
+        Void, Int, Bool, Float, Char, String, ¿¿¿¿¿Array??????, Range, Union, Struct
+        toInt, toFloat, toString, length
+
+        ::, ->
+        --
+        ;
+        ,
+        =
+        [, ]
+        ..
+        +, -, *, /, %, ^
+        (, )
+        ==
+        /= | !=
+        >, <, >=, <=
+
+
+
+***COMPLETAR Y ORDERNAR***
+Union??? Struct???
+
+
+### Tipos de datos
 
 Se dispone de los siguientes tipos de datos:
 
@@ -153,188 +118,297 @@ Se dispone de los siguientes tipos de datos:
 
 * **`Range`** rangos de enteros.
 
-El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, ademas todos los tipos de datos empiezan por una letra mayuscula.
+***
+
+* **`{Range}`** enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
+
+El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, además todos los tipos de datos empiezan por una letra mayuscula.
 
 
-##Instrucciones
+Instrucciones
+-------------
 
-###Instrucción vacia
+### Instrucción vacia
 
-Instrucción que no hace nada, *noop*. No tiene sintaxis. Un ejemplo para ilustrar su uso:
+Ejemplos:
 
+        ;;
 
-~~~
-    ;;
-~~~
+Instrucción que no hace nada, *noop*. En el ejemplo hay dos operaciones *noop*, una al principio y la otra entre los dos punto y coma (`;`).
 
-En el ejemplo hay dos operaciones *noop*, una al principio y la otra entre los dos caracteres punto y coma `;`.
+### Asignación
 
-###Asignación
+Ejemplos:
 
-~~~
-    <variable> = <expresión>
-~~~
+        foo = bar
+        foo[0] = bar
+
+Sintaxis:
+
+        <var> = <expr>
 
 Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado derecho y almacenarla en la variable del lado izquierdo. La variable tiene que haber sido declarada previamente y su tipo debe coincidir con el tipo de la expresión, en caso contrario debe arrojarse un error.
 
+### Asignación propia
+
+Ejemplos:
+
+        foo += 42
+
+Sintaxis:
+
+        <var> <op>= <expr>
+
+Esta instrucción es equivalente a `<var> = <var> <op> <expr>`. El `<op>` puede ser cualquiera de los siguientes: `+`, `-`, `*`, `/`, `%`, `^`, `and`, `or`.
+
 ###Bloque
 
-Permite colocar una secuencia de instrucciones donde se requiera *una* instrucción. Su sintaxis es:
+***CAPAZ NO SE NECESITA LITERALMENTE UNA INSTRUCCIÓN BLOQUE***
 
-~~~
-    {
-        <instrucción1>;
-        <instrucción2>;
-        ...
-        {
-            <instrucción3>;
-            <instrucción4>;
-        }
-        ...
-        <instrucciónN-1>;
-        <instrucciónN>
-    }
-~~~
+Ejemplos:
 
-Podemos ver dos bloques anidados, son una secuencia de instrucciones separadas por `;`. Nótese que se utiliza el caracter `;` como separador, no como finalizador, por lo que la última instrucción de un bloque **no debe** terminar con `;`, pero puede gracias a la *instrucción vacía*.
+        begin
+            x = 2
+            begin
+                y = 3; print x + y
+            end
+        end
 
-Colocar `}` trae implicitamente un `;` al final, para poder hacer cosas del estilo:
+Sintaxis:
 
-~~~
-    x = 2;
-    {
-        y = x
-    }
-    x = 3
-~~~
-sin tener que colocar `;` despues de cerrar el bloque.
+        begin
+            <stats..>
+        end
 
-###Declaración
+Permite colocar una secuencia de instrucciones donde se requiera *una* instrucción. Permite anidarlos arbitrariamente.
 
-Declara una variable para el *alcance* actual.
+### Declaración
 
-~~~
-    <Tipo> <identificador>
-~~~
+Ejemplos:
 
-Se escribe primero el `Tipo` de la variable a declarar y luego el identificador de esta.
+        Bool valid
+        Int num, index
 
-###Declaración de funciones
+
+Sintaxis:
+
+        <Tipo> <id> [, <ids..>]
+
+Declara variables para el *alcance* actual.
+
+Se escribe primero el `Tipo` de las variables a declarar y luego una lista de identificadores.
+
+### Declaración de funciones
+
+Ejemplos:
+
+        def iguales(a, b) :: (Int, Int) -> Bool as
+            return a == b
+        end
+
+> *es equivalente a:*
+
+        -- definición
+        def iguales :: (Int, Int) -> Bool
+
+            -- ...código...
+
+        -- implementación
+        def iguales(a, b) as
+            return a == b;
+        end
+
+Sintaxis:
+
+        def <id> :: <firma>
+
+        def <id>(<lista de entradas>) :: <firma> as
+            <stats..>
+        end
 
 Declara una función, especificando parametros de entrada y de salida.
 
-~~~
-    def <identificador> :: <firma>
-
-    def <identificador>(<lista de entradas>) :: <firma>
-        <instrucción>
-~~~
+Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`.
 
 Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego, en caso de no hacerlo se lanzaria un error si intenta hacerse una llamada a dicha funcion. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida. Un ejemplo es:
 
-~~~
-    def iguales(a, b) :: (Int, Int) -> Bool {
-        return a == b
-    }
-~~~
 
-Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`. Este ejemplo es equivalente al anterior:
+### Retorno de valores
 
-~~~
-    -- definición
-    def iguales :: (Int, Int) -> Bool
+Ejemplos:
 
-        -- ...código...
+        return 3
 
-    -- implementación
-    def iguales(a, b) {
-        return a == b;
-    }
-~~~
+Sintaxis:
 
-###Entrada
+        return <expr>
 
-~~~
-    read [<identificadores>]
-~~~
+Instrucción `return` típica.
 
-Instruccion encargada de la lectura de datos. Los `[<identificadores>]` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range????`).
 
-###Salida
+### Entrada
 
-~~~
-    write/print [<expresines>]
-~~~
+Ejemplos:
 
-Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<expresiones>` se evalúan completamente antes de imprimir los valores por pantalla.
+        read valid, num
 
-###Condicional
+Sintaxis:
 
-~~~
-    if <expresión Bool>
-        <instrucción1>
-    else
-        <instrucción2>
+        read <ids..>
 
-    --
+Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range????`).
 
-    if <expresión Bool>
-        <instrucción>
-~~~
+### Salida
 
-Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y en caso de ser cierta, se ejecuta la `<instrucción1>` , sino se ejecuta la `<instrucción2>`  al `else` (en caso de haber).
+Ejemplos:
 
-###Condicional por casos
+        print index, num
+
+Sintaxis:
+
+        write/print <exprs..>
+
+Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<exprs..>` se evalúan completamente antes de imprimir los valores por pantalla.
+
+### Condicional
+
+Ejemplos:
+
+        if x%2==0 then
+            print "even\n"
+        else if x%3 == 0 then
+            print "threeven"    -- esto no existe.
+        else
+            print "I dunno\n"
+        end
+
+Sintaxis:
+
+        if <expr Bool> then
+            <stats..>
+        [else
+            <stats..>]
+        end
+
+Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y en caso de ser cierta, se ejecuta la `<stat>` , sino se ejecuta la `<stat>` despues del `else` (en caso de haber).
+
+### Condicional invertido
+
+Ejemplos:
+
+        unless tired then
+            work()
+        end
+
+Sintaxis:
+
+        unless <expr Bool> then
+            <stats..>
+        end
+
+
+Es opuesto a un condicional `if`. Es equivalente a:
+
+        if not (<expr Bool>) then
+            <stats..>
+        end
+
+### Condicional por casos
+
+Ejemplos:
+
+        case age
+        when 0 .. 3 do
+            print "bebé"
+        when 4 .. 12 do
+            print "niño"
+        when 12 .. 17 do
+            -- notar que el 12 está en "niño" y "joven"
+            print "joven"
+        else
+            print "adulto"
+        end
+
+Sintaxis:
+
+        case <expr>
+        when <expr> do <stats..>
+        when <expr> do <stats..>
+        ...
+        [else <stats..>]
+        end
 
 Condicinal por casos, *case*.
 
-~~~
-    case <expresión> of
-      <expresión1> : <instrucción1>
-      <expresión2> : <instrucción2>
-      ...
-      <expresiónN> : <instrucciónN>
-    end
-~~~
+### Iteración determinada
 
-***PENSAR BIEN***: Palabra `end` es **necesaria**, trae discrepancia con el resto del lenguaje.
+Ejemplos:
 
-###Iteración determinada
+        for i in 1 .. 10 do
+            print i*2
+            print ","
+        end
 
-~~~
-    for <identificador> in <rango>
-        <instrucción>
-~~~
+Sintaxis:
 
-El campo para `<rango>` debe ser del estilo `[Int..Int]`, puede ser con identificadores o expresiones. El `<identificador>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración deja de existir.
+        for <id> in <rango> do
+            <stats..>
+        end
 
-###Iteración indeterminada
+El campo para `<rango>` debe ser del estilo `Int..Int`, puede ser con identificadores o expresiones. El `<id>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración éste deja de existir.
 
-~~~
-    while <expresión Bool>
-        <instrucción>
-~~~
+### Iteración indeterminada
 
-Esta instrucción equivale a evaluar la `<expresion>`, la cual debe ser de tipo `Bool`, en caso de que evalue a `true` se ejecuta el cuerpo de la instrucción en caso contrario se ejecuta la instrucción que esté justo después del `while`.
+Ejemplos:
 
-###Terminación de iteración
+        while money > 0 do
+            spend(money)
+            print money
+        end
 
-~~~
-    break
-~~~
+Sintaxis:
+
+        while <expr Bool> do
+            <stats..>
+        end
+
+Mientras la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`.
+
+### Iteración indeterminada invertida
+
+Ejemplos:
+
+        until entiende("recursión") do
+            estudia("recursión")
+        end
+
+Sintaxis:
+
+        until <expr Bool> do
+            <stats..>
+        end
+
+Hasta que la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`. Es equivalente a:
+
+        while not (<expr Bool>) do
+            <stats..>
+        end
+
+### Terminación de iteración
+
+        break
 
 Instrucción `break` típica.
 
-###Continuación de iteración
+### Continuación de iteración
 
-~~~
-    continue
-~~~
+        continue
 
 Instrucción `continue` típica.
 
 
-##Reglas de alcance de variables
+Reglas de alcance de variables
+------------------------------
 
 Para utilizar una variable primero debe ser declarada o ser parte de la variable de iteración de una instrucción `for`.
 Es posible anidar `bloques` e instrucciones `for` y también es posible declarar variables con el mismo nombre que otra variable en un `bloque` o `for` exterior.
@@ -343,13 +417,14 @@ En este caso se dice que la variable interior esconde a la variable exterior y c
 Dada una instrucción o expresión en un punto particular del programa, para determinar si existe una variable y a qué `bloque` pertenece, el interpretador debe partir del `bloque` o `for` más cercano que contenga a la instrucción y revisar las variables que haya declarado, si no la encuentra debe proceder a revisar el siguiente `bloque` que lo contenga, y así sucesivamente hasta encontrar un acierto o llegar al tope.
 
 
-##Expresiones
+Expresiones
+-----------
 
 Las expresiones consisten de variables, constantes numéricas y booleanas, y operadores. Al momento de evaluar una variable ésta debe buscarse utilizando las reglas de alcance descritas, y debe haber sido inicializada. Es un error utilizar una variable que no haya sido declarada ni inicializada.
 
 Los operadores poseen reglas de precedencia que determinan el orden de evaluación de una expresión dada. Es posible alterar el orden de evaluación utilizando paréntesis, de la misma manera que se hace en otros lenguajes de programación.
 
-###Expresiones con enteros
+### Expresiones con enteros
 
 Una expresión aritmética estará formada por números naturales (secuencias de dígitos del `0` al `9`), llamadas a funciones, variables y operadores ariméticos convencionales. Se considerarán la suma (`+`), la resta (`-`), la multiplicación (`*`), la división entera (`/`), módulo (`%`) y el inverso (`-` unario). Los operadores binarios usarán notación infija y el menos unario usará notación prefija.
 
@@ -360,12 +435,11 @@ La precedencia de los operadores (ordenados comenzando por la menor precedencia)
 
 * `*`, `/`, `%`
 
-* `-` unario
-
+* `-` unario, `^`
 
 Para los operadores binarios `+`, `-`, `*`, `/` y `%` sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
 
-###Expresiones con booleanos
+### Expresiones con booleanos
 
 Una expresión booleana estará formada por constantes booleanas (`true` y `false`), variables, llamadas a funciones y operadores booleanos. Se considerarán los operadores `and`, `or` y `not`. También se utilizará notación infija para el `and` y el `or`, y notación prefija para el `not`. Las precedencias son las siguientes:
 
@@ -386,7 +460,11 @@ La precedencia de los operadores relacionales son las siguientes:
 
 * `==`, `/=`
 
-###Conversiones de tipos
+### Expresiones con rangos
+
+***Primero llevar a cabo todo lo demas. Después nos preocupamos por rangos***
+
+### Conversiones de tipos
 
 Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
@@ -397,10 +475,3 @@ Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 * `def toString :: _ -> String`
 
 * `def length :: [_] -> Int`
-
-
-##Comentarios y espacios en blanco
-
-En SUPERCOOL se pueden escribir comentarios de una línea al estilo de Haskell. Al escribir `--` se ignorarán todos los caracteres que lo proceden en la línea.
-
-El espacio en blanco es ignorado de manera similar a otros lenguajes de programación, es decir, el programador es libre de colocar cualquier cantidad de espacio en blanco entre los elementos sintácticos del lenguaje.
