@@ -192,11 +192,23 @@ Ejemplos:
 
 Sintaxis:
 
-        <Tipo> <id> [, <ids..>]
+        <Type> <id> [, <ids..>]
 
 Declara variables para el *alcance* actual.
 
 Se escribe primero el `Tipo` de las variables a declarar y luego una lista de identificadores.
+
+### Declaración de arreglos
+
+Ejemplos:
+
+        [[Int]] array <- [10]*[10], veinte <- [20]*[2];
+
+Sintaxis:
+
+        [<Type>] <id> <- [<expr Int>] [, <ids..> <- [<expre Int>]]
+
+Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`). Notar que el `[, <ids..>]` es opcional.
 
 ### Declaración de funciones
 
@@ -468,10 +480,12 @@ La precedencia de los operadores relacionales son las siguientes:
 
 Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
-* `def toInt :: Float -> Int`
+* `def to_Int :: Float -> Int`
 
-* `def toFloat :: Int -> Float`
+* `def to_Float :: Int -> Float`
 
-* `def toString :: _ -> String`
+* `def to_String :: b -> String`
 
-* `def length :: [_] -> Int`
+* `def length :: [a] -> Int`
+
+* `def map :: ((a -> b), [a]) -> [b]`
