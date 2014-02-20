@@ -60,8 +60,9 @@ tokens :-
     Char            { mkLex TkCharType }
     String          { mkLex TkStringType }
     Range           { mkLex TkRangeType }
-    Union           { mkLex TkUnion }
-    Struct          { mkLex TkStruct }
+    Union           { mkLex TkUnionType }
+    Record          { mkLex TkRecordType }
+    Type            { mkLex TkTypeType }
 
     -- Statements
     -- -- Declarations
@@ -127,15 +128,9 @@ tokens :-
     "<="            { mkLex TkLessEq }
     ">="            { mkLex TkGreatEq }
 
-    -- -- Functions
-    toInt           { mkLex TkToInt }
-    toFloat         { mkLex TkToFloat }
-    toString        { mkLex TkToString }
-    length          { mkLex TkLength }
-
     -- -- Identifiers
     @varid          { mkLex TkVarId }
-    @structid       { mkLex TkStructId }
+    @recordid       { mkLex TkRecordId }
 
 {
 data Lexeme = Lex AlexPosn Token String deriving Show
@@ -146,7 +141,7 @@ data Token
     -- -- Brackets
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets
     -- Types
-    | TkVoidType | TkIntType | TkBoolTyp | TkFloatType | TkCharType | TkStringType | TkRangeType | TkUnion | TkStruct
+    | TkVoidType | TkIntType | TkBoolTyp | TkFloatType | TkCharType | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
     -- Statements
     -- -- Declarations
     | TkAssign | TkDef | TkA | TkSignature | TkArrow
@@ -169,10 +164,8 @@ data Token
     | TkOr | TkAnd | TkNot
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
-    -- -- Functions
-    | TkToInt | TkToFloat | TkToString | TkLength
     -- -- Identifiers
-    | TkVarId | TkStructId
+    | TkVarId | TkRecordId
     | TkEOF             -- TEMPORAL
     deriving (Eq, Show)
 
