@@ -2,16 +2,18 @@
 {-| Lexer for programming language SUPERCOOL.
 -}
 
-module Lexer where
+module Main where
 
 import System.IO (readFile)
 import System.Environment (getArgs)
+import Data.Maybe (fromJust, isJust)
+import Control.Monad (when)
 }
 
 %wrapper "monad"
 
-$white   = [ \t]
-$newline = [\n\r\f\v]
+$newline = [\n\r]
+$spaces  = $white # $newline
 
 $digit = 0-9
 
@@ -22,20 +24,20 @@ $alpha = [$small $large]
 $idchar = [$alpha $digit]
 
 @varid    = $small $idchar*
-@structid = $large $idchar*
+@recordid = $large $idchar*
 
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
-@string = \"($printable # \")*\"
+@string = \"($printable # [\"\\]|\\\")*\"
 
 tokens :-
 
     -- Whitespace/Comments
-    $white+         ;
+    $spaces+        ;
     "--".*          ;
 
     -- Language
-    $newline        { mkLex TkNewLine }
+    $newline+       { mkLex TkNewLine }
     main            { mkLex TkMain }
     begin           { mkLex TkBegin }
     end             { mkLex TkEnd }
@@ -133,7 +135,12 @@ tokens :-
     @recordid       { mkLex TkRecordId }
 
 {
-data Lexeme = Lex AlexPosn Token String deriving Show
+data Lexeme = Lex AlexPosn Token String
+
+instance Show Lexeme where
+    show (Lex p TkNewLine s) =
+        showPosn p ++ " -> " ++ show TkNewLine ++ " : `" ++ concat (replicate (length s) "\\n") ++ "`"
+    show (Lex p t s) = showPosn p ++ " -> " ++ show t ++ ": `" ++ s ++ "`"
 
 data Token
     -- Language
@@ -141,10 +148,11 @@ data Token
     -- -- Brackets
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets
     -- Types
-    | TkVoidType | TkIntType | TkBoolTyp | TkFloatType | TkCharType | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
+    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType
+    | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
     -- Statements
     -- -- Declarations
-    | TkAssign | TkDef | TkA | TkSignature | TkArrow
+    | TkAssign | TkDef | TkAs | TkSignature | TkArrow
     -- -- In/Out
     | TkRead | TkPrint
     -- -- Conditionals
@@ -153,7 +161,7 @@ data Token
     | TkCase | TkWhen
     -- -- Loops
     | TkFor | TkIn | TkFromTo | TkDo
-    | TkWhile | TkUnti
+    | TkWhile | TkUntil
     | TkBreak | TkContinue
     -- Expressions/Operators
     -- -- Literals
@@ -172,35 +180,86 @@ data Token
 mkLex :: Token -> AlexInput -> Int -> Alex Lexeme
 mkLex tok (pos,_,_,input) len = return $ Lex pos tok (take len input)
 
--- FUNCION TEMPORAL
-lexError str = do
-    (pos, _, _, input) <- alexGetInput
-    alexError $ showPosn pos ++ ": " ++ str ++
-        (if (not (null input))
-            then " before " ++ show (head input)
-            else " at end of file")
+ --FUNCION TEMPORAL
+--lexError :: a -> Alex a
+--lexError str = do
+--    (pos, _, _, input) <- alexGetInput
+--    alexError $ showPosn pos ++ ": " ++ str ++
+--        if (not (null input))
+--            then " before " ++ show (head input)
+            --else " at end of file"
 
--- FUNCION TEMPORAL
-scanner str = runAlex str $ do
-    let loop = do
-        lex@(Lex _ tok _) <- alexMonadScan
-        if tok == TkEOF
-            then return [lex]
-            else do
-                lexs <- loop
-                return (lex:lexs)
-    loop
+---- FUNCION TEMPORAL
+--scanner :: String -> String -> Either String [Lexeme]
+--scanner str err =
+--    let loop err = do
+--        (t, m) <- alexComplementError alexMonadScan
+--        case m of
+--            Just newErr -> do
+--                skip str 1
+--                loop $ newErr ++ err
+--            otherwise   -> do
+--                let tok@(Lex _ cl _) = t
+--                if (cl == TkEOF)
+--                    then
+--                        if null err
+--                            then return [tok]
+--                            else fail err
+--                    else do
+--                        toks <- loop err
+--                        return (tok : toks)
+--    in  runAlex str $ loop err
 
--- TEMPORAL
+---- we capture the error message in order to complement it with the file position
+--alexComplementError :: Alex a -> Alex (a, Maybe String)
+--alexComplementError (Alex al) =
+--    Alex (\s -> case al s of
+--        Right (s', x) -> Right (s', (x, Nothing))
+--        Left  message -> Right (s, (undefined, Just message)))
+
+
+
+---- FUNCION TEMPORAL
+--scanner :: String -> Either String [Lexeme]
+--scanner str = let loop = do (t, m) <- alexComplementError alexMonadScan
+--                            when (isJust m) (lexError (fromJust m))
+--                            let tok@(Lex _ cl _) = t
+--                            if (cl == TkEOF)
+--                               then return [tok]
+--                               else do toks <- loop
+--                                       return (tok : toks)
+--              in  runAlex str loop
+
+---- we capture the error message in order to complement it with the file position
+--alexComplementError :: Alex a -> Alex (a, Maybe String)
+--alexComplementError (Alex al) = Alex (\s -> case al s of
+--                                                 Right (s', x) -> Right (s', (x, Nothing))
+--                                                 Left  message -> Right (s, (undefined, Just message)))
+
+---- TEMPORAL
+alexEOF :: Alex Lexeme
 alexEOF = do
     (pos, _, _, _) <- alexGetInput
     return $ Lex pos TkEOF ""
 
-showPosn (AlexPn _ line col) = show line ++ ':': show col
+-- FUNCION TEMPORAL
+scanner :: String -> Either String [Lexeme]
+scanner str = runAlex str loop
+    where loop = do
+            lex@(Lex _ tok _) <- alexMonadScan
+            if tok == TkEOF
+                then return [lex]
+                else do
+                    lexs <- loop
+                    return (lex:lexs)
 
--- runhaskell Lexer.hs
--- luego escribir codigo de SUPERCOOL en la consola
--- al finalizar, hacer <ctrl+D>
+--alexEOF = return TkEOF
+
+showPosn :: AlexPosn -> String
+showPosn (AlexPn _ line col) = show line ++ ':' : show col
+
+-- runhaskell Lexer.hs <file>
+main :: IO ()
 main = do
     args <- getArgs
     str <- if null args

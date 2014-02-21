@@ -1,0 +1,45 @@
+Grammar for SAPPHIRE Programming Language
+
+starting symbol: PROGRAM
+
+$newline = [\n\r]
+
+$digit = 0-9
+
+$large = [A-Z \xc0-\xd6 \xd8-\xde]
+$small = [a-z \xdf-\xf6 \xf8-\xff \_]
+$alpha = [$small $large]
+
+$idchar = [$alpha $digit]
+
+@varid    = $small $idchar*
+@recordid = $large $idchar*
+
+@int    = $digit+
+@float  = $digit+(\.$digit+)?
+
+PROGRAM : STATEMENT_LIST
+
+STATEMENT_LIST : STATEMENT
+               | STATEMENT SEPARATOR STATEMENT_LIST
+
+STATEMENT : -- lambda
+          | "@varid" "=" EXPRESSION_ARITHMETIC
+          | "@varid" "=" EXPRESSION_BOOL
+          | DATA_TYPE VARIABLE_LIST
+          |
+
+DATA_TYPE : "Int"
+          | "Float"
+          | "Bool"
+          | "Char"
+          | "String"
+          | "Range"
+          | "Type"
+
+SEPARATOR : ";"
+          | "$newline"
+
+EXPRESSION_ARITHMETIC :
+
+EXPRESSION_BOOL

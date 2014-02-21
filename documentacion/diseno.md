@@ -182,7 +182,7 @@ Sintaxis:
 
 Permite colocar una secuencia de instrucciones donde se requiera *una* instrucción. Permite anidarlos arbitrariamente.
 
-### Declaración
+### Declaración de variables
 
 Ejemplos:
 
@@ -192,7 +192,7 @@ Ejemplos:
 
 Sintaxis:
 
-        <Type> <id> [, <ids..>]
+        <Type> <id> [, <id>..]
 
 Declara variables para el *alcance* actual.
 
@@ -206,9 +206,33 @@ Ejemplos:
 
 Sintaxis:
 
-        [<Type>] <id> <- [<expr Int>] [, <ids..> <- [<expre Int>]]
+        [<Type>] <id> <- [<expr Int>] [, <id> <- [<expre Int>]..]
 
 Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`). Notar que el `[, <ids..>]` es opcional.
+
+### Declaración de estructuras
+
+Ejemplos:
+
+        Record Coordenada = { x :: Int, y :: String }
+
+Sintaxis:
+
+        Record <Id> = { <id> :: <Type> [, <id> <Type>..] }
+
+Estructuras como `struct` de `C`.
+
+### Declaración de uniones
+
+Ejemplos:
+
+        Union MaybeInt = { just :: Int, nothing :: Void }
+
+Sintaxis:
+
+        Union <id> = { <id> :: <Type> [, <id> <Type>..] }
+
+Uniones como `union` de `C`.
 
 ### Declaración de funciones
 
@@ -345,8 +369,7 @@ Sintaxis:
 
         case <expr>
         when <expr> do <stats..>
-        when <expr> do <stats..>
-        ...
+        [when <expr> do <stats..>..]
         [else <stats..>]
         end
 
