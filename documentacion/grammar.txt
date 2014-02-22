@@ -1,6 +1,6 @@
 Grammar for SAPPHIRE Programming Language
 
-starting symbol: PROGRAM
+starting symbol: Program
 
 $newline = [\n\r]
 
@@ -13,33 +13,72 @@ $alpha = [$small $large]
 $idchar = [$alpha $digit]
 
 @varid    = $small $idchar*
-@recordid = $large $idchar*
+@typeid = $large $idchar*
 
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
+@string = \"($printable # [\"\\]|\\$printable)*\"
 
-PROGRAM : STATEMENT_LIST
 
-STATEMENT_LIST : STATEMENT
-               | STATEMENT SEPARATOR STATEMENT_LIST
+HAY QUE HACERLA CON RECURSION IZQUIERDA PARA HAPPY
 
-STATEMENT : -- lambda
-          | "@varid" "=" EXPRESSION_ARITHMETIC
-          | "@varid" "=" EXPRESSION_BOOL
-          | DATA_TYPE VARIABLE_LIST
+Program : Statement_list
+
+Statement_list : Statement
+               | Statement Separator Statement_list
+
+Statement : -- lambda
+          | "@varid" "=" Expression
+          | Data_type Variable_list
           |
 
-DATA_TYPE : "Int"
+Separator : ";"
+          | "$newline"
+
+-------------------------------------------------------------------------------
+
+Data_type : "Int"
           | "Float"
           | "Bool"
           | "Char"
           | "String"
           | "Range"
           | "Type"
+          | "Union" "@typeid"
+          | "Record" "@typeid"
+          | Data_type_Array
 
-SEPARATOR : ";"
-          | "$newline"
+Data_type_Array : "[" Data_type "]" "<-" "[" "@int" "]"
 
-EXPRESSION_ARITHMETIC :
+Variable_list : "@varid"
+              | Variable_list "," "@varid"
+-------------------------------------------------------------------------------
 
-EXPRESSION_BOOL
+Expression : Expression_arit
+           | Expression_bool
+           | Expression_rang
+           | Expression_strn
+           | Expression_arry
+
+Expression_arit : "@int"
+                      | "@float"
+                      | Expression_arit "+" Expression_arit
+                      | Expression_arit "-" Expression_arit
+                      | Expression_arit "*" Expression_arit
+                      | Expression_arit "/" Expression_arit
+                      | Expression_arit "%" Expression_arit
+                      | Expression_arit "^" Expression_arit
+                      | "-" Expression_arit
+
+Expression_bool : "true"
+                | "false"
+                | Expression_bool "or"  Expression_bool
+                | Expression_bool "and" Expression_bool
+                | Expression      "=="  Expression
+                | Expression      "/="  Expression
+                | Expression_arit "<"   Expression_arit
+                | Expression_arit "<="  Expression_arit
+                | Expression_arit ">"   Expression_arit
+                | Expression_arit ">="  Expression_arit
+                | Expression_arit ">>"  Expression_rang
+                | "not" Expression_bool

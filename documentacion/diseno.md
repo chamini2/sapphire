@@ -70,7 +70,7 @@ Las palabras reservadas son las siguientes
         if, then, else, unless, case, when
         for, in, while, do, until, break, continue
         print, read
-        Void, Int, Bool, Float, Char, String, ¿¿¿¿¿Array??????, Range, Union, Struct
+        Void, Int, Bool, Float, Char, String, ¿¿¿¿¿Array??????, Range, Union, Record
         toInt, toFloat, toString, length
 
         ::, ->
@@ -89,7 +89,7 @@ Las palabras reservadas son las siguientes
 
 
 ***COMPLETAR Y ORDERNAR***
-Union??? Struct???
+Union??? Record???
 
 
 ### Tipos de datos
@@ -114,7 +114,7 @@ Se dispone de los siguientes tipos de datos:
 
 * **`Union`** unions arbitrarimente anidados, equivalentes a los unions de `C`.
 
-* **`Struct`** structs arbitrarimente anidados, equivalentes a los structs de `C`.
+* **`Record`** records arbitrarimente anidados, equivalentes a los `struct` de `C`.
 
 * **`Range`** rangos de enteros.
 
@@ -340,6 +340,8 @@ Sintaxis:
 
         unless <expr Bool> then
             <stats..>
+        [else
+            <stats..>]
         end
 
 
