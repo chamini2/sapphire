@@ -6,6 +6,7 @@ module SymTable (
     -- * Types exportados
     SymTable,
     SymInfo  (..),
+    Stack,
     Scope,
     Value (..),
     -- * Funciones exportadas
@@ -21,29 +22,42 @@ import Data.Sequence as DS
 import qualified Data.Map as DM
 
 {-import Parser (Id, Type)-}
-type Type = ()
 type Id = String
+
+type Category = Variable
+              | Constant
+              | Function
+              | Parameter
+              | FieldName
+              deriving (Show, Eq)
 
 data SymTable = SymTable (DM.Map Id (Seq SymInfo))
     deriving (Show)
 
 data SymInfo = SymInfo {
-    s_type  :: Type,
+    s_type  :: DataType,
+    {-s_cat   :: Category,-}
     s_value :: Value,
-    scope   :: Scope,
+    scope   :: Stack,
     line    :: Int,
     column  :: Int
 } deriving (Show)
 
-newtype Scope a = Scope [a]
+data Scope = Scope {
+    serial :: Int,
+    active :: Bool
+    {-extra  :: undefined-}
+} deriving (Show)
+
+newtype Stack a = Stack [a]
     deriving (Show)
 
-push :: a -> Scope a -> Scope a
-push elem (Scope s) = Scope $ elem : s
+push :: a -> Stack a -> Stack a
+push elem (Stack s) = Stack $ elem : s
 
-pop :: Scope a -> (a, Scope a)
-pop (Scope [])      = error "empty stack"
-pop (Scope (x : s)) = (x, Scope s)
+pop :: Stack a -> (a, Stack a)
+pop (Stack [])      = error "empty stack"
+pop (Stack (x : s)) = (x, Stack s)
 
 data Value = Int Int 
            | Bool Bool
@@ -92,11 +106,3 @@ update id vn (SymTable m) = SymTable $ DM.alter f id m
     where f (Just is) =
             case viewl is of 
                 i :< iss -> Just $ i { s_value = vn } <| iss
-
-{-|
-    Eliminar la variable v del scope mas interno
--}
-{-eliminarVariable :: Id -> SymTable -> SymTable-}
-{-eliminarVariable id (SymTable m) = SymTable $ DM.alter f id m-}
-    {-where f Nothing  = Just DS.empty-}
-          {-f (Just s) = Just $ DS.drop 1 s-}

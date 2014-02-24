@@ -220,7 +220,7 @@ Sintaxis:
 
         Record <Id> = { <id> :: <Type> [, <id> <Type>..] }
 
-Estructuras como `struct` de `C`.
+Estructuras como `struct` del lenguaje `C`.
 
 ### Declaración de uniones
 
@@ -232,7 +232,7 @@ Sintaxis:
 
         Union <id> = { <id> :: <Type> [, <id> <Type>..] }
 
-Uniones como `union` de `C`.
+Uniones como `union` del lenguaje `C`.
 
 ### Declaración de funciones
 

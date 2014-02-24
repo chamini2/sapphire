@@ -114,12 +114,11 @@ import Lexer
 -- Precedence
 
 -- Bool
-%left "or"
-%left "and"
+%left  "or" "and"
 %right "not"
 
 -- -- Compare
-%nonassoc ">>"
+%nonassoc ">>"        -- Que es esto?
 %nonassoc "==" "/="
 %nonassoc "<" "<=" ">" ">="
 
@@ -147,7 +146,7 @@ Statement :: { Statement }
     | varid "=" Expression      { Assign $1 $3 }
 --    | DataType VariableList
 --    | FunctionDef
---    | "retrun" Expression
+--    | "return" Expression
 --    | "read" VariableList
 --    | "print" ExpressionList
 --    | "if" ExpressionBool "then" StatementList
@@ -187,12 +186,50 @@ Separator
 --    | Signature "->" DataType
 
 ---------------------------------------
+CompOp :: { CompOp }                          
+        : '=='                               { Eq  }
+        | '/='                               { Neq }
+        | '<='                               { Leq }
+        | '<'                                { Lt  }
+        | '>='                               { Geq }
+        | '>'                                { Gt  }
+
+OpAdd :: { BinOp }
+       : '+'                                { Add }
+       | '-'                                { Sub }
+       | 'or'                               { Or  }
+       | 'and'                              { And }
+       | '*'                                { Mul }
+       | '^'                                { Pow }
+       | '/'                                { Div }
+       | '%'                                { Mod }
+                                                
+UnOp :: { UnOp }                          
+        : '-'                              { AritNeg }
+        | 'not'                            { BoolNeg }
+
+B :: { Analyzer Expression }
+  : B CompOp E                                       { EComp $2 $1 $3 }
+  | E                                                { $1 }
+
+E :: { Analyzer Expression }
+  : E BinOp F                                        { EBin $2 $1 $3 }
+  | F                                                { $1 }
+
+F :: { Exp }
+  : ident                                            { EVar $1 Null } 
+  | num                                              { EConst $1 Null }
+  | UnOp F                                           { EUnOp $1 $2 Null }
+  | 'true'                                           { ETrue }
+  | 'false'                                          { EFalse }
+  | '(' B ')'                                        { EBrack $2 }     
+------------------------------ VIEJO ------------------------------------------
 
 Expression
     : ExpressionArit    { ExpressionArit $1 }
     | ExpressionBool    { ExpressionBool $1 }
---    | ExpressionRang
     | ExpressionStrn    { ExpressionStrn $1}
+--    | ExpressionRang
 --    | ExpressionArry
 
 --ExpressionList
