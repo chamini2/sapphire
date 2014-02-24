@@ -38,6 +38,7 @@ Sintaxis:
         [<funcs..>]
 
 Es una lista de instrucciones a ejecutar una tras otra. Cada instrucción está terminada por punto y comas (`;`) o saltos de línea, *newlines*.  **Qué pasa si ponemos *backslash* al final de una línea?**
+Es una lista de instrucciones a ejecutar una tras otra. Cada instrucción está terminada por punto y comas (`;`) o saltos de línea, *newlines*, que pueden ser *escapados* con un *backslash* (`\`).
 
 Estructura lexicográfica
 ------------------------
