@@ -1,6 +1,6 @@
 {
 {-# OPTIONS -w #-}
-module Parser( parseProgram ) where
+module Parser( parseProgram, treePrint ) where
 
 import Language
 import Lexer
@@ -13,10 +13,10 @@ import Lexer
 -- Without this we get a type error
 %error { happyError }
 
---%attributetype { Attribute a }
---%attribute value { a }
---%attribute num   { Int }
---%attribute label { String }
+%attributetype { Attribute a }
+%attribute value        { a }
+%attribute data_type    { Int }
+%attribute len          { Int }
 
 %token
 
@@ -143,40 +143,64 @@ StatementList :: { [Statement] }
     | StatementList Separator Statement     { $3 : $1 }
 
 Statement :: { Statement }
-    :                           { NoOp } -- λ
-    | varid "=" Expression      { Assign $1 $3 }
---    | DataType VariableList
---    | FunctionDef
---    | "retrun" Expression
---    | "read" VariableList
---    | "print" ExpressionList
---    | "if" ExpressionBool "then" StatementList
---    | "if" ExpressionBool "then" StatementList "else" StatementList
+    :                           { StNoop }      -- λ, no-operation
+    | varid "=" Expression      { StAssign $1 $3 }
+
+    -- Definitions
+    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1) $2 }
+    --| FunctionDef               {  }
+    | "return" Expression       { StReturn $2 }
+
+    -- I/O
+    | "read" VariableList       { StRead  (reverse $2) }
+    | "print" ExpressionList    { StPrint (reverse $2) }
+
+    -- Conditional
+    | "if" ExpressionBool "then" StatementList "end"                          { StIf $2           (reverse $4) []           }
+    | "if" ExpressionBool "then" StatementList "else" StatementList "end"     { StIf $2           (reverse $4) (reverse $6) }
+    | "unless" ExpressionBool "then" StatementList "end"                      { StIf (NotBool $2) (reverse $4) []           }
+    | "unless" ExpressionBool "then" StatementList "else" StatementList "end" { StIf (NotBool $2) (reverse $4) (reverse $6) }
+    | "case" ExpressionArit CaseList "end"                                    { StCase $2 (reverse $3) []                   }
+    | "case" ExpressionArit CaseList "else" StatementList "end"               { StCase $2 (reverse $3) (reverse $5)         }
+
+    -- Loops
+    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           (reverse $4) }
+    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) (reverse $4) }
+    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 (reverse $6)          }
+    | "break"           { StBreak }
+    | "continue"        { StContinue }
 
 Separator
     : ";"           {}
     | newline       {}
 
+CaseList :: { [Case] }
+    : Case              { [$1] }
+    | CaseList Case     { $2 : $1 }
+
+Case :: { Case }
+    : "when" Expression "do" StatementList      { Case $2 (reverse $4) }
+
 ---------------------------------------
 
---DataType :: { DataType }
---    : "Int"
---    | "Float"
---    | "Bool"
---    | "Char"
---    | "String"
---    | "Range"
---    | "Type"
---    | "Union" typeid
---    | "Record" typeid
+DataType :: { DataType }
+    : "Int"         { Int }
+    | "Float"       { Float }
+    | "Bool"        { Bool }
+    | "Char"        { Char }
+    | "String"      { String }
+    | "Range"       { Range }
+    | "Type"        { Type }
+    --| "Union" typeid
+    --| "Record" typeid
 --            ------------------------------ FALTA ARREGLOS
 
 ----DataTypeArray
 ----    : "[" DataType "]" "<-" "[" int "]"
 
---VariableList :: { [VarName] }
---    : varid
---    | VariableList "," varid
+VariableList :: { [Variable] }
+    : varid                         { [$1]    }
+    | VariableList "," varid        { $3 : $1 }
 
 --FunctionDef :: { Function }
 --    : "def" varid "::" Signature
@@ -188,47 +212,56 @@ Separator
 
 ---------------------------------------
 
-Expression
-    : ExpressionArit    { ExpressionArit $1 }
+Expression :: { Expression }
+    : varid             { ExpressionId $1   }
+    | ExpressionArit    { ExpressionArit $1 }
     | ExpressionBool    { ExpressionBool $1 }
---    | ExpressionRang
-    | ExpressionStrn    { ExpressionStrn $1}
---    | ExpressionArry
+    | ExpressionRang    { ExpressionRang $1 }
+    | ExpressionStrn    { ExpressionStrn $1 }
+    --| ExpressionArry    { ExpressionArry $1 }
 
---ExpressionList
---    : Expression
---    | ExpressionList "," Expression
+ExpressionList :: { [Expression] }
+    : Expression                        { [$1]    }
+    | ExpressionList "," Expression     { $3 : $1 }
 
-ExpressionArit
+ExpressionArit :: { ExpressionArit }
     : int       { LiteralInt $1 }
     | float     { LiteralFloat $1 }
-    | ExpressionArit "+" ExpressionArit     { PlusArit $1 $3 }  -- { $1 + $3 }
---    | ExpressionArit "-" ExpressionArit
---    | ExpressionArit "*" ExpressionArit
---    | ExpressionArit "/" ExpressionArit
---    | ExpressionArit "%" ExpressionArit
---    | ExpressionArit "^" ExpressionArit
---    | "-" ExpressionArit
+    | ExpressionArit "+" ExpressionArit     { PlusArit   $1 $3 }  -- { $1 + $3 }
+    | ExpressionArit "-" ExpressionArit     { MinusArit  $1 $3 }  -- { $1 - $3 }
+    | ExpressionArit "*" ExpressionArit     { TimesArit  $1 $3 }  -- { $1 * $3 }
+    | ExpressionArit "/" ExpressionArit     { DivideArit $1 $3 }  -- { $1 / $3 }
+    | ExpressionArit "%" ExpressionArit     { ModuloArit $1 $3 }  -- { $1 % $3 }
+    | ExpressionArit "^" ExpressionArit     { PowerArit  $1 $3 }  -- { $1 ^ $3 }
+    | "-" ExpressionArit                    { NegateArit $2    }  -- { negate $2 }
 
-ExpressionBool
+ExpressionBool :: { ExpressionBool }
     : "true"    { LiteralBool $1 }
     | "false"   { LiteralBool $1 }
-    | ExpressionBool "or"  ExpressionBool   { OrBool $1 $3  }  -- { $1 || $3 }
+
+    -- Booleans
+    | ExpressionBool "or"  ExpressionBool   { OrBool  $1 $3 }  -- { $1 || $3 }
     | ExpressionBool "and" ExpressionBool   { AndBool $1 $3 }  -- { $1 && $3 }
     | "not" ExpressionBool                  { NotBool $2    }  -- { not $2   }
---    | Expression      "=="  Expression
---    | Expression      "/="  Expression
---    | ExpressionArit "<"   ExpressionArit
---    | ExpressionArit "<="  ExpressionArit
---    | ExpressionArit ">"   ExpressionArit
---    | ExpressionArit ">="  ExpressionArit
---    | ExpressionArit ">>"  ExpressionRang
 
-ExpressionStrn
+    -- Compare
+    | ExpressionArit "==" ExpressionArit    { EqualBool   (ExpressionArit $1) (ExpressionArit $3) }  -- { $1 == $3 }
+    | ExpressionArit "/=" ExpressionArit    { UnequalBool (ExpressionArit $1) (ExpressionArit $3) }  -- { $1 /= $3 }
+    | ExpressionBool "==" ExpressionBool    { EqualBool   (ExpressionBool $1) (ExpressionBool $3) }  -- { $1 == $3 }
+    | ExpressionBool "/=" ExpressionBool    { UnequalBool (ExpressionBool $1) (ExpressionBool $3) }  -- { $1 /= $3 }
+
+    -- Arithmetic Compare
+    | ExpressionArit "<"  ExpressionArit    { LessBool    $1 $3 }  -- { $1 <  $3 }
+    | ExpressionArit "<=" ExpressionArit    { LessEqBool  $1 $3 }  -- { $1 <= $3 }
+    | ExpressionArit ">"  ExpressionArit    { GreatBool   $1 $3 }  -- { $1 >  $3 }
+    | ExpressionArit ">=" ExpressionArit    { GreatEqBool $1 $3 }  -- { $1 >= $3 }
+    --| ExpressionArit ">>" ExpressionRang    { BelongsBool $1 $3 }  -- { $1 >> $3 }
+
+ExpressionStrn :: { ExpressionStrn }
     : string    { LiteralStrn $1 }
 
---ExpressionRang
---    : ExpressionArit ".." ExpressionArit -- $1.type = Int and $2.type= Int
+ExpressionRang
+    : ExpressionArit ".." ExpressionArit        { LiteralRang $1 $3 } -- $1.type = Int and $2.type= Int
 
 ------------------------------ VIEJO ------------------------------------------
 

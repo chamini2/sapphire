@@ -12,5 +12,7 @@ main = do
         else readFile (head args)
     let result = parseProgram input
     case result of
-        (Right statements) -> mapM_ print statements
+        (Right statements) -> do
+            putStr "Program\n"
+            mapM_ (putStr . treePrint 1) statements
         (Left error) -> print error
