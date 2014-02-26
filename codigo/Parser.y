@@ -1,12 +1,12 @@
 {
 {-# OPTIONS -w #-}
-module Parser( parseProgram, runChecker ) where
+module Parser( parseProgram ) where
 
 import Control.Monad.Writer
 import Data.List (find)
 
-import Language
 import Lexer
+import Language
 }
 
 %name parse
@@ -151,8 +151,8 @@ Statement :: { Checker Statement }
     :                           { return StNoop }      -- λ, no-operation
     | varid "=" Expression
         { do
-            let (check, errors) = runChecker $3
-            tell errors
+            let (Right check, state, writer) = runChecker $3
+            tell writer
             return $ StAssign $1 check
         }
 
@@ -229,6 +229,7 @@ Binary :: { Binary }
     | "/"       { OpDivide  }
     | "%"       { OpModulo  }
     | "^"       { OpPower   }
+    | ".."      { OpFromTo  }
     | "or"      { OpOr      }
     | "and"     { OpAnd     }
     | "=="      { OpEqual   }
@@ -254,7 +255,6 @@ Expression :: { Checker Expression }
     | "false"                       { return $ LitBool $1   }
     | char                          { return $ LitChar $1   }      --- DEFINIR
     | string                        { return $ LitString $1 }
-    --| Expression ".." Expression    { binaryM $2 $1 $3      }
 
     -- Operators
     | Expression Binary Expression  { binaryM $2 $1 $3 }
@@ -315,7 +315,7 @@ unaryM op operandM = do
 
 putError :: DataType -> String -> Checker Expression
 putError dt str = do
-    tell [str]
+    tell [Right $ StaticError str]
     return $ ExpError dt
 
 

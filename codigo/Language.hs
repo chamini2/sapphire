@@ -1,10 +1,12 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Language where
 
-import Data.Typeable (typeOf, Typeable(..))
-import Control.Monad
-import Control.Monad.Writer
-import Control.Monad.Identity
+import Data.Typeable (Typeable(..), typeOf)
+
+import Control.Monad.Error -- (Error(..), ErrorT(..), runErrorT)
+import Control.Monad.RWS -- (RWST(..), runRWST)
+import Control.Monad.Identity -- (Identity(..), runIdentity)
+
 
 type Program  = [Checker Statement]
 type Identifier = String
@@ -81,16 +83,7 @@ data Expression
    -- | ExpressionArry ExpressionArry
     deriving (Show, Typeable)
 
-type Checker a = {-StateT-}  (WriterT [String] Identity) a
 
-runChecker :: Checker a -> (a, [String])
-runChecker = runIdentity . runWriterT
-
-getErrors ::  Checker a -> [String]
-getErrors = snd . runChecker
-
-getCheck ::  Checker a -> a
-getCheck = fst . runChecker
 
 dataType :: Expression -> DataType
 dataType (Variable s)        = undefined
@@ -102,6 +95,83 @@ dataType (LitString s)       = String
 dataType (ExpBinary _ _ _ d) = d
 dataType (ExpUnary _ _ d)    = d
 dataType (ExpError a)        = a
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+type Checker a = ErrorT LexError (RWST CheckReader CheckWriter CheckState Identity) a
+
+data Flag = Flag1 | Flag2 | Flag3
+type CheckReader = [Flag]
+
+data LexError = UnexpectedChar String deriving (Show)
+data ParseError = UnexpectedToken String deriving (Show)
+data StaticError
+    = BinaryTypes Binary [DataType]
+    | UnaryTypes  Unary DataType
+    | StaticError String
+
+instance Show StaticError where
+    show (UnaryTypes op dt)   = "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++ show dt
+    show (BinaryTypes op dts) = "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++  take 2 (concat $ map (\dt -> ", " ++ show dt) dts)
+    show (StaticError str)    = str
+type CheckWriter = [Either ParseError StaticError]
+
+data CheckState = CheckState
+    { symtable :: ()
+    , whatevs  :: ()
+    }
+    deriving (Show)
+
+instance Error LexError where
+    noMsg    = UnexpectedChar "Lexical error"
+    strMsg s = UnexpectedChar s
+
+flags :: CheckReader
+flags = []
+
+initialState :: CheckState
+initialState = CheckState () ()
+
+
+
+runChecker :: Checker a -> (Either LexError a, CheckState, CheckWriter)
+runChecker = runIdentity . flip (flip runRWST flags) initialState . runErrorT
+
+getWriter :: Checker a -> CheckWriter
+getWriter = (\(_,_,w) -> w) . runChecker
+
+getCheck :: Checker a -> Either LexError a
+getCheck = (\(c,_,_) -> c) . runChecker
+
+getState :: Checker a -> CheckState
+getState = (\(_,s,_) -> s) . runChecker
+
+
+
+
+
+
+
 
 -------------------------------------------------------------------------------
 
@@ -189,66 +259,3 @@ dataType (ExpError a)        = a
 --    treePrint n (LiteralRang from to) = rep n ++ "LiteralRang" ++ "\n" ++ treePrint (n+1) from ++ treePrint (n+1) to ++ "\n"
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- This example comes straight from the happy documentation
-
---data Exp
---      = Let String Exp Exp
---      | Exp1 Exp1
---      deriving Show
-
---data Exp1
---      = Plus Exp1 Term
---      | Minus Exp1 Term
---      | Term Term
---      deriving Show
-
---data Term
---      = Times Term Factor
---      | Div Term Factor
---      | Factor Factor
---      deriving Show
-
---data Factor
---      = Int Int
---      | Var String
---      | Brack Exp
---      deriving Show
-
---eval :: [(String,Int)] -> Exp -> Int
---eval p (Let var e1 e2) = eval ((var, eval p e1): p) e2
---eval p (Exp1 e)        = evalExp1 p e
---    where
---    evalExp1 p' (Plus  e' t) = evalExp1 p' e' + evalTerm p' t
---    evalExp1 p' (Minus e' t) = evalExp1 p' e' + evalTerm p' t
---    evalExp1 p' (Term  t)    = evalTerm p' t
-
---    evalTerm p' (Times t f) = evalTerm p' t * evalFactor p' f
---    evalTerm p' (Div   t f) = evalTerm p' t `div` evalFactor p' f
---    evalTerm p' (Factor f)  = evalFactor p' f
-
---    evalFactor _  (Int i)    = i
---    evalFactor p' (Var s)    = case lookup s p' of
---                               Nothing -> error "free variable"
---                               Just i  -> i
---    evalFactor p' (Brack e') = eval p' e'
