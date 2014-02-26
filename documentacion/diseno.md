@@ -497,6 +497,8 @@ La precedencia de los operadores relacionales son las siguientes:
 
 * `==`, `/=`
 
+* `@`
+
 ### Expresiones con rangos
 
 ***Primero llevar a cabo todo lo demas. Después nos preocupamos por rangos***

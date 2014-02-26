@@ -34,6 +34,7 @@ $idchar = [$alpha $digit]
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
 @string = \"($printable # [\"\\]|\\$printable)*\"
+@char   = \'$printable\'
 
 -------------------------------------------------------------------------------
 
@@ -113,6 +114,7 @@ tokens :-
         "false"         { lex' (TkFalse False) }
         @float          { lex (TkFloat . read) }
         @string         { lex TkString         }
+        @char           { lex (TkChar . read)  }
 
         -- -- Num
         "+"             { lex' TkPlus          }
@@ -126,6 +128,8 @@ tokens :-
         "or"            { lex' TkOr            }
         "and"           { lex' TkAnd           }
         "not"           { lex' TkNot           }
+
+        "@"             { lex' TkBelongs       }
 
         "=="            { lex' TkEqual         }
         "/="            { lex' TkUnequal       }
@@ -174,17 +178,19 @@ data Token
 
     -- Expressions/Operators
     -- -- Literals
-    | TkInt Int
-    | TkFloat Float
+    | TkInt    Int
+    | TkFloat  Float
     | TkString String
-    | TkTrue Bool
-    | TkFalse Bool
+    | TkChar   Char
+    | TkTrue   Bool
+    | TkFalse  Bool
 
     -- -- Num
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
 
     -- -- Bool
     | TkOr | TkAnd | TkNot
+    | TkBelongs
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
 
