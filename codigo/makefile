@@ -5,15 +5,15 @@ alex:
 	alex -g Lexer.x
 
 happy:
-	happy -g Parser.y
+	happy Parser.y
 
-run:
+run: main
 	./Main $(file)
 
-ghci:
+ghci: main
 	ghci Main
 
-file:
+file: main
 	./Main ../ejemplos/sapphire/ejemplo.sp
 
 clean:
