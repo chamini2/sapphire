@@ -2,8 +2,11 @@
 {-# OPTIONS -w #-}
 module Parser( parseProgram ) where
 
-import Language
+import Control.Monad.Writer
+import Data.List (find)
+
 import Lexer
+import Language
 }
 
 %name parse
@@ -14,9 +17,9 @@ import Lexer
 %error { happyError }
 
 --%attributetype { Attribute a }
---%attribute value { a }
---%attribute num   { Int }
---%attribute label { String }
+--%attribute value        { a }
+--%attribute data_type    { DataType }
+--%attribute len          { Int }
 
 %token
 
@@ -81,11 +84,12 @@ import Lexer
 
         -- Expressions/Operators
         -- -- Literals
-        int             { TkInt $$     }
-        "true"          { TkTrue $$    }
-        "false"         { TkFalse $$   }
-        float           { TkFloat $$   }
+        int             { TkInt    $$  }
+        "true"          { TkTrue   $$  }
+        "false"         { TkFalse  $$  }
+        float           { TkFloat  $$  }
         string          { TkString $$  }
+        char            { TkChar   $$  }
 
         -- -- Num
         "+"             { TkPlus       }
@@ -99,6 +103,7 @@ import Lexer
         "or"            { TkOr         }
         "and"           { TkAnd        }
         "not"           { TkNot        }
+        "@"             { TkBelongs    }
         "=="            { TkEqual      }
         "/="            { TkUnequal    }
         "<"             { TkLess       }
@@ -107,7 +112,7 @@ import Lexer
         ">="            { TkGreatEq    }
 
         -- -- Identifiers
-        varid           { TkVarId $$   }
+        varid           { TkVarId  $$  }
         typeid          { TkTypeId $$  }
 
 -------------------------------------------------------------------------------
@@ -118,7 +123,10 @@ import Lexer
 %right "not"
 
 -- -- Compare
-%nonassoc ">>"        -- Que es esto?
+%nonassoc "@"
+%nonassoc "==" "/="
+%nonassoc "<" "<=" ">" ">="
+
 %nonassoc "==" "/="
 %nonassoc "<" "<=" ">" ">="
 
@@ -137,45 +145,75 @@ import Lexer
 Program :: { Program }
     : StatementList         { reverse $1 }
 
-StatementList :: { [Statement] }
+StatementList :: { [Checker Statement] }
     : Statement                             { [$1]    }
     | StatementList Separator Statement     { $3 : $1 }
 
-Statement :: { Statement }
-    :                           { NoOp } -- λ
-    | varid "=" Expression      { Assign $1 $3 }
---    | DataType VariableList
---    | FunctionDef
---    | "return" Expression
---    | "read" VariableList
---    | "print" ExpressionList
---    | "if" ExpressionBool "then" StatementList
---    | "if" ExpressionBool "then" StatementList "else" StatementList
+Statement :: { Checker Statement }
+    :                           { return StNoop }      -- λ, no-operation
+    | varid "=" Expression
+        { do
+            let (Right check, state, writer) = runChecker $3
+            tell writer
+            return $ StAssign $1 check
+        }
+
+--    -- Definitions
+--    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1) $2 }
+--    --| FunctionDef               {  }
+--    | "return" Expression       { StReturn $2 }
+
+--    -- I/O
+--    | "read" VariableList       { StRead  (reverse $2) }
+--    | "print" ExpressionList    { StPrint (reverse $2) }
+
+--    -- Conditional
+--    | "if" ExpressionBool "then" StatementList "end"                          { StIf $2           (reverse $4) []           }
+--    | "if" ExpressionBool "then" StatementList "else" StatementList "end"     { StIf $2           (reverse $4) (reverse $6) }
+--    | "unless" ExpressionBool "then" StatementList "end"                      { StIf (NotBool $2) (reverse $4) []           }
+--    | "unless" ExpressionBool "then" StatementList "else" StatementList "end" { StIf (NotBool $2) (reverse $4) (reverse $6) }
+--    | "case" ExpressionArit CaseList "end"                                    { StCase $2 (reverse $3) []                   }
+--    | "case" ExpressionArit CaseList "else" StatementList "end"               { StCase $2 (reverse $3) (reverse $5)         }
+
+--    -- Loops
+--    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           (reverse $4) }
+--    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) (reverse $4) }
+--    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 (reverse $6)          }
+--    | "break"           { StBreak }
+--    | "continue"        { StContinue }
 
 Separator
     : ";"           {}
     | newline       {}
 
+--CaseList :: { [Case] }
+--    : Case              { [$1] }
+--    | CaseList Case     { $2 : $1 }
+
+--Case :: { Case }
+--    : "when" Expression "do" StatementList      { Case $2 (reverse $4) }
+
 ---------------------------------------
 
---DataType :: { DataType }
---    : "Int"
---    | "Float"
---    | "Bool"
---    | "Char"
---    | "String"
---    | "Range"
---    | "Type"
---    | "Union" typeid
---    | "Record" typeid
+DataType :: { DataType }
+    : "Int"         { Int }
+    | "Float"       { Float }
+    | "Bool"        { Bool }
+    | "Char"        { Char }
+    | "String"      { String }
+    | "Range"       { Range }
+    | "Type"        { Type }
+    | "Void"        { Void }
+    --| "Union" typeid
+    --| "Record" typeid
 --            ------------------------------ FALTA ARREGLOS
 
 ----DataTypeArray
 ----    : "[" DataType "]" "<-" "[" int "]"
 
---VariableList :: { [VarName] }
---    : varid
---    | VariableList "," varid
+--VariableList :: { [Variable] }
+--    : varid                         { [$1]    }
+--    | VariableList "," varid        { $3 : $1 }
 
 --FunctionDef :: { Function }
 --    : "def" varid "::" Signature
@@ -186,121 +224,123 @@ Separator
 --    | Signature "->" DataType
 
 ---------------------------------------
-CompOp :: { CompOp }                          
-        : '=='                               { Eq  }
-        | '/='                               { Neq }
-        | '<='                               { Leq }
-        | '<'                                { Lt  }
-        | '>='                               { Geq }
-        | '>'                                { Gt  }
 
-OpAdd :: { BinOp }
-       : '+'                                { Add }
-       | '-'                                { Sub }
-       | 'or'                               { Or  }
-       | 'and'                              { And }
-       | '*'                                { Mul }
-       | '^'                                { Pow }
-       | '/'                                { Div }
-       | '%'                                { Mod }
-                                                
-UnOp :: { UnOp }                          
-        : '-'                              { AritNeg }
-        | 'not'                            { BoolNeg }
+Binary :: { Binary }
+    : "+"       { OpPlus    }
+    | "-"       { OpMinus   }
+    | "*"       { OpTimes   }
+    | "/"       { OpDivide  }
+    | "%"       { OpModulo  }
+    | "^"       { OpPower   }
+    | ".."      { OpFromTo  }
+    | "or"      { OpOr      }
+    | "and"     { OpAnd     }
+    | "=="      { OpEqual   }
+    | "/="      { OpUnEqual }
+    | "<"       { OpLess    }
+    | "<="      { OpLessEq  }
+    | ">"       { OpGreat   }
+    | ">="      { OpGreatEq }
+    | "@"       { OpBelongs }
 
-B :: { Analyzer Expression }
-  : B CompOp E                                       { EComp $2 $1 $3 }
-  | E                                                { $1 }
+Unary :: { Unary }
+    : "-"       { OpNegate }
+    | "not"     { OpNot    }
 
-E :: { Analyzer Expression }
-  : E BinOp F                                        { EBin $2 $1 $3 }
-  | F                                                { $1 }
 
-F :: { Exp }
-  : ident                                            { EVar $1 Null } 
-  | num                                              { EConst $1 Null }
-  | UnOp F                                           { EUnOp $1 $2 Null }
-  | 'true'                                           { ETrue }
-  | 'false'                                          { EFalse }
-  | '(' B ')'                                        { EBrack $2 }     
------------------------------- VIEJO ------------------------------------------
+Expression :: { Checker Expression }
+    -- Variable
+    : varid                         { return $ Variable $1 }
+    -- Literals
+    | int                           { return $ LitInt $1    }
+    | float                         { return $ LitFloat $1  }
+    | "true"                        { return $ LitBool $1   }
+    | "false"                       { return $ LitBool $1   }
+    | char                          { return $ LitChar $1   }      --- DEFINIR
+    | string                        { return $ LitString $1 }
 
-Expression
-    : ExpressionArit    { ExpressionArit $1 }
-    | ExpressionBool    { ExpressionBool $1 }
-    | ExpressionStrn    { ExpressionStrn $1}
---    | ExpressionRang
---    | ExpressionArry
+    -- Operators
+    | Expression Binary Expression  { binaryM $2 $1 $3 }
+    --{ ExpBinary $2 $1 $3 DataType }
+    | Unary Expression              { unaryM $1 $2 }
 
---ExpressionList
---    : Expression
---    | ExpressionList "," Expression
+ExpressionList :: { [Checker Expression] }
+    : Expression                        { [$1]    }
+    | ExpressionList Separator Expression     { $3 : $1 }
 
-ExpressionArit
-    : int       { LiteralInt $1 }
-    | float     { LiteralFloat $1 }
-    | ExpressionArit "+" ExpressionArit     { PlusArit $1 $3 }  -- { $1 + $3 }
---    | ExpressionArit "-" ExpressionArit
---    | ExpressionArit "*" ExpressionArit
---    | ExpressionArit "/" ExpressionArit
---    | ExpressionArit "%" ExpressionArit
---    | ExpressionArit "^" ExpressionArit
---    | "-" ExpressionArit
-
-ExpressionBool
-    : "true"    { LiteralBool $1 }
-    | "false"   { LiteralBool $1 }
-    | ExpressionBool "or"  ExpressionBool   { OrBool $1 $3  }  -- { $1 || $3 }
-    | ExpressionBool "and" ExpressionBool   { AndBool $1 $3 }  -- { $1 && $3 }
-    | "not" ExpressionBool                  { NotBool $2    }  -- { not $2   }
---    | Expression      "=="  Expression
---    | Expression      "/="  Expression
---    | ExpressionArit "<"   ExpressionArit
---    | ExpressionArit "<="  ExpressionArit
---    | ExpressionArit ">"   ExpressionArit
---    | ExpressionArit ">="  ExpressionArit
---    | ExpressionArit ">>"  ExpressionRang
-
-ExpressionStrn
-    : string    { LiteralStrn $1 }
-
---ExpressionRang
---    : ExpressionArit ".." ExpressionArit -- $1.type = Int and $2.type= Int
-
------------------------------- VIEJO ------------------------------------------
-
---Exp   : let var '=' Exp in Exp  { Let $2 $4 $6 }
---      | Exp1                    { Exp1 $1 }
-
---Exp1  : Exp1 '+' Term           { Plus $1 $3 }
---      | Exp1 '-' Term           { Minus $1 $3 }
---      | Term                    { Term $1 }
-
---Term  : Term '*' Factor         { Times $1 $3 }
---      | Term '/' Factor         { Div $1 $3 }
---      | Factor                  { Factor $1 }
-
---Factor
---      : int                     { Int $1 }
---      | var                     { Var $1 }
---      | '(' Exp ')'             { Brack $2 }
 
 {
 
+-------------------------------------------------------------------------------
+-- Functions
+
+binaryM :: Binary -> Checker Expression -> Checker Expression -> Checker Expression
+binaryM op leftM rightM = do
+    left  <- leftM
+    right <- rightM
+    let checking = checkBinaryType left right
+    case op of
+        OpOr      -> checking [(Bool,Bool,Bool)]
+        OpAnd     -> checking [(Bool,Bool,Bool)]
+        OpEqual   -> checking ((Bool,Bool,Bool) : numbers)
+        OpUnEqual -> checking ((Bool,Bool,Bool) : numbers)
+        OpFromTo  -> checking [(Int, Int, Range)]
+        OpBelongs -> checking [(Int, Range, Bool)]
+        otherwise -> checking numbers        -- OpPlus OpMinus OpTimes OpDivide OpModulo OpPower OpLess OpLessEq OpGreat OpGreatEq
+    where
+        numbers = [(Int, Int, Int), (Float, Float, Float)]
+        checkBinaryType :: Expression -> Expression -> [(DataType,DataType,DataType)] -> Checker Expression
+        checkBinaryType left right types = do
+            let cond (l,r,_) = dataType left == l && dataType right == r
+                defaultType  = (\(_,_,r) -> r) $ head types
+            case find cond types of
+                Just (_,_,r) -> return $ ExpBinary op left right r
+                Nothing      -> putError defaultType $ "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++
+                                           show (dataType left) ++ ", " ++ show (dataType right) ++ "\n"
+
+unaryM :: Unary -> Checker Expression -> Checker Expression
+unaryM op operandM = do
+    operand <- operandM
+    let checking = checkUnaryType operand
+    case op of
+        OpNegate -> checking [(Int, Int), (Float, Float)]
+        OpNot    -> checking [(Bool,Bool)]
+    where
+        checkUnaryType :: Expression -> [(DataType,DataType)] -> Checker Expression
+        checkUnaryType operand types = do
+            let cond (u,_)  = dataType operand == u
+                defaultType = snd $ head types
+            case find cond types of
+                Just (_,r) -> return $ ExpUnary op operand r
+                Nothing    -> putError defaultType $ "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++
+                                         show (dataType operand) ++ "\n"
+
+
+putError :: DataType -> String -> Checker Expression
+putError dt str = do
+    tell [Right $ StaticError str]
+    return $ ExpError dt
+
+
+
+
+
+-------------------------------------------------------------------------------
+
 lexWrap :: (Token -> Alex a) -> Alex a
 lexWrap cont = do
-  t <- alexMonadScan
-  cont t
+    t <- alexMonadScan
+    cont t
 
 getPosn :: Alex (Int, Int)
 getPosn = do
-  (AlexPn _ l c,_,_,_) <- alexGetInput
-  return (l,c)
+    (AlexPn _ l c,_,_,_) <- alexGetInput
+    return (l,c)
 
 happyError :: Token -> Alex a
 happyError t = do
-  (l,c) <- getPosn
-  fail (show l ++ ":" ++ show c ++ ": Parse error on Token: " ++ show t ++ "\n")
+    (l,c) <- getPosn
+    fail (show l ++ ":" ++ show c ++ ": Parse error on Token: " ++ show t ++ "\n")
 
 parseProgram :: String -> Either String Program
 parseProgram s = runAlex s parse

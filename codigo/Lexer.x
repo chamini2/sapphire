@@ -34,6 +34,7 @@ $idchar = [$alpha $digit]
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
 @string = \"($printable # [\"\\]|\\$printable)*\"
+@char   = \'$printable\'
 
 -------------------------------------------------------------------------------
 
@@ -93,7 +94,6 @@ tokens :-
 
         "case"          { lex' TkCase          }
         "when"          { lex' TkWhen          }
-        --":"             { lex' TkColon         }
 
         -- -- Loops
         "for"           { lex' TkFor           }
@@ -114,6 +114,7 @@ tokens :-
         "false"         { lex' (TkFalse False) }
         @float          { lex (TkFloat . read) }
         @string         { lex TkString         }
+        @char           { lex (TkChar . read)  }
 
         -- -- Num
         "+"             { lex' TkPlus          }
@@ -127,6 +128,8 @@ tokens :-
         "or"            { lex' TkOr            }
         "and"           { lex' TkAnd           }
         "not"           { lex' TkNot           }
+
+        "@"             { lex' TkBelongs       }
 
         "=="            { lex' TkEqual         }
         "/="            { lex' TkUnequal       }
@@ -145,39 +148,52 @@ tokens :-
 -------------------------------------------------------------------------------
 
 data Token
+
     -- Language
     = TkNewLine | TkMain | TkBegin | TkEnd | TkReturn | TkSemicolon | TkComma
+
     -- -- Brackets
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets | TkLBraces | TkRBraces
+
     -- Types
     | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType
     | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
+
     -- Statements
     -- -- Declarations
     | TkAssign | TkDef | TkAs | TkSignature | TkArrow | TkDot
+
     -- -- In/Out
     | TkRead | TkPrint
+
     -- -- Conditionals
     | TkIf | TkThen | TkElse
     | TkUnless
     | TkCase | TkWhen
+
     -- -- Loops
     | TkFor | TkIn | TkFromTo | TkDo
     | TkWhile | TkUntil
     | TkBreak | TkContinue
+
     -- Expressions/Operators
     -- -- Literals
-    | TkInt Int
-    | TkFloat Float
+    | TkInt    Int
+    | TkFloat  Float
     | TkString String
-    | TkTrue Bool
-    | TkFalse Bool
+    | TkChar   Char
+    | TkTrue   Bool
+    | TkFalse  Bool
+
     -- -- Num
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
+
     -- -- Bool
     | TkOr | TkAnd | TkNot
+    | TkBelongs
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
+
     -- -- Identifiers
     | TkVarId String
     | TkTypeId String
@@ -325,7 +341,6 @@ showPosn (AlexPn _ line col) = show line ++ ':' : show col
 
 --    case            { mkLex TkCase  }
 --    when            { mkLex TkWhen  }
---    --":"             { mkLex TkColon }
 
 --    -- -- Loops
 --    for             { mkLex TkFor    }
