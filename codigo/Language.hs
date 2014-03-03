@@ -1,11 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Language where
 
-import Data.Typeable (Typeable(..), typeOf)
+import           Data.Typeable          (Typeable (..))
 
-import Control.Monad.Error -- (Error(..), ErrorT(..), runErrorT)
-import Control.Monad.RWS -- (RWST(..), runRWST)
-import Control.Monad.Identity -- (Identity(..), runIdentity)
+import           Control.Monad.Error    (Error (..), ErrorT (..), runErrorT)
+import           Control.Monad.Identity (Identity (..), runIdentity)
+import           Control.Monad.RWS      (RWST (..), runRWST)
 
 
 type Program  = [Checker Statement]
@@ -86,12 +86,12 @@ data Expression
 
 
 dataType :: Expression -> DataType
-dataType (Variable s)        = undefined
-dataType (LitInt s)          = Int
-dataType (LitFloat s)        = Float
-dataType (LitBool s)         = Bool
-dataType (LitChar s)         = Char
-dataType (LitString s)       = String
+dataType (Variable _)        = undefined
+dataType (LitInt _)          = Int
+dataType (LitFloat _)        = Float
+dataType (LitBool _)         = Bool
+dataType (LitChar _)         = Char
+dataType (LitString _)       = String
 dataType (ExpBinary _ _ _ d) = d
 dataType (ExpUnary _ _ d)    = d
 dataType (ExpError a)        = a
@@ -132,7 +132,7 @@ data StaticError
 
 instance Show StaticError where
     show (UnaryTypes op dt)   = "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++ show dt
-    show (BinaryTypes op dts) = "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++  take 2 (concat $ map (\dt -> ", " ++ show dt) dts)
+    show (BinaryTypes op dts) = "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++  take 2 (concatMap (\dt -> ", " ++ show dt) dts)
     show (StaticError str)    = str
 type CheckWriter = [Either ParseError StaticError]
 
@@ -143,8 +143,8 @@ data CheckState = CheckState
     deriving (Show)
 
 instance Error LexError where
-    noMsg    = UnexpectedChar "Lexical error"
-    strMsg s = UnexpectedChar s
+    noMsg  = UnexpectedChar "Lexical error"
+    strMsg = UnexpectedChar
 
 flags :: CheckReader
 flags = []
@@ -155,7 +155,7 @@ initialState = CheckState () ()
 
 
 runChecker :: Checker a -> (Either LexError a, CheckState, CheckWriter)
-runChecker = runIdentity . flip (flip runRWST flags) initialState . runErrorT
+runChecker = runIdentity . flip (`runRWST` flags) initialState . runErrorT
 
 getWriter :: Checker a -> CheckWriter
 getWriter = (\(_,_,w) -> w) . runChecker

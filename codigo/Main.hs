@@ -1,10 +1,10 @@
 module Main where
 
-import System.Environment (getArgs)
-import Data.Either (lefts, rights)
+import           Data.Either        (lefts, rights)
+import           System.Environment (getArgs)
 
-import Parser
-import Language
+import           Language
+import           Parser
 
 main :: IO ()
 main = do
@@ -17,9 +17,9 @@ main = do
         (Right program) -> mapM_ (printer . runChecker) program
         (Left errors)   -> print errors
 
---printer :: (Either LexError Statement, CheckState, CheckWriter) -> IO ()
-printer (either, state, writer) =
-    case either of
+printer :: (Either LexError Statement, CheckState, CheckWriter) -> IO ()
+printer (ethr, state, writer) =
+    case ethr of
         Left lexError   -> print lexError
         Right statement -> if null writer
             then print statement
