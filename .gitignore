@@ -7,3 +7,7 @@ cabal-dev
 .virthualenv
 codigo/Lexer.hs
 codigo/Parser.hs
+
+#Floobits
+.floo
+.flooignore

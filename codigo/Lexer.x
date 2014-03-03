@@ -197,7 +197,7 @@ data Token
     -- -- Identifiers
     | TkVarId String
     | TkTypeId String
-    | TkEOF             -- TEMPORAL (o no??)
+    | TkEOF
     deriving (Eq, Show)
 
 alexEOF :: Alex Token
