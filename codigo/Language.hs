@@ -69,18 +69,7 @@ data Expression
     | ExpBinary Binary Expression Expression DataType
     | ExpUnary  Unary  Expression            DataType
     | ExpError  DataType
-   -- | ExpBinary
-   --     { binary   :: Binary
-   --     , left     :: Expression
-   --     , right    :: Expression
-   --     , dataType :: DataType
-   --     }
-   -- | ExpUnary
-   --     { unary    :: Unary
-   --     , operand  :: Expression
-   --     , dataType :: DataType
-   --     }
-   -- | ExpressionArry ExpressionArry
+--    | ExpressionArry ExpressionArry
     deriving (Show, Typeable)
 
 

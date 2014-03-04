@@ -5,6 +5,7 @@ import           System.Environment (getArgs)
 
 import           Language
 import           Parser
+import           SymTable
 
 main :: IO ()
 main = do
@@ -41,4 +42,3 @@ printer (ethr, state, writer) =
 --            putStr "Program\n"
 --            mapM_ (putStr . treePrint 1) statements
 --        (Left error) -> print error
-

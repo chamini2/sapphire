@@ -1,7 +1,7 @@
 {-|
     Tabla de simbolos basada en una tabla de hash con Strings como
     claves y un Data.Sequence de SymInfo como valuees
--}
+ -}
 module SymTable (-- Types exportados
                  SymTable
                 , SymInfo(..)
@@ -12,25 +12,22 @@ module SymTable (-- Types exportados
                 , insert
                 --, lookup
                 , update
-                , eliminarVariable
                 ) where
 
 import qualified Data.Map      as DM
-import           Data.Sequence as DS
+import           Data.Sequence as DS hiding (update)
 
---import Parser (Id, Type)
-type Type = ()
-type Id = String
+import           Language      (DataType, Identifier)
 
-data SymTable = SymTable (DM.Map Id (Seq SymInfo))
+data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
     deriving (Show)
 
 data SymInfo = SymInfo
-    { s_type  :: Type
-    , s_value :: Value
-    , scope   :: Scope
-    , line    :: Int
-    , column  :: Int
+    { sType  :: DataType
+    , sValue :: Value
+    , scope  :: Scope () -- () está mientras tanto
+    , line   :: Int
+    , column :: Int
     } deriving (Show)
 
 newtype Scope a = Scope [a]
@@ -43,36 +40,37 @@ pop :: Scope a -> (a, Scope a)
 pop (Scope [])      = error "empty stack"
 pop (Scope (x : s)) = (x, Scope s)
 
-data Value = Int Int
-           | Bool Bool
-           | Char Char
-           | Null
-           deriving (Eq)
+data Value
+    = Int Int
+    | Bool Bool
+    | Char Char
+    | Null
+    deriving (Eq)
 
 instance Show Value where
-    show (Int v) = show v
+    show (Int v)  = show v
     show (Bool v) = show v
     show (Char v) = show v
     show Null     = "Null"
 
 {-|
     Crear una tabla de simbolos vacia
--}
+ -}
 empty :: SymTable
-empty = SymTable (DM.empty)
+empty = SymTable DM.empty
 
 {-|
-    Agregar la variable v a la tabla de simbolos
--}
-insert :: Id -> SymInfo -> SymTable -> SymTable
+    Agregar la variable vn a la tabla de simbolos
+ -}
+insert :: Identifier -> SymInfo -> SymTable -> SymTable
 insert vn info (SymTable m) = SymTable $ DM.alter f vn m
     where f Nothing  = Just $ DS.singleton info
           f (Just x) = Just $ info <| x
 
 {-|
-    Buscar la informacion relacionada con una variable en la tabla de simbolos
--}
-lookup :: Id -> SymTable -> Maybe SymInfo
+    Buscar la información relacionada con una variable en la tabla de simbolos
+ -}
+lookup :: Identifier -> SymTable -> Maybe SymInfo
 lookup id (SymTable m) = do
     is <- DM.lookup id m
     case viewl is of
@@ -80,19 +78,19 @@ lookup id (SymTable m) = do
         info :< _ -> Just info
 
 {-|
-    update el value de una variable, solo si la variable esta
+    Actualiza el value de una variable, solo si la variable esta
     en la tabla de simbolos
  -}
-update :: Id -> Value -> SymTable -> SymTable
+update :: Identifier -> Value -> SymTable -> SymTable
 update id vn (SymTable m) = SymTable $ DM.alter f id m
     where f (Just is) =
             case viewl is of
-                i :< iss -> Just $ i { s_value = vn } <| iss
+                i :< iss -> Just $ i { sValue = vn } <| iss
 
 {-|
     Eliminar la variable v del scope mas interno
--}
-{-eliminarVariable :: Id -> SymTable -> SymTable-}
-{-eliminarVariable id (SymTable m) = SymTable $ DM.alter f id m-}
-    {-where f Nothing  = Just DS.empty-}
-          {-f (Just s) = Just $ DS.drop 1 s-}
+ -}
+--eliminarVariable :: Id -> SymTable -> SymTable
+--eliminarVariable id (SymTable m) = SymTable $ DM.alter f id m
+--    where f Nothing  = Just DS.empty
+--          f (Just s) = Just $ DS.drop 1 s
