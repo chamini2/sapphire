@@ -1,43 +1,60 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
 module Language where
 
+import           Prelude
+--import           Control.Monad.Error    (Error(..))
+import           Control.Monad.Identity (Identity (..), runIdentity)
+import           Control.Monad.RWS
 import           Data.Typeable          (Typeable (..))
 
-import           Control.Monad.Error    (Error (..), ErrorT (..), runErrorT)
-import           Control.Monad.Identity (Identity (..), runIdentity)
-import           Control.Monad.RWS      (RWST (..), runRWST)
-
-
-type Program  = [Checker Statement]
+type Program  = Checker [Statement]
 type Identifier = String
 
-data DataType = Void | Int | Float | Bool | Char | String | Range | Type -- | Array
+data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Array
     deriving (Show, Typeable, Eq)
 
 data Declaration = Declaration Identifier DataType
     deriving (Show, Typeable)
 
-data Statement
-    = StNoop
-    | StAssign Identifier Expression
+--data Statement
+--    -- Language
+--    = StNoop
+--    | StAssign Identifier Expression
+--    -- Definitions
+--    | StDeclaration [Declaration]
+--    | StReturn      Expression
+--    -- I/O
+--    | StRead  [Identifier]
+--    | StPrint [Expression]
+--    -- Conditional
+--    | StIf   Expression [Statement] [Statement]
+--    | StCase Expression [Case]      [Statement]
+--    -- Loops
+--    | StWhile Expression [Statement]
+--    | StFor   Identifier Expression [Statement]
+--    | StBreak
+--    | StContinue
+--    deriving (Show, Typeable)
 
-    --Definitions
-    | StDeclaration [Declaration]
-    | StReturn Expression
-
+data Statement where
+    -- Language
+    StNoop   :: Statement
+    StAssign :: Identifier -> Expression -> Statement
+    -- Definitions
+    StDeclaration :: [Declaration] -> Statement
+    StReturn      :: Expression    -> Statement
     -- I/O
-    | StRead  [Identifier]
-    | StPrint [Expression]
-
+    StRead  :: [Identifier] -> Statement
+    StPrint :: [Expression] -> Statement
     -- Conditional
-    | StIf   Expression [Statement] [Statement]
-    | StCase Expression [Case] [Statement]
-
+    StIf   :: Expression -> [Statement] -> [Statement] -> Statement
+    StCase :: Expression -> [Case]      -> [Statement] -> Statement
     -- Loops
-    | StWhile Expression [Statement]
-    | StFor   Identifier Expression [Statement]
-    | StBreak
-    | StContinue
+    StWhile    :: Expression -> [Statement] ->  Statement
+    StFor      :: Identifier -> Expression  -> [Statement] -> Statement
+    StBreak    :: Statement
+    StContinue :: Statement
     deriving (Show, Typeable)
 
 data Case = Case Expression [Statement]
@@ -55,23 +72,39 @@ data Unary = OpNegate | OpNot
 data Range = FromTo Expression Expression
     deriving (Show)
 
-data Expression
-    -- Variable
-    = Variable Identifier
-    -- Literals
-    | LitInt    Int
-    | LitFloat  Float
-    | LitBool   Bool
-    | LitChar   Char
-    | LitString String
-   -- | LitRange  Range
-    -- Operators
-    | ExpBinary Binary Expression Expression DataType
-    | ExpUnary  Unary  Expression            DataType
-    | ExpError  DataType
---    | ExpressionArry ExpressionArry
-    deriving (Show, Typeable)
+--data Expression
+--    -- Variable
+--    = Variable Identifier
+--    -- Literals
+--    | LitInt    Int
+--    | LitFloat  Float
+--    | LitBool   Bool
+--    | LitChar   Char
+--    | LitString String
+--   -- | LitRange  Range
+--    -- Operators
+--    | ExpBinary Binary Expression Expression DataType
+--    | ExpUnary  Unary  Expression            DataType
+--    | ExpError  DataType
+----    | ExpArray ExpressionArray
+--    deriving (Show, Typeable)
 
+data Expression where
+    -- Variable
+    Variable :: Identifier -> Expression
+    -- Literals
+    LitInt    :: Int    -> Expression
+    LitFloat  :: Float  -> Expression
+    LitBool   :: Bool   -> Expression
+    LitChar   :: Char   -> Expression
+    LitString :: String -> Expression
+    --LitRange  :: Range
+    -- Operators
+    ExpBinary :: Binary   -> Expression -> Expression -> DataType -> Expression
+    ExpUnary  :: Unary    -> Expression -> DataType   -> Expression
+    ExpError  :: DataType -> Expression
+    --ExpArray  :: ExpressionArray
+    deriving (Show, Typeable)
 
 
 dataType :: Expression -> DataType
@@ -83,47 +116,44 @@ dataType (LitChar _)         = Char
 dataType (LitString _)       = String
 dataType (ExpBinary _ _ _ d) = d
 dataType (ExpUnary _ _ d)    = d
-dataType (ExpError a)        = a
+dataType (ExpError d)        = d
 
 
+--------------------------------------------------------------------------------
+-- Monad Checker
 
+--type Checker a = ErrorT LexError (RWST CheckReader CheckWriter CheckState Identity) a
+type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-type Checker a = ErrorT LexError (RWST CheckReader CheckWriter CheckState Identity) a
-
-data Flag = Flag1 | Flag2 | Flag3
+data Flag = OutputFile String | SupressWarnings
 type CheckReader = [Flag]
 
-data LexError = UnexpectedChar String deriving (Show)
+
+--data CheckError
+--    = LError LexError
+--    | PError ParseError
+--    | SError StaticError
+--    deriving (Show, Typeable)
+
+data CheckError where
+    LError :: LexError    -> CheckError
+    PError :: ParseError  -> CheckError
+    SError :: StaticError -> CheckError
+    deriving (Show, Typeable)
+
+data LexError   = UnexpectedChar  String deriving (Show)
 data ParseError = UnexpectedToken String deriving (Show)
 data StaticError
     = BinaryTypes Binary [DataType]
-    | UnaryTypes  Unary DataType
+    | UnaryTypes  Unary  DataType
     | StaticError String
 
 instance Show StaticError where
-    show (UnaryTypes op dt)   = "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++ show dt
-    show (BinaryTypes op dts) = "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++  take 2 (concatMap (\dt -> ", " ++ show dt) dts)
+    show (UnaryTypes op dt)   = "Static Error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
+    show (BinaryTypes op dts) = "Static Error: operator '" ++ show op ++ "' doesn't work with arguments " ++  take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
     show (StaticError str)    = str
-type CheckWriter = [Either ParseError StaticError]
+
+type CheckWriter = [CheckError]
 
 data CheckState = CheckState
     { symtable :: ()
@@ -131,9 +161,9 @@ data CheckState = CheckState
     }
     deriving (Show)
 
-instance Error LexError where
-    noMsg  = UnexpectedChar "Lexical error"
-    strMsg = UnexpectedChar
+--instance Error LexError where
+--    noMsg  = UnexpectedChar "Lexical error"
+--    strMsg = UnexpectedChar
 
 flags :: CheckReader
 flags = []
@@ -141,28 +171,38 @@ flags = []
 initialState :: CheckState
 initialState = CheckState () ()
 
+----------------------------------------
 
 
-runChecker :: Checker a -> (Either LexError a, CheckState, CheckWriter)
-runChecker = runIdentity . flip (`runRWST` flags) initialState . runErrorT
+--runChecker :: Checker a -> (Either LexError a, CheckState, CheckWriter)
+--runChecker = runIdentity . flip (`runRWST` flags) initialState . runErrorT
+runChecker :: Checker a -> (a, CheckState, CheckWriter)
+runChecker = runIdentity . flip (`runRWST` flags) initialState
 
 getWriter :: Checker a -> CheckWriter
 getWriter = (\(_,_,w) -> w) . runChecker
 
-getCheck :: Checker a -> Either LexError a
+--getCheck :: Checker a -> Either LexError a
+--getCheck = (\(c,_,_) -> c) . runChecker
+getCheck :: Checker a -> a
 getCheck = (\(c,_,_) -> c) . runChecker
 
 getState :: Checker a -> CheckState
 getState = (\(_,s,_) -> s) . runChecker
 
+getErrors :: CheckWriter -> ([LexError], [ParseError], [StaticError])
+getErrors errors = (lexErrors, parseErrors, staticErrors)
+    where
+        lexErrors    = map (\(LError e) -> e) $ filter ((=="LError") . show . typeOf) errors
+        parseErrors  = map (\(PError e) -> e) $ filter ((=="PError") . show . typeOf) errors
+        staticErrors = map (\(SError e) -> e) $ filter ((=="SError") . show . typeOf) errors
 
 
 
 
 
 
-
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 --class Printer p where
 --    treePrint :: Int -> p -> String

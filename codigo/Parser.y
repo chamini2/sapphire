@@ -1,12 +1,12 @@
 {
 {-# OPTIONS -w #-}
-module Parser( parseProgram ) where
+module Parser (parseProgram) where
 
-import Control.Monad.Writer
-import Data.List (find)
+import           Language
+import           Lexer
 
-import Lexer
-import Language
+import           Control.Monad.RWS
+import           Data.List (find)
 }
 
 %name parse
@@ -115,7 +115,7 @@ import Language
         varid           { TkVarId  $$  }
         typeid          { TkTypeId $$  }
 
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Precedence
 
 -- Bool
@@ -137,28 +137,30 @@ import Language
 
 %%
 
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Grammar
 
 Program :: { Program }
-    : StatementList         { reverse $1 }
+    : StatementList         { continueChecker $1 reverse }
+--    | error                 { [parseError StNoop "Expecting a statement"] }
 
-StatementList :: { [Checker Statement] }
-    : Statement                             { [$1]    }
-    | StatementList Separator Statement     { $3 : $1 }
+StatementList :: { Checker [Statement] }
+    : Statement                             { continueChecker $1 (:[]) }
+    | StatementList Separator Statement     { $1 >>= \ls -> continueChecker $3 (:ls) }
+        -- Equivalente a
+        --{ do
+        --    ls <- $1
+        --    continueChecker $3 (:ls)
+        --}
+--    | error                                 { [parseError StNoop "Expecting a statement"] }
 
 Statement :: { Checker Statement }
     :                           { return StNoop }      -- λ, no-operation
-    | varid "=" Expression
-        { do
-            let (Right check, state, writer) = runChecker $3
-            tell writer
-            return $ StAssign $1 check
-        }
+    | varid "=" Expression      { continueChecker $3 (StAssign $1) }
 
 --    -- Definitions
 --    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1) $2 }
---    --| FunctionDef               {  }
+--    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
 --    -- I/O
@@ -179,13 +181,14 @@ Statement :: { Checker Statement }
 --    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 (reverse $6)          }
 --    | "break"           { StBreak }
 --    | "continue"        { StContinue }
+--    | error         { parseError StNoop "Expecting a statement" }
 
 Separator
     : ";"           {}
     | newline       {}
 
 --CaseList :: { [Case] }
---    : Case              { [$1] }
+--    : Case              { [$1]    }
 --    | CaseList Case     { $2 : $1 }
 
 --Case :: { Case }
@@ -201,8 +204,8 @@ DataType :: { DataType }
     | "String"      { String }
     | "Range"       { Range }
     | "Type"        { Type }
-    --| "Union" typeid
-    --| "Record" typeid
+--    | "Union" typeid
+--    | "Record" typeid
 --            ------------------------------ FALTA ARREGLOS
 
 ----DataTypeArray
@@ -253,22 +256,21 @@ Expression :: { Checker Expression }
     | float                         { return $ LitFloat $1  }
     | "true"                        { return $ LitBool $1   }
     | "false"                       { return $ LitBool $1   }
-    | char                          { return $ LitChar $1   }      --- DEFINIR
+    | char                          { return $ LitChar $1   }
     | string                        { return $ LitString $1 }
-
     -- Operators
     | Expression Binary Expression  { binaryM $2 $1 $3 }
-    --{ ExpBinary $2 $1 $3 DataType }
-    | Unary Expression              { unaryM $1 $2 }
+    | Unary Expression              { unaryM $1 $2     }
+--    | error                         { parseError (ExpError Void) "Expecting an expression" }
 
 ExpressionList :: { [Checker Expression] }
-    : Expression                        { [$1]    }
-    | ExpressionList Separator Expression     { $3 : $1 }
-
+    : Expression                                { [$1]    }
+    | ExpressionList Separator Expression       { $3 : $1 }
+--    | error                                     { [parseError (ExpError Void) "Expecting an expression"] }
 
 {
 
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 -- Functions
 
 binaryM :: Binary -> Checker Expression -> Checker Expression -> Checker Expression
@@ -283,16 +285,16 @@ binaryM op leftM rightM = do
         OpUnEqual -> checking ((Bool,Bool,Bool) : numbers)
         OpFromTo  -> checking [(Int, Int, Range)]
         OpBelongs -> checking [(Int, Range, Bool)]
-        otherwise -> checking numbers        -- OpPlus OpMinus OpTimes OpDivide OpModulo OpPower OpLess OpLessEq OpGreat OpGreatEq
+        _         -> checking numbers -- OpPlus OpMinus OpTimes OpDivide OpModulo OpPower OpLess OpLessEq OpGreat OpGreatEq
     where
         numbers = [(Int, Int, Int), (Float, Float, Float)]
         checkBinaryType :: Expression -> Expression -> [(DataType,DataType,DataType)] -> Checker Expression
         checkBinaryType left right types = do
             let cond (l,r,_) = dataType left == l && dataType right == r
-                defaultType  = (\(_,_,r) -> r) $ head types
+                defaultType  = (\(_,_,r) -> r) $ head types -- We have to calculate better the defaultType
             case find cond types of
                 Just (_,_,r) -> return $ ExpBinary op left right r
-                Nothing      -> putError defaultType $ "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++
+                Nothing      -> expError defaultType $ "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++
                                            show (dataType left) ++ ", " ++ show (dataType right) ++ "\n"
 
 unaryM :: Unary -> Checker Expression -> Checker Expression
@@ -306,38 +308,46 @@ unaryM op operandM = do
         checkUnaryType :: Expression -> [(DataType,DataType)] -> Checker Expression
         checkUnaryType operand types = do
             let cond (u,_)  = dataType operand == u
-                defaultType = snd $ head types
+                defaultType = snd $ head types -- We have to calculate better the defaultType
             case find cond types of
                 Just (_,r) -> return $ ExpUnary op operand r
-                Nothing    -> putError defaultType $ "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++
+                Nothing    -> expError defaultType $ "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++
                                          show (dataType operand) ++ "\n"
 
 
-putError :: DataType -> String -> Checker Expression
-putError dt str = do
-    tell [Right $ StaticError str]
+expError :: DataType -> String -> Checker Expression
+expError dt str = do
+    tell [SError $ StaticError str]
     return $ ExpError dt
 
+parseError :: a -> String -> Checker a
+parseError identity str = do
+    tell [PError $ UnexpectedToken str]
+    return identity
+
+continueChecker :: Checker a -> (a -> b) -> Checker b
+continueChecker extract func = do
+    let (check, state, writer) = runChecker extract
+    tell writer
+    put state
+    return $ func check
 
 
-
-
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 lexWrap :: (Token -> Alex a) -> Alex a
 lexWrap cont = do
     t <- alexMonadScan
-    cont t
-
-getPosn :: Alex (Int, Int)
-getPosn = do
-    (AlexPn _ l c,_,_,_) <- alexGetInput
-    return (l,c)
+    case t of
+        TkError c -> do
+            (p,_,_,_) <- alexGetInput
+            fail $ showPosn p ++ "Unexpected character: '" ++ [c] ++ "'\n"
+        _         -> cont t
 
 happyError :: Token -> Alex a
 happyError t = do
-    (l,c) <- getPosn
-    fail (show l ++ ":" ++ show c ++ ": Parse error on Token: " ++ show t ++ "\n")
+    (p,_,_,_) <- alexGetInput
+    fail $ showPosn p ++ "Parse error on Token: " ++ show t ++ "\n"
 
 parseProgram :: String -> Either String Program
 parseProgram s = runAlex s parse

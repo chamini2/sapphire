@@ -1,11 +1,11 @@
 main: clean alex happy
-	ghc Main
+	ghc -O2 -W Main
 
 alex:
 	alex -g Lexer.x
 
 happy:
-	happy -g Parser.y
+	happy -g -s Parser.y
 
 run:
 	./Main $(file)
