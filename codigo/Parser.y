@@ -2,9 +2,11 @@
 {-# OPTIONS -w #-}
 module Parser (parseProgram) where
 
-import           Language
 import           Lexer
+import           Language
+import           Checker
 
+import           Prelude
 import           Control.Monad.RWS
 --import           Control.Monad
 import           Data.List (find)
@@ -19,10 +21,10 @@ import           Data.List (find)
 -- Without this we get a type error
 %error { happyError }
 
---%attributetype { Attribute a }
---%attribute value        { a }
---%attribute data_type    { DataType }
---%attribute len          { Int }
+--%attributetype       { Attribute a }
+--%attribute value     { a }
+--%attribute data_type { DataType }
+--%attribute len       { Int }
 
 %token
 
@@ -267,12 +269,12 @@ Statement :: { Checker Statement }
 --    | "print" ExpressionList    { StPrint (reverse $2) }
 
 --    -- Conditional
---    | "if" ExpressionBool "then" StatementList "end"                          { StIf $2           (reverse $4) []           }
---    | "if" ExpressionBool "then" StatementList "else" StatementList "end"     { StIf $2           (reverse $4) (reverse $6) }
---    | "unless" ExpressionBool "then" StatementList "end"                      { StIf (NotBool $2) (reverse $4) []           }
---    | "unless" ExpressionBool "then" StatementList "else" StatementList "end" { StIf (NotBool $2) (reverse $4) (reverse $6) }
---    | "case" ExpressionArit CaseList "end"                                    { StCase $2 (reverse $3) []                   }
---    | "case" ExpressionArit CaseList "else" StatementList "end"               { StCase $2 (reverse $3) (reverse $5)         }
+--    | "if" ExpressionBool "then" StatementList "end"                           { StIf $2           (reverse $4) []           }
+--    | "if" ExpressionBool "then" StatementList "else" StatementList "end"      { StIf $2           (reverse $4) (reverse $6) }
+--    | "unless" ExpressionBool "then" StatementList "end"                       { StIf (NotBool $2) (reverse $4) []           }
+--    | "unless" ExpressionBool "then" StatementList "else" StatementList "end"  { StIf (NotBool $2) (reverse $4) (reverse $6) }
+--    | "case" ExpressionArit CaseList "end"                                     { StCase $2 (reverse $3) []                   }
+--    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 (reverse $3) (reverse $5)         }
 
 --    -- Loops
 --    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           (reverse $4) }
@@ -282,7 +284,7 @@ Statement :: { Checker Statement }
 --    | "continue"        { StContinue }
 --    | error         { parseError StNoop "Expecting a statement" }
 
-Separator
+Separator :: { () }
     : ";"           {}
     | newline       {}
 
@@ -295,7 +297,7 @@ Separator
 
 ---------------------------------------
 
-DataType --:: { DataType }
+DataType :: { DataType }
     : "Int"         { Int }
     | "Float"       { Float }
     | "Bool"        { Bool }
@@ -310,7 +312,7 @@ DataType --:: { DataType }
 ----DataTypeArray
 ----    : "[" DataType "]" "<-" "[" int "]"
 
-VariableList --:: { [Identifier] }
+VariableList :: { [Identifier] }
     : varid                         { [$1]    }
     | VariableList "," varid        { $3 : $1 }
 
@@ -438,7 +440,7 @@ lexWrap cont = do
             --fail $ alexShowPosn p ++ "Unexpected character: '" ++ [c] ++ "'\n"
             addLexerError t
             lexWrap cont
-        TkStringError -> do
+        TkStringError str -> do
             p <- alexGetPosn
             --fail $ alexShowPosn p ++ "Missing matching '\"' for string\n"
             addLexerError t
@@ -452,7 +454,7 @@ happyError t = do
     p <- alexGetPosn
     fail $ alexShowPosn p ++ "Parse error on Token: " ++ show t ++ "\n"
 
-parseProgram :: String -> Either String Program
-parseProgram s = runAlex s parse
+parseProgram :: String -> Either [(LexerError, Lexeme)] Program
+parseProgram input = runAlex' input parse
 
 }

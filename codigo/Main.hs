@@ -2,6 +2,7 @@ module Main where
 
 import           Language
 import           Parser
+import           Checker
 
 import           Prelude
 import           System.Environment (getArgs)
@@ -14,8 +15,8 @@ main = do
         else readFile (head args)
     case parseProgram input of
         Right program -> printProgram program
-        _             -> putStrLn "IMPOSSIBLE ERROR!"
-        --Left errors   -> print errors
+        --_             -> putStrLn "IMPOSSIBLE ERROR!"
+        Left errors   -> mapM_ print $ reverse errors
 
 printProgram :: Program -> IO ()
 printProgram program = do

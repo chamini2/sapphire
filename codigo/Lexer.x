@@ -7,12 +7,15 @@ module Lexer
     , AlexPosn(..)
     , Token(..)
     , Lexeme(..)
+    , AlexUserState(..)
     , alexMonadScan
-    , runAlex
+    , runAlex'
     , addLexerError
     , alexGetPosn
     , alexShowPosn
     ) where
+
+import           Checker
 
 import           Prelude hiding (lex)
 }
@@ -154,7 +157,7 @@ tokens :-
 
         -- Errors
         .               { lex  (TkError . head) }
-        @stringerror    { lex' TkStringError    }
+        @stringerror    { lex TkStringError     }
 
 {
 
@@ -216,14 +219,14 @@ data Token
     -- Compiling
     | TkEOF
     | TkError Char
-    | TkStringError
+    | TkStringError String
     deriving (Eq, Show)
 
 
 
 --------------------------------------------------------------------------------
 
-data AlexUserState = AlexUSt { lexerErrors :: [Lexeme] }
+data AlexUserState = AlexUSt { lexerErrors :: [(LexerError, Lexeme)] }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUSt []
@@ -235,17 +238,20 @@ modifyUserState f = Alex $ \s -> let st = alex_ust s in Right (s {alex_ust = f s
 getUserState :: Alex AlexUserState
 getUserState = Alex (\s -> Right (s,alex_ust s))
 
-pushLexerError :: Token -> Alex ()
-pushLexerError t = alexGetPosn >>= \p -> modifyUserState (push $ Lex t p)
-    where
-       push :: Lexeme -> AlexUserState -> AlexUserState
-       push l (AlexUSt ls) = AlexUSt $ l : ls
+--pushLexerError :: Token -> Alex ()
+--pushLexerError t = alexGetPosn >>= \p -> modifyUserState (push $ Lex t p)
+--    where
+--       push :: Lexeme -> AlexUserState -> AlexUserState
+--       push l (AlexUSt ls) = AlexUSt $ l : ls
 
 
 addLexerError :: Token -> Alex ()
 addLexerError t = do
     p <- alexGetPosn
-    Alex $ \s -> let st = alex_ust s in Right (s { alex_ust = st { lexerErrors = (Lex t p) : (lexerErrors st) } } , () )
+    let error = case t of
+            TkError c       -> (UnexpectedChar c, Lex t p)
+            TkStringError s -> (StringError s   , Lex t p)
+    Alex $ \s -> let st = alex_ust s in Right (s { alex_ust = st { lexerErrors = error : (lexerErrors st) } } , () )
 
 ----------------------------------------
 
@@ -274,4 +280,18 @@ alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return p
 alexShowPosn :: AlexPosn -> String
 alexShowPosn (AlexPn _ line col) = show line ++ ':' : show (col - 1) ++ ": "
 
+runAlex' :: String -> Alex a -> Either [(LexerError,Lexeme)] a
+runAlex' input (Alex f)
+   = case f (AlexState
+            { alex_pos = alexStartPos
+            , alex_inp = input
+            , alex_chr = '\n'
+            , alex_bytes = []
+            , alex_ust = alexInitUserState
+            , alex_scd = 0 }) of
+                Right (st,a) ->
+                    let ust = lexerErrors (alex_ust st)
+                    in if null ust
+                        then Right a
+                        else Left ust
 }

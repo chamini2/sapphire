@@ -3,13 +3,10 @@
 module Language where
 
 import           Prelude
---import           Control.Monad.Error    (Error(..))
-import           Control.Monad.Identity (Identity (..), runIdentity)
-import           Control.Monad.RWS
 import           Data.Typeable          (Typeable (..))
 
 --type Program  = StFunction
-type Program  = Checker [Statement]
+--type Program  = Checker [Statement]   DEFINIDO EN Checker.hs
 type Identifier = String
 
 data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Array
@@ -102,8 +99,8 @@ data Expression where
     LitString :: String -> Expression
     --LitRange  :: Range
     -- Operators
-    ExpBinary :: Binary   -> Expression -> Expression -> Expression
-    ExpUnary  :: Unary    -> Expression -> Expression
+    ExpBinary :: Binary   -> Expression -> Expression {- -> DataType -} -> Expression
+    ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
     ExpError  :: DataType -> Expression
     --ExpArray  :: ExpressionArray
     deriving (Show, Typeable)
@@ -119,91 +116,6 @@ data Expression where
 --dataType (ExpBinary _ _ _ d) = d
 --dataType (ExpUnary _ _ d)    = d
 --dataType (ExpError d)        = d
-
-
---------------------------------------------------------------------------------
--- Monad Checker
-
---type Checker a = ErrorT LexError (RWST CheckReader CheckWriter CheckState Identity) a
-type Checker a = RWST CheckReader CheckWriter CheckState Identity a
-
-data Flag = OutputFile String | SupressWarnings
-type CheckReader = [Flag]
-
-
---data CheckError
---    = LError LexError
---    | PError ParseError
---    | SError StaticError
---    deriving (Show, Typeable)
-
-data CheckError where
-    LError :: LexError    -> CheckError
-    PError :: ParseError  -> CheckError
-    SError :: StaticError -> CheckError
-    deriving (Show, Typeable)
-
-data LexError   = UnexpectedChar  String deriving (Show)
-data ParseError = UnexpectedToken String deriving (Show)
-data StaticError
-    = BinaryTypes Binary [DataType]
-    | UnaryTypes  Unary  DataType
-    | StaticError String
-
-instance Show StaticError where
-    show (UnaryTypes op dt)   = "Static Error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op dts) = "Static Error: operator '" ++ show op ++ "' doesn't work with arguments " ++  take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
-    show (StaticError str)    = str
-
-type CheckWriter = [CheckError]
-
-data CheckState = CheckState
-    { symtable :: ()-- SymTable
-    , ast      :: ()-- Program
-    }
-    --deriving (Show)
-
---instance Error LexError where
---    noMsg  = UnexpectedChar "Lexical error"
---    strMsg = UnexpectedChar
-
-flags :: CheckReader
-flags = []
-
-initialState :: CheckState
-initialState = CheckState () ()
-
-----------------------------------------
-
-
---checkBinary :: Expression -> Expression -> Checker Program
-
---runChecker :: Checker a -> (Either LexError a, CheckState, CheckWriter)
---runChecker = runIdentity . flip (`runRWST` flags) initialState . runErrorT
-runChecker :: Checker a -> (a, CheckState, CheckWriter)
-runChecker = runIdentity . flip (`runRWST` flags) initialState
-
-getWriter :: Checker a -> CheckWriter
-getWriter = (\(_,_,w) -> w) . runChecker
-
---getCheck :: Checker a -> Either LexError a
---getCheck = (\(c,_,_) -> c) . runChecker
-getCheck :: Checker a -> a
-getCheck = (\(c,_,_) -> c) . runChecker
-
-getState :: Checker a -> CheckState
-getState = (\(_,s,_) -> s) . runChecker
-
-getErrors :: CheckWriter -> ([LexError], [ParseError], [StaticError])
-getErrors errors = (lexErrors, parseErrors, staticErrors)
-    where
-        lexErrors    = map (\(LError e) -> e) $ filter ((=="LError") . show . typeOf) errors
-        parseErrors  = map (\(PError e) -> e) $ filter ((=="PError") . show . typeOf) errors
-        staticErrors = map (\(SError e) -> e) $ filter ((=="SError") . show . typeOf) errors
-
-
-
-
 
 
 --------------------------------------------------------------------------------
