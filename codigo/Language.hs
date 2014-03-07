@@ -8,6 +8,7 @@ import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
 import           Data.Typeable          (Typeable (..))
 
+--type Program  = StFunction
 type Program  = Checker [Statement]
 type Identifier = String
 
@@ -23,6 +24,7 @@ data Declaration = Declaration Identifier DataType
 --    | StAssign Identifier Expression
 --    -- Definitions
 --    | StDeclaration [Declaration]
+--    | StFunction    Signature [Statements]
 --    | StReturn      Expression
 --    -- I/O
 --    | StRead  [Identifier]
@@ -100,23 +102,23 @@ data Expression where
     LitString :: String -> Expression
     --LitRange  :: Range
     -- Operators
-    ExpBinary :: Binary   -> Expression -> Expression -> DataType -> Expression
-    ExpUnary  :: Unary    -> Expression -> DataType   -> Expression
+    ExpBinary :: Binary   -> Expression -> Expression -> Expression
+    ExpUnary  :: Unary    -> Expression -> Expression
     ExpError  :: DataType -> Expression
     --ExpArray  :: ExpressionArray
     deriving (Show, Typeable)
 
 
-dataType :: Expression -> DataType
-dataType (Variable _)        = undefined
-dataType (LitInt _)          = Int
-dataType (LitFloat _)        = Float
-dataType (LitBool _)         = Bool
-dataType (LitChar _)         = Char
-dataType (LitString _)       = String
-dataType (ExpBinary _ _ _ d) = d
-dataType (ExpUnary _ _ d)    = d
-dataType (ExpError d)        = d
+--dataType :: Expression -> DataType
+--dataType (Variable _)        = undefined
+--dataType (LitInt _)          = Int
+--dataType (LitFloat _)        = Float
+--dataType (LitBool _)         = Bool
+--dataType (LitChar _)         = Char
+--dataType (LitString _)       = String
+--dataType (ExpBinary _ _ _ d) = d
+--dataType (ExpUnary _ _ d)    = d
+--dataType (ExpError d)        = d
 
 
 --------------------------------------------------------------------------------
@@ -156,10 +158,10 @@ instance Show StaticError where
 type CheckWriter = [CheckError]
 
 data CheckState = CheckState
-    { symtable :: ()
-    , whatevs  :: ()
+    { symtable :: ()-- SymTable
+    , ast      :: ()-- Program
     }
-    deriving (Show)
+    --deriving (Show)
 
 --instance Error LexError where
 --    noMsg  = UnexpectedChar "Lexical error"
@@ -173,6 +175,8 @@ initialState = CheckState () ()
 
 ----------------------------------------
 
+
+--checkBinary :: Expression -> Expression -> Checker Program
 
 --runChecker :: Checker a -> (Either LexError a, CheckState, CheckWriter)
 --runChecker = runIdentity . flip (`runRWST` flags) initialState . runErrorT

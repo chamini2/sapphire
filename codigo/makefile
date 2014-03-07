@@ -1,5 +1,5 @@
 main: clean alex happy
-	ghc -O2 -W Main
+	ghc -O2 Main
 
 alex:
 	alex -g Lexer.x

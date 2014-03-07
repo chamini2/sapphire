@@ -6,16 +6,19 @@ module Lexer
     ( Alex(..)
     , AlexPosn(..)
     , Token(..)
+    , Lexeme(..)
     , alexMonadScan
     , runAlex
-    , alexGetInput
-    , showPosn
+    , addLexerError
+    , alexGetPosn
+    , alexShowPosn
     ) where
 
 import           Prelude hiding (lex)
 }
 
-%wrapper "monad"
+--%wrapper "monad"
+%wrapper "monadUserState"
 
 $newline   = [\n\r]
 @spaces    = ($white # $newline)|\\$newline
@@ -37,7 +40,8 @@ $idchar = [$alpha $digit]
 
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
-@string = \"($printable # [\"\\]|\\$printable)*\"
+@string = \"($printable # [\"\\]|\\$printable|\\$newline)*\"
+@stringerror = \"($printable # [\"\\]|\\$printable|\\$newline)*
 @char   = \'$printable\'
 
 --------------------------------------------------------------------------------
@@ -149,11 +153,14 @@ tokens :-
         @typeid         { lex TkTypeId          }
 
         -- Errors
-        .               { lex (TkError . head)  }
+        .               { lex  (TkError . head) }
+        @stringerror    { lex' TkStringError    }
 
 {
 
 --------------------------------------------------------------------------------
+
+data Lexeme = Lex Token AlexPosn deriving (Eq, Show)
 
 data Token
 
@@ -209,22 +216,62 @@ data Token
     -- Compiling
     | TkEOF
     | TkError Char
+    | TkStringError
     deriving (Eq, Show)
 
+
+
+--------------------------------------------------------------------------------
+
+data AlexUserState = AlexUSt { lexerErrors :: [Lexeme] }
+
+alexInitUserState :: AlexUserState
+alexInitUserState = AlexUSt []
+
+-- some useful interaces to the Alex monad (which is naturally an instance of state monad)
+modifyUserState :: (AlexUserState -> AlexUserState) -> Alex ()
+modifyUserState f = Alex $ \s -> let st = alex_ust s in Right (s {alex_ust = f st},())
+
+getUserState :: Alex AlexUserState
+getUserState = Alex (\s -> Right (s,alex_ust s))
+
+pushLexerError :: Token -> Alex ()
+pushLexerError t = alexGetPosn >>= \p -> modifyUserState (push $ Lex t p)
+    where
+       push :: Lexeme -> AlexUserState -> AlexUserState
+       push l (AlexUSt ls) = AlexUSt $ l : ls
+
+
+addLexerError :: Token -> Alex ()
+addLexerError t = do
+    p <- alexGetPosn
+    Alex $ \s -> let st = alex_ust s in Right (s { alex_ust = st { lexerErrors = (Lex t p) : (lexerErrors st) } } , () )
+
+----------------------------------------
+
+--alexEOF :: Alex Lexeme
+--alexEOF = alexGetPosn >>= return . Lex TkEOF
 alexEOF :: Alex Token
 alexEOF = return TkEOF
 
 -- Unfortunately, we have to extract the matching bit of string
 -- ourselves...
+--lex :: (String -> Token) -> AlexAction Lexeme
+--lex f = \(p,_,_,s) i -> return $ Lex (f $ take i s) p
 lex :: (String -> a) -> AlexAction a
-lex f = \(_,_,_,s) i -> return (f (take i s))
+lex f = \(_,_,_,s) i -> return $ (f $ take i s)
 
 -- For constructing tokens that do not depend on
 -- the input
+--lex' :: Token -> AlexAction Lexeme
+--lex' = lex . const
 lex' :: a -> AlexAction a
 lex' = lex . const
 
-showPosn :: AlexPosn -> String
-showPosn (AlexPn _ line col) = show line ++ ':' : show (col - 1) ++ ": "
+alexGetPosn :: Alex AlexPosn
+alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return p
+
+alexShowPosn :: AlexPosn -> String
+alexShowPosn (AlexPn _ line col) = show line ++ ':' : show (col - 1) ++ ": "
 
 }

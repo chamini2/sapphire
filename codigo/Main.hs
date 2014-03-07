@@ -22,4 +22,8 @@ printProgram program = do
     let (statements,_,writer) = runChecker program
     if null writer
         then mapM_ print statements
-        else mapM_ print writer
+        else do
+            let (lexErrors,parseErrors,staticErrors) = getErrors writer
+            mapM_ print lexErrors
+            mapM_ print parseErrors
+            mapM_ print staticErrors
