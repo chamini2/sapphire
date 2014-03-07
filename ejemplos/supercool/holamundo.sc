@@ -1,1 +1,0 @@
-write "Hola Mundo"

@@ -1,19 +1,19 @@
 main: clean alex happy
-	ghc Main
+	ghc -O2 Main
 
 alex:
 	alex -g Lexer.x
 
 happy:
-	happy Parser.y
+	happy -g -s Parser.y
 
-run: main
+run:
 	./Main $(file)
 
-ghci: main
+ghci:
 	ghci Main
 
-file: main
+file:
 	./Main ../ejemplos/sapphire/ejemplo.sp
 
 clean:
