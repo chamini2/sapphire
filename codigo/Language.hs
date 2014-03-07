@@ -105,17 +105,6 @@ data Expression where
     --ExpArray  :: ExpressionArray
     deriving (Show, Typeable)
 
-data DataType = Void
-              | Char
-              | Int
-              | Float
-              | String
-              | Range
-              | Type 
-              | Array DataType
-              {-| Union-}
-              {-| Record-}
-              deriving (Eq, Show) 
 
 --dataType :: Expression -> DataType
 --dataType (Variable _)        = undefined
