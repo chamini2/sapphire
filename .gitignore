@@ -12,3 +12,8 @@ codigo/Main
 #Floobits
 .floo
 .flooignore
+
+# Vim
+*.swp
+*~
+
