@@ -4,11 +4,13 @@ module Checker where
 
 --import           Lexer
 import           Language
+import           SymbolTable
 
 --import           Control.Monad.Error    (Error(..))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
 import           Data.Typeable          (Typeable (..))
+import           Prelude hiding (lookup)
 
 type Program  = Checker [Statement]
 
@@ -59,10 +61,10 @@ instance Show StaticError where
 type CheckWriter = [CheckError]
 
 data CheckState = CheckState
-    { symtable :: ()-- SymTable
-    , ast      :: ()-- Program
-    }
-    --deriving (Show)
+    { table :: SymTable
+    , stack :: Stack Scope
+    {-, ast   :: ()-- Program-}
+    } deriving (Show)
 
 --instance Error LexerError where
 --    noMsg  = UnexpectedChar "Lexical error"
@@ -72,7 +74,93 @@ flags :: CheckReader
 flags = []
 
 initialState :: CheckState
-initialState = CheckState () ()
+initialState = CheckState { table = emptyTable , stack = emptyStack }
+
+{-|
+    Entrando a un nuevo scope
+-}
+enterScope :: Checker ()
+enterScope = do
+    cs <- getCurrentScope 
+    ss <- gets stack
+    let sc = Scope { serial = cs + 1 , closed = False }
+    modify (\s -> s { stack = push sc ss })
+
+{-|
+    Saliendo de un scope ya recorrido completamente
+-}
+exitScope :: Checker ()
+exitScope = do
+    ss <- gets stack
+    {-let (top, rest) = pop ss-}
+    modify (\s -> s { stack = snd $ pop ss } )
+
+{-|
+    Consigue el serial del scope actual
+-}
+getCurrentScope :: Checker ScopeNum
+getCurrentScope = liftM (serial . fst . pop) (gets stack) 
+
+{-|
+    Adds a symbol to the Checker's symbol table
+-}
+addSymbol :: Identifier -> SymInfo -> Checker ()
+addSymbol id info = modify (\s -> s { table = insert id info (table s)})
+
+{-|
+    Gets a symbol's value if it has one or Nothing otherwise
+-}
+getSymbolValue :: Identifier -> (SymInfo -> a) -> Checker a
+getSymbolValue id f = do
+    table <- gets table
+    maybe fail success $ lookup id table 
+    where success = return . f 
+          fail    = undefined
+
+{-|
+    Cambia el valor de la variable id por el valor vn en
+    la tabla de simbolos
+-}
+changeValue :: Identifier -> Value -> Checker ()
+changeValue id vn = undefined
+
+{-|
+    Marcamos a la variable id como bloqueada en la tabla de simbolos
+-}
+{-marcarVariableOcupada :: Identifier -> Checker ()-}
+{-marcarVariableOcupada id = do-}
+    {-tabla <- gets tabla-}
+    {-case buscarInfoSim id tabla of-}
+        {-Just info -> do-}
+            {-eliminarDeclaracion $ Decl id (tipo info) -}
+            {-agregarSimbolo id $ info { ocupado = True } -}
+        {-otherwise -> continue-}
+
+{-|
+    Agregamos a la tabla de simbolos las variables definidas en ds
+    y aumentamos el scope actual
+-}
+processDeclarationList :: [Declaration] -> Checker () 
+processDeclarationList ds = enterScope >> mapM_ processDeclaration ds >> exitScope
+
+{-|
+    Agregamos la variable v de tipo tn a la tabla de simbolos 
+-}
+processDeclaration :: Declaration -> Checker ()
+processDeclaration (Declaration id t) = do
+    table <- gets table
+    cs    <- getCurrentScope
+    let info = SymInfo {
+                 dataType = t,
+                 value    = Nothing,
+                 scopeNum = cs,
+                 line     = 0,
+                 column   = 0
+               }
+    case lookup id table of 
+        Nothing                              -> addSymbol id info
+        Just (SymInfo _ _ l _ _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
+                                 | otherwise -> addSymbol id info
 
 ----------------------------------------
 

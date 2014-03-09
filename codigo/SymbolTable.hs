@@ -1,16 +1,25 @@
 {-|
-    Tabla de símbolos basada en una tabla de hash con Strings como
-    claves y un Data.Sequence de SymInfo como valuees
+    Symbol table based on the LeBlanc-Cook symbol table abstraction 
  -}
 module SymbolTable
+    -- SymTable
     ( SymTable
-    , SymInfo(..)
-    , Scope
-    , Value(..)
-    , empty
+    , emptyTable
     , insert
     , lookup
     , update
+    -- SymInfo
+    , SymInfo(..)
+    -- Scope
+    , Scope(..)
+    , ScopeNum
+    -- Value according to the Sapphire language definition
+    , Value(..)
+    -- Stack
+    , Stack
+    , emptyStack
+    , pop
+    , push
     ) where
 
 import           Language      (DataType, Identifier)
@@ -19,48 +28,62 @@ import           Prelude       hiding (lookup)
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (empty, update)
 
-data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
-    deriving (Show)
 
 data SymInfo = SymInfo
-    { sType  :: DataType
-    , sValue :: Value
-    , scope  :: Scope () -- `()` está mientras tanto
-    , line   :: Int
-    , column :: Int
+    { dataType :: DataType
+    , value    :: Maybe Value
+    , scopeNum :: ScopeNum
+    , line     :: Int
+    , column   :: Int
     } deriving (Show)
 
-newtype Scope a = Scope [a]
+data Scope = Scope
+    { serial :: ScopeNum
+    , closed :: Bool
+    } deriving (Show)
+
+initialScope = Scope { serial = 0 , closed = False } 
+
+type ScopeNum = Int
+
+newtype Stack a = Stack [a]
     deriving (Show)
 
-push :: a -> Scope a -> Scope a
-push element (Scope s) = Scope $ element : s
+push :: a -> Stack a -> Stack a
+push element (Stack s) = Stack $ element : s
 
-pop :: Scope a -> (a, Scope a)
-pop (Scope [])      = error "empty stack"
-pop (Scope (x : s)) = (x, Scope s)
+pop :: Stack a -> (a, Stack a)
+pop (Stack [])      = error "empty stack"
+pop (Stack (x : s)) = (x, Stack s)
+
+emptyStack :: Stack Scope
+emptyStack = Stack [initialScope]
 
 data Value
     = Int  Int
     | Bool Bool
     | Char Char
-    | Null
     deriving (Eq)
 
 instance Show Value where
     show (Int v)  = show v
     show (Bool v) = show v
     show (Char v) = show v
-    show Null     = "Null"
 
 {-|
-    Crear una tabla de símbolos vacia
+    Symbol Table
+-}
+data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
+    deriving (Show)
+
+{-|
+    Empty symbol table
  -}
-empty :: SymTable
-empty = SymTable DM.empty
+emptyTable :: SymTable
+emptyTable = SymTable DM.empty
 
 {-|
-    Agregar la variable vn a la tabla de símbolos
+    Adds a symbol to the symbol table along with its information
  -}
 insert :: Identifier -> SymInfo -> SymTable -> SymTable
 insert vn info (SymTable m) = SymTable $ DM.alter f vn m
@@ -68,21 +91,21 @@ insert vn info (SymTable m) = SymTable $ DM.alter f vn m
           f (Just x) = Just $ info <| x
 
 {-|
-    Buscar la información relacionada con una variable en la tabla de símbolos
+    Looks up the symbol identified by id in the symbol table
  -}
 lookup :: Identifier -> SymTable -> Maybe SymInfo
-lookup name (SymTable m) = do
-    is <- DM.lookup name m
+lookup id (SymTable m) = do
+    is <- DM.lookup id m
     case viewl is of
         EmptyL    -> Nothing
         info :< _ -> Just info
 
 {-|
-    Actualiza el value de una variable, solo si la variable esta
+    Update Actualiza el value de una variable, solo si la variable esta
     en la tabla de símbolos
  -}
 update :: Identifier -> Value -> SymTable -> SymTable
-update name vn (SymTable m) = SymTable $ DM.alter f name m
+update id vn (SymTable m) = SymTable $ DM.alter f id m
     where f (Just is) =
             case viewl is of
-                i :< iss -> Just $ i { sValue = vn } <| iss
+                i :< iss -> Just $ i { value = Just vn } <| iss
