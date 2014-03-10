@@ -5,9 +5,9 @@ cabal-dev
 *.chi
 *.chs.h
 .virthualenv
-codigo/Lexer.hs
-codigo/Parser.hs
-codigo/Main
+src/Lexer.hs
+src/Parser.hs
+src/Main
 
 #Floobits
 .floo
