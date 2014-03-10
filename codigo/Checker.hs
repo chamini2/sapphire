@@ -81,7 +81,7 @@ initialState = CheckState { table = emptyTable , stack = emptyStack }
 -}
 enterScope :: Checker ()
 enterScope = do
-    cs <- getCurrentScope 
+    cs <- getCurrentScope
     ss <- gets stack
     let sc = Scope { serial = cs + 1 , closed = False }
     modify (\s -> s { stack = push sc ss })
@@ -99,7 +99,7 @@ exitScope = do
     Consigue el serial del scope actual
 -}
 getCurrentScope :: Checker ScopeNum
-getCurrentScope = liftM (serial . fst . pop) (gets stack) 
+getCurrentScope = liftM (serial . fst . pop) (gets stack)
 
 {-|
     Adds a symbol to the Checker's symbol table
@@ -113,8 +113,8 @@ addSymbol id info = modify (\s -> s { table = insert id info (table s)})
 getSymbolValue :: Identifier -> (SymInfo -> a) -> Checker a
 getSymbolValue id f = do
     table <- gets table
-    maybe fail success $ lookup id table 
-    where success = return . f 
+    maybe fail success $ lookup id table
+    where success = return . f
           fail    = undefined
 
 {-|
@@ -140,11 +140,11 @@ changeValue id vn = undefined
     Agregamos a la tabla de simbolos las variables definidas en ds
     y aumentamos el scope actual
 -}
-processDeclarationList :: [Declaration] -> Checker () 
+processDeclarationList :: [Declaration] -> Checker ()
 processDeclarationList ds = enterScope >> mapM_ processDeclaration ds >> exitScope
 
 {-|
-    Agregamos la variable v de tipo tn a la tabla de simbolos 
+    Agregamos la variable v de tipo tn a la tabla de simbolos
 -}
 processDeclaration :: Declaration -> Checker ()
 processDeclaration (Declaration id t) = do
@@ -157,9 +157,9 @@ processDeclaration (Declaration id t) = do
                  line     = 0,
                  column   = 0
                }
-    case lookup id table of 
+    case lookup id table of
         Nothing                              -> addSymbol id info
-        Just (SymInfo _ _ l _ _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
+        Just (SymInfo _ _ l _ _) | l == cs   -> return () --throwError $ MultipleDeclarations id
                                  | otherwise -> addSymbol id info
 
 ----------------------------------------

@@ -1,5 +1,5 @@
 {-|
-    Symbol table based on the LeBlanc-Cook symbol table abstraction 
+    Symbol table based on the LeBlanc-Cook symbol table abstraction
  -}
 module SymbolTable
     -- SymTable
@@ -42,7 +42,7 @@ data Scope = Scope
     , closed :: Bool
     } deriving (Show)
 
-initialScope = Scope { serial = 0 , closed = False } 
+initialScope = Scope { serial = 0 , closed = False }
 
 type ScopeNum = Int
 
