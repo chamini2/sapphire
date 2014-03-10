@@ -1,4 +1,4 @@
-module Main where
+module Sapphire where
 
 import           Language
 import           Parser
