@@ -15,12 +15,12 @@ data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Arr
 data Declaration = Declaration Identifier DataType Category
     deriving (Show, Typeable)
 
-data Category = Variable
-              | Function
-              | Parameter
-              | RecordField
-              | UnionField
-              | Type
+data Category = CatVariable
+              | CatFunction
+              | CatParameter
+              | CatRecordField
+              | CatUnionField
+              | CatDataType
               deriving (Eq, Show)
 
 --data Statement

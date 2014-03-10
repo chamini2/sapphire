@@ -260,7 +260,7 @@ Statement :: { Checker Statement }
     | varid "=" Expression      { return $ StAssign $1 $3 }
 
 --    -- Definitions
---    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1 Variable) $2 }
+--    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1 CatVariable) $2 }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
