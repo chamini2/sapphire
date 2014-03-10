@@ -61,8 +61,9 @@ instance Show StaticError where
 type CheckWriter = [CheckError]
 
 data CheckState = CheckState
-    { table :: SymTable
-    , stack :: Stack Scope
+    { table        :: SymTable
+    , stack        :: Stack Scope
+    , currentScope :: ScopeNum
     {-, ast   :: ()-- Program-}
     } deriving (Show)
 
@@ -74,32 +75,27 @@ flags :: CheckReader
 flags = []
 
 initialState :: CheckState
-initialState = CheckState { table = emptyTable , stack = emptyStack }
+initialState = CheckState 
+    { table        = emptyTable
+    , stack        = emptyStack
+    , currentScope = 0
+    } 
 
 {-|
     Entrando a un nuevo scope
 -}
 enterScope :: Checker ()
 enterScope = do
-    cs <- getCurrentScope 
-    ss <- gets stack
-    let sc = Scope { serial = cs + 1 , closed = False }
-    modify (\s -> s { stack = push sc ss })
+    cs <- gets currentScope
+    let sc    = Scope { serial = cs + 1 }
+        newCs = cs + 1
+    modify (\s -> s { stack = push sc (stack s), currentScope = cs + 1 })
 
 {-|
     Saliendo de un scope ya recorrido completamente
 -}
 exitScope :: Checker ()
-exitScope = do
-    ss <- gets stack
-    {-let (top, rest) = pop ss-}
-    modify (\s -> s { stack = snd $ pop ss } )
-
-{-|
-    Consigue el serial del scope actual
--}
-getCurrentScope :: Checker ScopeNum
-getCurrentScope = liftM (serial . fst . pop) (gets stack) 
+exitScope = modify (\s -> s { stack = snd . pop $ stack s })
 
 {-|
     Adds a symbol to the Checker's symbol table
@@ -149,18 +145,17 @@ processDeclarationList ds = enterScope >> mapM_ processDeclaration ds >> exitSco
 processDeclaration :: Declaration -> Checker ()
 processDeclaration (Declaration id t) = do
     table <- gets table
-    cs    <- getCurrentScope
+    cs    <- gets currentScope
     let info = SymInfo {
                  dataType = t,
                  value    = Nothing,
                  scopeNum = cs,
-                 line     = 0,
-                 column   = 0
+                 position = (0, 0) -- TODO Esto debe conseguir del AlexPosn
                }
     case lookup id table of 
         Nothing                              -> addSymbol id info
-        Just (SymInfo _ _ l _ _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
-                                 | otherwise -> addSymbol id info
+        Just (SymInfo _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
+                               | otherwise -> addSymbol id info
 
 ----------------------------------------
 

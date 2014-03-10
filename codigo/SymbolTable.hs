@@ -33,16 +33,14 @@ data SymInfo = SymInfo
     { dataType :: DataType
     , value    :: Maybe Value
     , scopeNum :: ScopeNum
-    , line     :: Int
-    , column   :: Int
+    , position :: Position
     } deriving (Show)
 
-data Scope = Scope
-    { serial :: ScopeNum
-    , closed :: Bool
-    } deriving (Show)
+type Position = (Int, Int) -- (Fila, Columna)
 
-initialScope = Scope { serial = 0 , closed = False } 
+data Scope = Scope { serial :: ScopeNum } deriving (Show)
+
+initialScope = Scope { serial = 0 }
 
 type ScopeNum = Int
 
@@ -63,12 +61,16 @@ data Value
     = Int  Int
     | Bool Bool
     | Char Char
+    | Float Float
+    | Void
     deriving (Eq)
 
 instance Show Value where
-    show (Int v)  = show v
-    show (Bool v) = show v
-    show (Char v) = show v
+    show (Int v)   = show v
+    show (Bool v)  = show v
+    show (Char v)  = show v
+    show (Float v) = show v
+    show (Void)    = "void"
 
 {-|
     Symbol Table
