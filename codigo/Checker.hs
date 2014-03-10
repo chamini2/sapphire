@@ -109,8 +109,8 @@ addSymbol id info = modify (\s -> s { table = insert id info (table s)})
 getSymbolValue :: Identifier -> (SymInfo -> a) -> Checker a
 getSymbolValue id f = do
     table <- gets table
-    maybe fail success $ lookup id table 
-    where success = return . f 
+    maybe fail success $ lookup id table
+    where success = return . f
           fail    = undefined
 
 {-|
@@ -136,11 +136,11 @@ changeValue id vn = undefined
     Agregamos a la tabla de simbolos las variables definidas en ds
     y aumentamos el scope actual
 -}
-processDeclarationList :: [Declaration] -> Checker () 
+processDeclarationList :: [Declaration] -> Checker ()
 processDeclarationList ds = enterScope >> mapM_ processDeclaration ds >> exitScope
 
 {-|
-    Agregamos la variable v de tipo tn a la tabla de simbolos 
+    Agregamos la variable v de tipo tn a la tabla de simbolos
 -}
 processDeclaration :: Declaration -> Checker ()
 processDeclaration (Declaration id t) = do
@@ -152,7 +152,7 @@ processDeclaration (Declaration id t) = do
                  scopeNum = cs,
                  position = (0, 0) -- TODO Esto debe conseguir del AlexPosn
                }
-    case lookup id table of 
+    case lookup id table of
         Nothing                              -> addSymbol id info
         Just (SymInfo _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
                                | otherwise -> addSymbol id info

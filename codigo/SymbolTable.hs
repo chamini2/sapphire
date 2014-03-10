@@ -1,5 +1,5 @@
 {-|
-    Symbol table based on the LeBlanc-Cook symbol table abstraction 
+    Symbol table based on the LeBlanc-Cook symbol table abstraction
  -}
 module SymbolTable
     -- SymTable
