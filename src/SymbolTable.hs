@@ -22,7 +22,7 @@ module SymbolTable
     , push
     ) where
 
-import           Language      (DataType, Identifier)
+import           Language      (DataType, Identifier, Category)
 
 import           Prelude       hiding (lookup)
 import qualified Data.Map      as DM
@@ -31,6 +31,7 @@ import           Data.Sequence as DS hiding (empty, update)
 
 data SymInfo = SymInfo
     { dataType :: DataType
+    , category :: Category
     , value    :: Maybe Value
     , scopeNum :: ScopeNum
     , position :: Position
