@@ -1,5 +1,5 @@
 main: clean alex happy
-	ghc -O2 Main
+	ghc -O2 Sapphire
 
 alex:
 	alex -g Lexer.x
@@ -8,16 +8,16 @@ happy:
 	happy -g -s Parser.y
 
 run:
-	./Main $(file)
+	./Sapphire $(file)
 
 ghci:
-	ghci Main
+	ghci Sapphire
 
 file:
-	./Main ../ejemplos/sapphire/ejemplo.sp
+	./Sapphire ../ejemplos/sapphire/ejemplo.sp
 
 clean:
 	@rm *.hi *.o || true
 	@rm Lexer.hs || true
 	@rm Parser.hs || true
-	@rm Main || true
+	@rm Sapphire || true

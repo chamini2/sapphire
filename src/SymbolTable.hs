@@ -36,6 +36,7 @@ data SymInfo = SymInfo
     , position :: Position
     } deriving (Show)
 
+
 type Position = (Int, Int) -- (Fila, Columna)
 
 data Scope = Scope { serial :: ScopeNum } deriving (Show)
@@ -51,7 +52,7 @@ push :: a -> Stack a -> Stack a
 push element (Stack s) = Stack $ element : s
 
 pop :: Stack a -> (a, Stack a)
-pop (Stack [])      = error "empty stack"
+pop (Stack [])      = error "SymbolTable.pop: Empty stack"
 pop (Stack (x : s)) = (x, Stack s)
 
 emptyStack :: Stack Scope
@@ -62,7 +63,6 @@ data Value
     | Bool Bool
     | Char Char
     | Float Float
-    | Void
     deriving (Eq)
 
 instance Show Value where
@@ -70,7 +70,6 @@ instance Show Value where
     show (Bool v)  = show v
     show (Char v)  = show v
     show (Float v) = show v
-    show (Void)    = "void"
 
 {-|
     Symbol Table
@@ -106,8 +105,9 @@ lookup id (SymTable m) = do
     Update Actualiza el value de una variable, solo si la variable esta
     en la tabla de símbolos
  -}
-update :: Identifier -> Value -> SymTable -> SymTable
-update id vn (SymTable m) = SymTable $ DM.alter f id m
-    where f (Just is) =
+update :: Identifier -> (SymInfo -> SymInfo) -> SymTable -> SymTable
+update id f (SymTable m) = SymTable $ DM.alter g id m
+    where g (Just is) =
             case viewl is of
-                i :< iss -> Just $ i { value = Just vn } <| iss
+                i :< iss  -> Just $ f i <| iss
+                otherwise -> error "SymbolTable.update: No value to update"

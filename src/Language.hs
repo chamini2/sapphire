@@ -12,8 +12,16 @@ type Identifier = String
 data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Array
     deriving (Show, Typeable, Eq)
 
-data Declaration = Declaration Identifier DataType
+data Declaration = Declaration Identifier DataType Category
     deriving (Show, Typeable)
+
+data Category = Variable
+              | Function
+              | Parameter
+              | RecordField
+              | UnionField
+              | Type
+              deriving (Eq, Show)
 
 --data Statement
 --    -- Language

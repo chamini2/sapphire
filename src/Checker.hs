@@ -61,9 +61,9 @@ instance Show StaticError where
 type CheckWriter = [CheckError]
 
 data CheckState = CheckState
-    { table        :: SymTable
-    , stack        :: Stack Scope
-    , currentScope :: ScopeNum
+    { table     :: SymTable
+    , stack     :: Stack Scope
+    , currentSc :: ScopeNum
     {-, ast   :: ()-- Program-}
     } deriving (Show)
 
@@ -76,9 +76,9 @@ flags = []
 
 initialState :: CheckState
 initialState = CheckState 
-    { table        = emptyTable
-    , stack        = emptyStack
-    , currentScope = 0
+    { table     = emptyTable
+    , stack     = emptyStack
+    , currentSc = 0
     } 
 
 {-|
@@ -86,10 +86,10 @@ initialState = CheckState
 -}
 enterScope :: Checker ()
 enterScope = do
-    cs <- gets currentScope
+    cs <- gets currentSc
     let sc    = Scope { serial = cs + 1 }
         newCs = cs + 1
-    modify (\s -> s { stack = push sc (stack s), currentScope = cs + 1 })
+    modify (\s -> s { stack = push sc (stack s), currentSc = cs + 1 })
 
 {-|
     Saliendo de un scope ya recorrido completamente
@@ -140,22 +140,23 @@ processDeclarationList :: [Declaration] -> Checker ()
 processDeclarationList ds = enterScope >> mapM_ processDeclaration ds >> exitScope
 
 {-|
-    Agregamos la variable v de tipo tn a la tabla de simbolos
+    Adds the declaration of id to the symbol table
 -}
 processDeclaration :: Declaration -> Checker ()
-processDeclaration (Declaration id t) = do
+processDeclaration (Declaration id t c) = do
     table <- gets table
-    cs    <- gets currentScope
+    cs    <- gets currentSc
     let info = SymInfo {
                  dataType = t,
+                 category = c,
                  value    = Nothing,
                  scopeNum = cs,
                  position = (0, 0) -- TODO Esto debe conseguir del AlexPosn
                }
     case lookup id table of
         Nothing                              -> addSymbol id info
-        Just (SymInfo _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
-                               | otherwise -> addSymbol id info
+        Just (SymInfo _ _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
+                                 | otherwise -> addSymbol id info
 
 ----------------------------------------
 
