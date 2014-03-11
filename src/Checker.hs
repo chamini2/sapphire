@@ -145,12 +145,7 @@ modifyValue var v = do
         modValue sy = sy { value = Just v }
 
 markInitialized :: Identifier -> Checker ()
-markInitialized var = do
-    maySymI <- getSymInfoArg var id
-    case maySymI of
-        Just symI  -> let newSymI = symI { initialized = True }
-            in modify (\s -> s { table = update var (const newSymI) (table s) })
-        Nothing ->  return ()
+markInitialized var = modify (\s -> s { table = update var (\sym -> sym { initialized = True }) (table s) })
 
 
 {-|
