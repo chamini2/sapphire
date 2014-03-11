@@ -1,6 +1,5 @@
-module Sapphire where
+module Main where
 
-import           Language
 import           Parser
 import           Checker
 
@@ -20,9 +19,17 @@ main = do
 
 printProgram :: Program -> IO ()
 printProgram program = do
-    let (statements,_,writer) = runChecker program
+    let (checked,state,writer) = runChecker program
+
+    -- TEMPORAL
+    print state
+    mapM_ print writer
+    mapM_ print checked
+    putStrLn "--------------------------------------------------------------------------------"
+    -- /TEMPORAL
+
     if null writer
-        then mapM_ print statements
+        then mapM_ print checked
         else do
             let (lexErrors,parseErrors,staticErrors) = getErrors writer
             mapM_ print lexErrors

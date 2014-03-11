@@ -7,7 +7,7 @@ cabal-dev
 .virthualenv
 src/Lexer.hs
 src/Parser.hs
-src/Main
+src/Sapphire
 
 #Floobits
 .floo

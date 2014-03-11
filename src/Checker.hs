@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GADTs #-}
 module Checker where
 
@@ -7,10 +6,11 @@ import           Language
 import           SymbolTable
 
 --import           Control.Monad.Error    (Error(..))
+import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
-import           Data.Typeable          (Typeable (..))
-import           Prelude hiding (lookup)
+import           Data.List              (sortBy)
+import           Prelude                hiding (lookup)
 
 type Program  = Checker [Statement]
 
@@ -23,10 +23,10 @@ type CheckReader = [Flag]
 ----------------------------------------
 
 data CheckError where
-    LError :: LexerError  {- -> AlexPosn -} -> CheckError
-    PError :: ParseError  {- -> AlexPosn -} -> CheckError
-    SError :: StaticError {- -> AlexPosn -} -> CheckError
-    deriving (Show, Typeable)
+    LError :: Position -> LexerError  -> CheckError
+    PError :: Position -> ParseError  -> CheckError
+    SError :: Position -> StaticError -> CheckError
+    deriving (Show)
 
 data LexerError where
     UnexpectedChar :: Char   -> LexerError
@@ -47,13 +47,22 @@ instance Show ParseError where
     show (ParseError msg)      = "Parsing error: " ++ msg
 
 data StaticError where
+    -- Variables
+    VariableNotDeclared    :: Identifier -> StaticError
+    VariableNotInitialized :: Identifier -> StaticError
+    InvalidAssignType      :: Identifier -> DataType -> DataType -> StaticError
+    -- Operators
     BinaryTypes :: Binary -> [DataType] -> StaticError
     UnaryTypes  :: Unary  -> DataType   -> StaticError
+    -- General
     StaticError :: String -> StaticError
 
 instance Show StaticError where
+    show (VariableNotDeclared id)     = "Static error: variable '" ++ id ++ "' has not been declared"
+    show (VariableNotInitialized id)  = "Static error: variable '" ++ id ++ "' has not been initialized"
+    show (InvalidAssignType id vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ id ++ "' of type '" ++ show vt ++ "'"
     show (UnaryTypes op dt)   = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op dts) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments " ++  take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    show (BinaryTypes op dts) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments " ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
     show (StaticError msg)    = "Static error: " ++ msg
 
 ----------------------------------------
@@ -61,10 +70,11 @@ instance Show StaticError where
 type CheckWriter = [CheckError]
 
 data CheckState = CheckState
-    { table     :: SymTable
-    , stack     :: Stack Scope
-    , currentSc :: ScopeNum
+    { table    :: SymTable
+    , stack    :: Stack Scope
+    , currtSc  :: ScopeNum
     {-, ast   :: ()-- Program-}
+    , currPosn :: Position
     } deriving (Show)
 
 --instance Error LexerError where
@@ -75,21 +85,22 @@ flags :: CheckReader
 flags = []
 
 initialState :: CheckState
-initialState = CheckState 
-    { table     = emptyTable
-    , stack     = emptyStack
-    , currentSc = 0
-    } 
+initialState = CheckState
+    { table    = emptyTable
+    , stack    = emptyStack
+    , currtSc  = 0
+    , currPosn = (1,1)
+    }
 
 {-|
     Entrando a un nuevo scope
 -}
 enterScope :: Checker ()
 enterScope = do
-    cs <- gets currentSc
+    cs <- gets currtSc
     let sc    = Scope { serial = cs + 1 }
         newCs = cs + 1
-    modify (\s -> s { stack = push sc (stack s), currentSc = cs + 1 })
+    modify (\s -> s { stack = push sc (stack s), currtSc = cs + 1 })
 
 {-|
     Saliendo de un scope ya recorrido completamente
@@ -106,20 +117,33 @@ addSymbol id info = modify (\s -> s { table = insert id info (table s)})
 {-|
     Gets a symbol's value if it has one or Nothing otherwise
 -}
-getSymbolValue :: Identifier -> (SymInfo -> a) -> Checker a
-getSymbolValue id f = do
-    table <- gets table
-    maybe fail success $ lookup id table
-    where success = return . f
-          fail    = undefined
+getSymInfoArg :: Identifier -> (SymInfo -> a) -> Checker a
+getSymInfoArg id f = do
+    tab <- gets table
+    maybe fail success $ lookup id tab
+    where
+        success = return . f
+        fail    = do
+            posn <- gets currPosn
+            tell [SError posn $ VariableNotDeclared id]
+            return $ f emptySymInfo
 
 {-|
     Cambia el valor de la variable id por el valor vn en
     la tabla de simbolos
 -}
-changeValue :: Identifier -> Value -> Checker ()
-changeValue id vn = undefined
-
+modifyValue :: Identifier -> Value -> Checker ()
+modifyValue id v = do
+    tab <- gets table
+    let mSym = lookup id tab
+    case mSym of
+        Just _  -> modify $ func tab
+        Nothing -> do
+            posn <- gets currPosn
+            tell [SError posn $ VariableNotDeclared id]
+    where
+        func tab s = s { table = update id modValue tab }
+        modValue sy = sy { value = Just v }
 {-|
     Marcamos a la variable id como bloqueada en la tabla de simbolos
 -}
@@ -133,30 +157,59 @@ changeValue id vn = undefined
         {-otherwise -> continue-}
 
 {-|
-    Agregamos a la tabla de simbolos las variables definidas en ds
-    y aumentamos el scope actual
--}
-processDeclarationList :: [Declaration] -> Checker ()
-processDeclarationList ds = enterScope >> mapM_ processDeclaration ds >> exitScope
-
-{-|
     Adds the declaration of id to the symbol table
 -}
 processDeclaration :: Declaration -> Checker ()
 processDeclaration (Declaration id t c) = do
-    table <- gets table
-    cs    <- gets currentSc
+    posn <- gets currPosn
+    tab  <- gets table
+    cs   <- gets currtSc
     let info = SymInfo {
                  dataType = t,
                  category = c,
                  value    = Nothing,
                  scopeNum = cs,
-                 position = (0, 0) -- TODO Esto debe conseguir del AlexPosn
+                 declPosn = posn
                }
-    case lookup id table of
+    case lookup id tab of
         Nothing                              -> addSymbol id info
-        Just (SymInfo _ _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id 
+        Just (SymInfo _ _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id
                                  | otherwise -> addSymbol id info
+
+checkExpression :: Expression -> Checker DataType
+checkExpression (Variable id)   = do
+    (val, dt) <- getSymInfoArg id (value &&& dataType) -- (\si -> (value si, dataType si))
+    case val of
+        Just _  -> return dt
+        Nothing -> do
+            posn <- gets currPosn
+            tell [SError posn $ VariableNotInitialized id]
+            return dt
+checkExpression (LitInt _)      = return Int
+checkExpression (LitFloat _)    = return Float
+checkExpression (LitBool _)     = return Bool
+checkExpression (LitChar _)     = return Char
+checkExpression (LitString _)   = return String
+checkExpression (ExpBinary op l r) = do
+    ldt  <- checkExpression l
+    rdt  <- checkExpression r
+    let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
+    if null dts
+        then do
+            posn <- gets currPosn
+            tell [SError posn $ BinaryTypes op [ldt,rdt]]
+            return . snd . head $ binaryOperation op
+        else return . snd $ head dts
+checkExpression (ExpUnary op e)    = do
+    dt   <- checkExpression e
+    let dts = filter ((dt==) . fst) $ unaryOperation op
+    if null dts
+        then do
+            posn <- gets currPosn
+            tell [SError posn $ UnaryTypes op dt]
+            return . snd . head $ unaryOperation op
+        else return . snd $ head dts
+
 
 ----------------------------------------
 
@@ -179,9 +232,19 @@ getCheck = (\(c,_,_) -> c) . runChecker
 getState :: Checker a -> CheckState
 getState = (\(_,s,_) -> s) . runChecker
 
-getErrors :: CheckWriter -> ([LexerError], [ParseError], [StaticError])
+getErrors :: CheckWriter -> ([(LexerError, Position)], [(ParseError, Position)], [(StaticError, Position)])
 getErrors errors = (lexErrors, parseErrors, staticErrors)
     where
-        lexErrors    = map (\(LError e) -> e) $ filter ((=="LError") . show . typeOf) errors
-        parseErrors  = map (\(PError e) -> e) $ filter ((=="PError") . show . typeOf) errors
-        staticErrors = map (\(SError e) -> e) $ filter ((=="SError") . show . typeOf) errors
+        lexErrors    = sortBy posSort . map (\(LError p e) -> (e,p)) $ filter funcLError errors
+        parseErrors  = sortBy posSort . map (\(PError p e) -> (e,p)) $ filter funcPError errors
+        staticErrors = sortBy posSort . map (\(SError p e) -> (e,p)) $ filter funcSError errors
+        posSort (_,l) (_,r) = l `compare` r
+        funcLError e = case e of
+            (LError p e) -> True
+            _            -> False
+        funcPError e = case e of
+            (PError p e) -> True
+            _            -> False
+        funcSError e = case e of
+            (SError p e) -> True
+            _            -> False

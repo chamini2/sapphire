@@ -4,12 +4,14 @@
 module SymbolTable
     -- SymTable
     ( SymTable
+    , Position
     , emptyTable
     , insert
     , lookup
     , update
     -- SymInfo
     , SymInfo(..)
+    , emptySymInfo
     -- Scope
     , Scope(..)
     , ScopeNum
@@ -22,26 +24,35 @@ module SymbolTable
     , push
     ) where
 
-import           Language      (DataType, Identifier, Category)
+import           Language      (DataType(Void), Identifier, Category(CatVariable), Expression)
 
 import           Prelude       hiding (lookup)
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (empty, update)
 
 
+type Position = (Int, Int) -- (Fila, Columna)
+
 data SymInfo = SymInfo
     { dataType :: DataType
     , category :: Category
     , value    :: Maybe Value
     , scopeNum :: ScopeNum
-    , position :: Position
+    , declPosn :: Position
     } deriving (Show)
 
-
-type Position = (Int, Int) -- (Fila, Columna)
+emptySymInfo :: SymInfo
+emptySymInfo = SymInfo {
+                 dataType = Void,
+                 category = CatVariable,
+                 value    = Nothing,
+                 scopeNum = -1,
+                 declPosn = (0, 0) -- TODO Esto se debe conseguir del AlexPosn
+               }
 
 data Scope = Scope { serial :: ScopeNum } deriving (Show)
 
+initialScope :: Scope
 initialScope = Scope { serial = 0 }
 
 type ScopeNum = Int
@@ -60,17 +71,19 @@ emptyStack :: Stack Scope
 emptyStack = Stack [initialScope]
 
 data Value
-    = Int  Int
-    | Bool Bool
-    | Char Char
-    | Float Float
-    deriving (Eq)
+    = ValInt  Int
+    | ValBool Bool
+    | ValChar Char
+    | ValFloat Float
+    | ValExpression Expression
+    --deriving (Eq)
 
 instance Show Value where
-    show (Int v)   = show v
-    show (Bool v)  = show v
-    show (Char v)  = show v
-    show (Float v) = show v
+    show (ValInt v)        = show v
+    show (ValBool v)       = show v
+    show (ValChar v)       = show v
+    show (ValFloat v)      = show v
+    show (ValExpression e) = show e
 
 {-|
     Symbol Table
@@ -111,4 +124,4 @@ update id f (SymTable m) = SymTable $ DM.alter g id m
     where g (Just is) =
             case viewl is of
                 i :< iss  -> Just $ f i <| iss
-                otherwise -> error "SymbolTable.update: No value to update"
+                _         -> error "SymbolTable.update: No value to update"

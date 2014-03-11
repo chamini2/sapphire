@@ -1,5 +1,5 @@
 main: clean alex happy
-	ghc -O2 Sapphire
+	ghc -O2 Sapphire.hs
 
 alex:
 	alex -g Lexer.x

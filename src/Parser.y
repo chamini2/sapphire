@@ -5,6 +5,7 @@ module Parser (parseProgram) where
 import           Lexer
 import           Language
 import           Checker
+import           SymbolTable
 
 import           Prelude
 import           Control.Monad.RWS
@@ -257,10 +258,27 @@ StatementList :: { Checker [Statement] }
 
 Statement :: { Checker Statement }
     :                           { return StNoop }      -- λ, no-operation
-    | varid "=" Expression      { return $ StAssign $1 $3 }
+--    | varid "=" Expression      { return $ StAssign $1 $3 }
+    | varid "=" Expression
+        { do
+            varDt <- getSymInfoArg $1 dataType
+            expDt <- checkExpression $3
+            if varDt == expDt
+                then return ()
+                else do
+                    posn  <- gets currPosn
+                    tell [SError posn $ InvalidAssignType $1 varDt expDt]
+            return $ StAssign $1 $3
+        }
 
 --    -- Definitions
---    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1 CatVariable) $2 }
+--    | DataType VariableList     { return . StDeclaration $ map (\var -> Declaration var $1 CatVariable) (reverse $2) }
+    | DataType VariableList
+        { do
+            let decls = map (\id -> Declaration id $1 CatVariable) (reverse $2)
+            mapM_ processDeclaration decls
+            return $ StDeclaration decls
+        }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
