@@ -5,7 +5,6 @@ module Checker where
 import           Language
 import           SymbolTable
 
---import           Control.Monad.Error    (Error(..))
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
@@ -58,11 +57,11 @@ data StaticError where
     StaticError :: String -> StaticError
 
 instance Show StaticError where
-    show (VariableNotDeclared id)     = "Static error: variable '" ++ id ++ "' has not been declared"
-    show (VariableNotInitialized id)  = "Static error: variable '" ++ id ++ "' has not been initialized"
-    show (InvalidAssignType id vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ id ++ "' of type '" ++ show vt ++ "'"
+    show (VariableNotDeclared var)     = "Static error: variable '" ++ var ++ "' has not been declared"
+    show (VariableNotInitialized var)  = "Static error: variable '" ++ var ++ "' has not been initialized"
+    show (InvalidAssignType var vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
     show (UnaryTypes op dt)   = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op dts) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments " ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    show (BinaryTypes op dts) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show (head dts) ++ ", " ++ show (dts !! 1) ++ "'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
     show (StaticError msg)    = "Static error: " ++ msg
 
 ----------------------------------------
@@ -112,79 +111,88 @@ exitScope = modify (\s -> s { stack = snd . pop $ stack s })
     Adds a symbol to the Checker's symbol table
 -}
 addSymbol :: Identifier -> SymInfo -> Checker ()
-addSymbol id info = modify (\s -> s { table = insert id info (table s)})
+addSymbol var info = modify (\s -> s { table = insert var info (table s)})
 
 {-|
     Gets a symbol's value if it has one or Nothing otherwise
 -}
-getSymInfoArg :: Identifier -> (SymInfo -> a) -> Checker a
-getSymInfoArg id f = do
+getSymInfoArg :: Identifier -> (SymInfo -> a) -> Checker (Maybe a)
+getSymInfoArg var f = do
     tab <- gets table
-    maybe fail success $ lookup id tab
+    maybe failure success $ lookup var tab
     where
-        success = return . f
-        fail    = do
+        success = return . Just . f
+        failure = do
             posn <- gets currPosn
-            tell [SError posn $ VariableNotDeclared id]
-            return $ f emptySymInfo
+            tell [SError posn $ VariableNotDeclared var]
+            return Nothing
 
 {-|
-    Cambia el valor de la variable id por el valor vn en
+    Cambia el valor de la variable var por el valor vn en
     la tabla de simbolos
 -}
 modifyValue :: Identifier -> Value -> Checker ()
-modifyValue id v = do
+modifyValue var v = do
     tab <- gets table
-    let mSym = lookup id tab
+    let mSym = lookup var tab
     case mSym of
         Just _  -> modify $ func tab
         Nothing -> do
             posn <- gets currPosn
-            tell [SError posn $ VariableNotDeclared id]
+            tell [SError posn $ VariableNotDeclared var]
     where
-        func tab s = s { table = update id modValue tab }
+        func tab s = s { table = update var modValue tab }
         modValue sy = sy { value = Just v }
+
+markInitialized :: Identifier -> Checker ()
+markInitialized var = do
+    maySymI <- getSymInfoArg var id
+    case maySymI of
+        Just symI  -> let newSymI = symI { initialized = True }
+            in modify (\s -> s { table = update var (const newSymI) (table s) })
+        Nothing ->  return ()
+
+
 {-|
-    Marcamos a la variable id como bloqueada en la tabla de simbolos
+    Marcamos a la variable var como bloqueada en la tabla de simbolos
 -}
 {-marcarVariableOcupada :: Identifier -> Checker ()-}
-{-marcarVariableOcupada id = do-}
+{-marcarVariableOcupada var = do-}
     {-tabla <- gets tabla-}
-    {-case buscarInfoSim id tabla of-}
+    {-case buscarInfoSim var tabla of-}
         {-Just info -> do-}
-            {-eliminarDeclaracion $ Decl id (tipo info) -}
-            {-agregarSimbolo id $ info { ocupado = True } -}
+            {-eliminarDeclaracion $ Decl var (tipo info) -}
+            {-agregarSimbolo var $ info { ocupado = True } -}
         {-otherwise -> continue-}
 
 {-|
-    Adds the declaration of id to the symbol table
+    Adds the declaration of var to the symbol table
 -}
 processDeclaration :: Declaration -> Checker ()
-processDeclaration (Declaration id t c) = do
+processDeclaration (Declaration var t c) = do
     posn <- gets currPosn
     tab  <- gets table
     cs   <- gets currtSc
-    let info = SymInfo {
+    let info = emptySymInfo {
                  dataType = t,
                  category = c,
-                 value    = Nothing,
                  scopeNum = cs,
                  declPosn = posn
                }
-    case lookup id tab of
-        Nothing                              -> addSymbol id info
-        Just (SymInfo _ _ _ l _) | l == cs   -> return () --throwError $ MultipleDeclarations id
-                                 | otherwise -> addSymbol id info
+    case lookup var tab of
+        Nothing                              -> addSymbol var info
+        Just (SymInfo _ _ _ l _ _) | l == cs   -> return () --throwError $ MultipleDeclarations var
+                                 | otherwise -> addSymbol var info
 
 checkExpression :: Expression -> Checker DataType
-checkExpression (Variable id)   = do
-    (val, dt) <- getSymInfoArg id (value &&& dataType) -- (\si -> (value si, dataType si))
-    case val of
-        Just _  -> return dt
-        Nothing -> do
-            posn <- gets currPosn
-            tell [SError posn $ VariableNotInitialized id]
+checkExpression (Variable var)   = do
+    mayInf <- getSymInfoArg var (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
+    case mayInf of
+        Just (ini, dt) -> do
+            unless ini $ gets currPosn >>=
+                \pos -> tell [SError pos $ VariableNotInitialized var]
             return dt
+        Nothing         -> return Void
 checkExpression (LitInt _)      = return Int
 checkExpression (LitFloat _)    = return Float
 checkExpression (LitBool _)     = return Bool
@@ -240,11 +248,11 @@ getErrors errors = (lexErrors, parseErrors, staticErrors)
         staticErrors = sortBy posSort . map (\(SError p e) -> (e,p)) $ filter funcSError errors
         posSort (_,l) (_,r) = l `compare` r
         funcLError e = case e of
-            (LError p e) -> True
+            (LError _ _) -> True
             _            -> False
         funcPError e = case e of
-            (PError p e) -> True
+            (PError _ _) -> True
             _            -> False
         funcSError e = case e of
-            (SError p e) -> True
+            (SError _ _) -> True
             _            -> False

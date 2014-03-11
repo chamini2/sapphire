@@ -246,9 +246,12 @@ Program :: { Program }
     : StatementList         { liftM reverse $1 }
 --    | error                 { [parseError StNoop "Expecting a statement"] }
 
-StatementList :: { Checker [Statement] }
+--StatementList :: { Checker [Statement] }
+--    : Statement                             { liftM (:[]) $1   }
+--    | StatementList Separator Statement     { liftM2 (:) $3 $1 }
+StatementList :: { Checker [Statement] }    -- ARMANDOLO AL REVES
     : Statement                             { liftM (:[]) $1   }
-    | StatementList Separator Statement     { liftM2 (:) $3 $1 }
+    | Statement Separator StatementList     { liftM2 (:) $1 $3 }
         -- Equivalente a
         --{ do
         --    ls <- $1
@@ -261,14 +264,15 @@ Statement :: { Checker Statement }
 --    | varid "=" Expression      { return $ StAssign $1 $3 }
     | varid "=" Expression
         { do
-            varDt <- getSymInfoArg $1 dataType
+            mayVarDt <- getSymInfoArg $1 dataType
             expDt <- checkExpression $3
-            if varDt == expDt
-                then return ()
-                else do
-                    posn  <- gets currPosn
-                    tell [SError posn $ InvalidAssignType $1 varDt expDt]
-            return $ StAssign $1 $3
+            case mayVarDt of
+                Just varDt -> do
+                    markInitialized $1
+                    unless (varDt == expDt) $ gets currPosn >>=
+                        \pos -> tell [SError pos $ InvalidAssignType $1 varDt expDt]
+                    return $ StAssign $1 $3
+                Nothing    -> return $ StAssign $1 $3
         }
 
 --    -- Definitions

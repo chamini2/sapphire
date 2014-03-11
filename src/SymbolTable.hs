@@ -34,20 +34,22 @@ import           Data.Sequence as DS hiding (empty, update)
 type Position = (Int, Int) -- (Fila, Columna)
 
 data SymInfo = SymInfo
-    { dataType :: DataType
-    , category :: Category
-    , value    :: Maybe Value
-    , scopeNum :: ScopeNum
-    , declPosn :: Position
+    { dataType    :: DataType
+    , category    :: Category
+    , value       :: Maybe Value
+    , scopeNum    :: ScopeNum
+    , declPosn    :: Position
+    , initialized :: Bool
     } deriving (Show)
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo {
-                 dataType = Void,
-                 category = CatVariable,
-                 value    = Nothing,
-                 scopeNum = -1,
-                 declPosn = (0, 0) -- TODO Esto se debe conseguir del AlexPosn
+                 dataType    = Void,
+                 category    = CatVariable,
+                 value       = Nothing,
+                 scopeNum    = -1,
+                 declPosn    = (0, 0), -- TODO Esto se debe conseguir del AlexPosn
+                 initialized = False
                }
 
 data Scope = Scope { serial :: ScopeNum } deriving (Show)
@@ -106,11 +108,11 @@ insert vn info (SymTable m) = SymTable $ DM.alter f vn m
           f (Just x) = Just $ info <| x
 
 {-|
-    Looks up the symbol identified by id in the symbol table
+    Looks up the symbol identified by var in the symbol table
  -}
 lookup :: Identifier -> SymTable -> Maybe SymInfo
-lookup id (SymTable m) = do
-    is <- DM.lookup id m
+lookup var (SymTable m) = do
+    is <- DM.lookup var m
     case viewl is of
         EmptyL    -> Nothing
         info :< _ -> Just info
@@ -120,8 +122,8 @@ lookup id (SymTable m) = do
     en la tabla de símbolos
  -}
 update :: Identifier -> (SymInfo -> SymInfo) -> SymTable -> SymTable
-update id f (SymTable m) = SymTable $ DM.alter g id m
-    where g (Just is) =
-            case viewl is of
-                i :< iss  -> Just $ f i <| iss
-                _         -> error "SymbolTable.update: No value to update"
+update var f (SymTable m) = SymTable $ DM.alter func var m
+    where
+        func (Just is) = case viewl is of
+            i :< iss  -> Just $ f i <| iss
+            _         -> error "SymbolTable.update: No value to update"
