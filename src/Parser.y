@@ -7,7 +7,7 @@ import           Language
 import           Checker
 import           SymbolTable
 
-import           Prelude
+import           Prelude 
 import           Control.Monad.RWS
 --import           Control.Monad
 import           Data.List (find)
@@ -279,7 +279,9 @@ Statement :: { Checker Statement }
 --    | DataType VariableList     { return . StDeclaration $ map (\var -> Declaration var $1 CatVariable) (reverse $2) }
     | DataType VariableList
         { do
-            let decls = map (\id -> Declaration id $1 CatVariable) (reverse $2)
+            /*let decls = fmap (\id -> Declaration id $1 CatVariable) $2*/
+            /*let decls = map (\id -> Declaration id $1 CatVariable) (reverse $2)*/
+            let decls = foldl (\r var -> (Declaration var $1 CatVariable) : r) [] $2
             mapM_ processDeclaration decls
             return $ StDeclaration decls
         }

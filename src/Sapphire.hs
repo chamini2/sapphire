@@ -11,7 +11,7 @@ main = do
     args <- getArgs
     input <- if null args
         then getContents
-        else readFile (head args)
+        else readFile $ head args
     case parseProgram input of
         Right program -> printProgram program
         --_             -> putStrLn "IMPOSSIBLE ERROR!"
