@@ -161,6 +161,14 @@ printStatement st = case st of
         printNonTerminal "DECLARATION LIST"
         lowerTabs
     StReturn e -> printExpressionWithTag "RETURN" e
+    -- I/O
+    StRead vs -> do
+        printNonTerminal "READ"
+        raiseTabs
+        DF.mapM_ (printExpression . Variable) vs 
+        lowerTabs
+    StPrint es -> printExpressions "PRINT" es
+    -- Conditional
     StIf g success fail -> do
         printNonTerminal "IF"
         raiseTabs
@@ -168,6 +176,8 @@ printStatement st = case st of
         printStatements        "- success: " success
         printStatements        "- fail: "    fail
         lowerTabs
+    StCase e cs ss -> return ()
+    -- Loops
     StWhile g c -> do
         printNonTerminal "WHILE" 
         raiseTabs
@@ -181,12 +191,8 @@ printStatement st = case st of
         printExpressionWithTag "- range: "       r
         printStatements        "- body: "        c
         lowerTabs
-    StPrint es -> printExpressions "PRINT" es
-    StRead vs -> do
-        printNonTerminal "READ"
-        raiseTabs  
-        printNonTerminal "VARIABLES LIST"
-        lowerTabs
+    StBreak    -> printNonTerminal "BREAK"
+    StContinue -> printNonTerminal "CONTINUE"
     otherwise -> return ()
 
 --
