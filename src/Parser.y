@@ -8,7 +8,6 @@ import           Checker
 
 import           Prelude
 import qualified Data.Foldable as DF
-import           Data.List (foldl')
 import           Data.Sequence
 --import           Control.Monad.RWS
 --import           Control.Monad
@@ -250,51 +249,32 @@ StatementList :: { Seq Statement }
 Statement :: { Statement }
     :                           { StNoop }      -- λ, no-operation
     | varid "=" Expression      { StAssign $1 $3 }
-    --| varid "=" Expression
-    --    { do
-    --        mayVarDt <- getSymInfoArg $1 dataType
-    --        expDt <- checkExpression $3
-    --        case mayVarDt of
-    --            Just varDt -> do
-    --                markInitialized $1
-    --                unless (varDt == expDt) $ gets currPosn >>=
-    --                    \pos -> tell [SError pos $ InvalidAssignType $1 varDt expDt]
-    --                return $ StAssign $1 $3
-    --            Nothing    -> return $ StAssign $1 $3
-    --    }
 
---    -- Definitions
+    -- Definitions
     | DataType VariableList     { StDeclaration $ fmap (\var -> Declaration var $1 CatVariable) $2 }
---  | DataType VariableList     { StDeclaration $ foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2 }
---    | DataType VariableList
---        { do
---            let decls = fmap (\var -> Declaration var $1 CatVariable) $2
---            DF.mapM_ processDeclaration decls
---            return $ StDeclaration decls
---        }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
---    -- I/O
---    | "read" VariableList       { StRead  (reverse $2) }
---    | "print" ExpressionList    { StPrint (reverse $2) }
+    -- Conditional
+--    | "if" ExpressionBool "then" StatementList "end"                           { StIf $2           $4 empty }
+--    | "if" ExpressionBool "then" StatementList "else" StatementList "end"      { StIf $2           $4 $6    }
+--    | "unless" ExpressionBool "then" StatementList "end"                       { StIf (NotBool $2) $4 empty }
+--    | "unless" ExpressionBool "then" StatementList "else" StatementList "end"  { StIf (NotBool $2) $4 $6    }
+--    | "case" ExpressionArit CaseList "end"                                     { StCase $2 $3 empty         }   
+--    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 $3 $5            }   
 
---    -- Conditional
---    | "if" ExpressionBool "then" StatementList "end"                           { StIf $2           (reverse $4) []           }
---    | "if" ExpressionBool "then" StatementList "else" StatementList "end"      { StIf $2           (reverse $4) (reverse $6) }
---    | "unless" ExpressionBool "then" StatementList "end"                       { StIf (NotBool $2) (reverse $4) []           }
---    | "unless" ExpressionBool "then" StatementList "else" StatementList "end"  { StIf (NotBool $2) (reverse $4) (reverse $6) }
---    | "case" ExpressionArit CaseList "end"                                     { StCase $2 (reverse $3) []                   }
---    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 (reverse $3) (reverse $5)         }
+    -- I/O
+--    | "read" VariableList       { StRead  $2 }
+--    | "print" ExpressionList    { StPrint $2 }
 
---    -- Loops
---    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           (reverse $4) }
---    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) (reverse $4) }
+    -- Loops
+--    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           $4 }
+--    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) $4 }
 
-    --| "repeat" StatementList "while" ExpressionBool            { StRepeat (reverse $2) $4           }
-    --| "repeat" StatementList "until" ExpressionBool            { StRepeat (reverse $2) (NotBool $4) }
+--    | "repeat" StatementList "while" ExpressionBool            { StRepeat $2 $4           }
+--    | "repeat" StatementList "until" ExpressionBool            { StRepeat $2 (NotBool $4) }
 
---    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 (reverse $6)          }
+--    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 $6          }
 --    | "break"           { StBreak }
 --    | "continue"        { StContinue }
 --    | error         { parseError StNoop "Expecting a statement" }
@@ -303,12 +283,12 @@ Separator :: { () }
     : ";"           {}
     | newline       {}
 
---CaseList --:: { [Case] }
---    : Case              { [$1]    }
---    | CaseList Case     { $2 : $1 }
+--CaseList --:: { Seq Case }
+--    : Case              { singleton $1 }
+--    | CaseList Case     { $1 |> $2     }
 
 --Case --:: { Case }
---    : "when" Expression "do" StatementList      { Case $2 (reverse $4) }
+--    : "when" Expression "do" StatementList      { Case $2 $4 }
 
 ---------------------------------------
 
@@ -321,17 +301,15 @@ DataType :: { DataType }
     | "Range"       { Range }
     | "Type"        { Type }
 --    | "Union" typeid
---    | "Record" typeid
---            ------------------------------ FALTA ARREGLOS
-
-----DataTypeArray
-----    : "[" DataType "]" "<-" "[" int "]"
+--    | "Record" typeid --            
+------------------------------ FALTA ARREGLOS --
+--DataTypeArray ----    : "[" DataType "]" "<-" "[" int "]" 
 
 VariableList :: { Seq Identifier }
-    : varid                         { singleton $1 }
-    | VariableList "," varid        { $1 |> $3 }
-
---FunctionDef --:: { Function }
+             : varid                         { singleton $1 }
+             | VariableList "," varid        { $1 |> $3 } 
+             
+--FunctionDef :: { Function } 
 --    : "def" varid "::" Signature
 --    | "def" varid "(" VariableList ")" "::" Signature "as" StatementList "end" -- length(ParemeterList) == length(Signature) - 1
 
@@ -372,57 +350,15 @@ Expression :: { Expression }
     | "not" Expression             { ExpUnary OpNot    $2 {-Void-} }
 --    | error                         { parseError (ExpError Void) "Expecting an expression" }
 
-ExpressionList :: { [Expression] }
-    : Expression                                { $1 : [] }
-    | ExpressionList Separator Expression       { $3 : $1 }
+ExpressionList :: { Seq Expression }
+    : Expression                                { singleton $1 }
+    | ExpressionList Separator Expression       { $1 |> $3     }
 --    | error                                     { [parseError (ExpError Void) "Expecting an expression"] }
 
 {
 
 --------------------------------------------------------------------------------
 -- Functions
-
---binaryM :: Binary -> Checker Expression -> Checker Expression -> Checker Expression
---binaryM op leftM rightM = do
---    left  <- leftM
---    right <- rightM
---    let checking = checkBinaryType left right
---    case op of
---        OpOr      -> checking [(Bool,Bool,Bool)]
---        OpAnd     -> checking [(Bool,Bool,Bool)]
---        OpEqual   -> checking ((Bool,Bool,Bool) : numbers)
---        OpUnEqual -> checking ((Bool,Bool,Bool) : numbers)
---        OpFromTo  -> checking [(Int, Int, Range)]
---        OpBelongs -> checking [(Int, Range, Bool)]
---        _         -> checking numbers -- OpPlus OpMinus OpTimes OpDivide OpModulo OpPower OpLess OpLessEq OpGreat OpGreatEq
---    where
---        numbers = [(Int, Int, Int), (Float, Float, Float)]
---        checkBinaryType :: Expression -> Expression -> [(DataType,DataType,DataType)] -> Checker Expression
---        checkBinaryType left right types = do
---            let cond (l,r,_) = dataType left == l && dataType right == r
---                defaultType  = (\(_,_,r) -> r) $ head types -- We have to calculate better the defaultType
---            case find cond types of
---                Just (_,_,r) -> return $ ExpBinary op left right r
---                Nothing      -> expError defaultType $ "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++
---                                           show (dataType left) ++ ", " ++ show (dataType right) ++ "\n"
-
---unaryM :: Unary -> Checker Expression -> Checker Expression
---unaryM op operandM = do
---    operand <- operandM
---    let checking = checkUnaryType operand
---    case op of
---        OpNegate -> checking [(Int, Int), (Float, Float)]
---        OpNot    -> checking [(Bool,Bool)]
---    where
---        checkUnaryType :: Expression -> [(DataType,DataType)] -> Checker Expression
---        checkUnaryType operand types = do
---            let cond (u,_)  = dataType operand == u
---                defaultType = snd $ head types -- We have to calculate better the defaultType
---            case find cond types of
---                Just (_,r) -> return $ ExpUnary op operand r
---                Nothing    -> expError defaultType $ "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++
---                                         show (dataType operand) ++ "\n"
-
 
 --expError :: DataType -> String -> Checker Expression
 --expError dt str = do
@@ -433,14 +369,6 @@ ExpressionList :: { [Expression] }
 --parseError identity str = do
 --    tell [PError $ UnexpectedToken str]
 --    return identity
-
---continueChecker :: Checker a -> (a -> b) -> Checker b
---continueChecker extract func = do
---    let (check, state, writer) = runChecker extract
---    tell writer
---    put state
---    return $ func check
-
 
 --------------------------------------------------------------------------------
 

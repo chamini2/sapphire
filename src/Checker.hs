@@ -223,6 +223,7 @@ processDeclaration (Declaration var t c) = do
 
 {- |
     Checks the validity of each statement of the program, modifying the state.
+    Filling up the symbol table while performing type checking
 -}
 checkProgram :: Program -> Checker ()
 checkProgram pr@(Program sts) = do

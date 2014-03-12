@@ -5,7 +5,7 @@ import           Checker            (CheckState (..), checkProgram, getErrors,
 import           Language           (Program (..))
 import           Parser
 
-import qualified Data.Foldable as DF
+import qualified Data.Foldable as DF (mapM_)
 import           Prelude
 import           System.Environment (getArgs)
 

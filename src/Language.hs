@@ -2,10 +2,10 @@
 module Language where
 
 import           Prelude
-import qualified Data.Sequence as DS
+import           Data.Sequence (Seq)
 
 --type Program = StFunction
-newtype Program = Program (DS.Seq Statement)
+newtype Program = Program (Seq Statement)
     deriving (Show)
 
 type Identifier = String
@@ -20,17 +20,17 @@ data Statement where
     StNoop   :: Statement
     StAssign :: Identifier -> Expression -> Statement
     -- Definitions
-    StDeclaration :: DS.Seq Declaration -> Statement
+    StDeclaration :: Seq Declaration -> Statement
     StReturn      :: Expression    -> Statement
     -- I/O
-    StRead  :: DS.Seq Identifier -> Statement
-    StPrint :: [Expression] -> Statement
+    StRead  :: Seq Identifier -> Statement
+    StPrint :: Seq Expression -> Statement
     -- Conditional
-    StIf   :: Expression -> [Statement] -> [Statement] -> Statement
-    StCase :: Expression -> [Case]      -> [Statement] -> Statement
+    StIf   :: Expression -> Seq Statement -> Seq Statement -> Statement
+    StCase :: Expression -> Seq Case      -> Seq Statement -> Statement
     -- Loops
-    StWhile    :: Expression -> DS.Seq Statement ->  Statement
-    StFor      :: Identifier -> Expression  -> DS.Seq Statement -> Statement
+    StWhile    :: Expression -> Seq Statement ->  Statement
+    StFor      :: Identifier -> Expression  -> Seq Statement -> Statement
     StBreak    :: Statement
     StContinue :: Statement
     deriving (Show)
@@ -47,7 +47,7 @@ data Category = CatVariable
               | CatDataType             -- Que es esto?? no será CatDeclaration? En verdad no tengo idea
               deriving (Eq, Show)
 
-data Case = Case Expression (DS.Seq Statement)
+data Case = Case Expression (Seq Statement)
     deriving (Show)
 
 ----------------------------------------
