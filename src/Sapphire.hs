@@ -1,7 +1,8 @@
 module Main where
 
-import           Parser
 import           Checker
+import           Language
+import           Parser
 
 import           Prelude
 import           System.Environment (getArgs)
@@ -18,18 +19,18 @@ main = do
         Left errors   -> mapM_ print $ reverse errors
 
 printProgram :: Program -> IO ()
-printProgram program = do
-    let (checked,state,writer) = runChecker program
-
+printProgram pr = do
+    let (state,writer) = runProgramChecker $ checkProgram pr
+        (Program prog) = ast state
     -- TEMPORAL
     print state
     mapM_ print writer
-    mapM_ print checked
+    mapM_ print prog
     putStrLn "--------------------------------------------------------------------------------"
     -- /TEMPORAL
 
     if null writer
-        then mapM_ print checked
+        then mapM_ print prog
         else do
             let (lexErrors,parseErrors,staticErrors) = getErrors writer
             mapM_ print lexErrors

@@ -5,12 +5,12 @@ module Parser (parseProgram) where
 import           Lexer
 import           Language
 import           Checker
-import           SymbolTable
+--import           SymbolTable
 
 import           Prelude
-import           Control.Monad.RWS
+--import           Control.Monad.RWS
 --import           Control.Monad
-import           Data.List (find)
+--import           Data.List (find)
 }
 
 %name parse
@@ -243,46 +243,38 @@ import           Data.List (find)
 -- Grammar
 
 Program :: { Program }
-    : StatementList         { liftM reverse $1 }
+    : StatementList         { Program $ reverse $1 }
 --    | error                 { [parseError StNoop "Expecting a statement"] }
 
---StatementList :: { Checker [Statement] }
---    : Statement                             { liftM (:[]) $1   }
---    | StatementList Separator Statement     { liftM2 (:) $3 $1 }
-StatementList :: { Checker [Statement] }    -- ARMANDOLO AL REVES
-    : Statement                             { liftM (:[]) $1   }
-    | Statement Separator StatementList     { liftM2 (:) $1 $3 }
-        -- Equivalente a
-        --{ do
-        --    ls <- $1
-        --    continueChecker $3 (:ls)
-        --}
+StatementList :: { [Statement] }    -- ARMANDOLO AL REVES
+    : Statement                             { $1 : [] }
+    | StatementList Separator Statement     { $3 : $1 }
 --    | error                                 { [parseError StNoop "Expecting a statement"] }
 
-Statement :: { Checker Statement }
-    :                           { return StNoop }      -- λ, no-operation
---    | varid "=" Expression      { return $ StAssign $1 $3 }
-    | varid "=" Expression
-        { do
-            mayVarDt <- getSymInfoArg $1 dataType
-            expDt <- checkExpression $3
-            case mayVarDt of
-                Just varDt -> do
-                    markInitialized $1
-                    unless (varDt == expDt) $ gets currPosn >>=
-                        \pos -> tell [SError pos $ InvalidAssignType $1 varDt expDt]
-                    return $ StAssign $1 $3
-                Nothing    -> return $ StAssign $1 $3
-        }
+Statement :: { Statement }
+    :                           { StNoop }      -- λ, no-operation
+    | varid "=" Expression      { StAssign $1 $3 }
+    --| varid "=" Expression
+    --    { do
+    --        mayVarDt <- getSymInfoArg $1 dataType
+    --        expDt <- checkExpression $3
+    --        case mayVarDt of
+    --            Just varDt -> do
+    --                markInitialized $1
+    --                unless (varDt == expDt) $ gets currPosn >>=
+    --                    \pos -> tell [SError pos $ InvalidAssignType $1 varDt expDt]
+    --                return $ StAssign $1 $3
+    --            Nothing    -> return $ StAssign $1 $3
+    --    }
 
 --    -- Definitions
---    | DataType VariableList     { return . StDeclaration $ map (\var -> Declaration var $1 CatVariable) (reverse $2) }
-    | DataType VariableList
-        { do
-            let decls = map (\id -> Declaration id $1 CatVariable) (reverse $2)
-            mapM_ processDeclaration decls
-            return $ StDeclaration decls
-        }
+    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1 CatVariable) (reverse $2) }
+    --| DataType VariableList
+    --    { do
+    --        let decls = map (\id -> Declaration id $1 CatVariable) (reverse $2)
+    --        mapM_ processDeclaration decls
+    --        return $ StDeclaration decls
+    --    }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
@@ -335,7 +327,7 @@ DataType :: { DataType }
 ----    : "[" DataType "]" "<-" "[" int "]"
 
 VariableList :: { [Identifier] }
-    : varid                         { [$1]    }
+    : varid                         { $1 : [] }
     | VariableList "," varid        { $3 : $1 }
 
 --FunctionDef --:: { Function }
@@ -380,7 +372,7 @@ Expression :: { Expression }
 --    | error                         { parseError (ExpError Void) "Expecting an expression" }
 
 ExpressionList :: { [Expression] }
-    : Expression                                { [$1]    }
+    : Expression                                { $1 : [] }
     | ExpressionList Separator Expression       { $3 : $1 }
 --    | error                                     { [parseError (ExpError Void) "Expecting an expression"] }
 

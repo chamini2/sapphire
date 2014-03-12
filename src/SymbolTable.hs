@@ -2,33 +2,33 @@
     Symbol table based on the LeBlanc-Cook symbol table abstraction
  -}
 module SymbolTable
-    -- SymTable
     ( SymTable
     , Position
     , emptyTable
     , insert
     , lookup
     , update
-    -- SymInfo
+
     , SymInfo(..)
     , emptySymInfo
-    -- Scope
+
     , Scope(..)
     , ScopeNum
-    -- Value according to the Sapphire language definition
+
     , Value(..)
-    -- Stack
+
     , Stack
     , emptyStack
     , pop
     , push
     ) where
 
-import           Language      (DataType(Void), Identifier, Category(CatVariable), Expression)
+import           Language      (Category (CatVariable), DataType (Void),
+                                Expression, Identifier)
 
-import           Prelude       hiding (lookup)
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (empty, update)
+import           Prelude       hiding (lookup)
 
 
 type Position = (Int, Int) -- (Fila, Columna)

@@ -1,48 +1,16 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GADTs #-}
 module Language where
 
 import           Prelude
-import           Data.Typeable          (Typeable (..))
 
---type Program  = StFunction
---type Program  = Checker [Statement]   DEFINIDO EN Checker.hs
+--type Program = StFunction
+newtype Program = Program [Statement]
+    deriving (Show)
+
 type Identifier = String
 
 data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Array
-    deriving (Show, Typeable, Eq)
-
-data Declaration = Declaration Identifier DataType Category
-    deriving (Show, Typeable)
-
-data Category = CatVariable
-              | CatFunction
-              | CatParameter
-              | CatRecordField
-              | CatUnionField
-              | CatDataType             -- Que es esto?? no será CatDeclaration? En verdad no tengo idea
-              deriving (Eq, Show)
-
---data Statement
---    -- Language
---    = StNoop
---    | StAssign Identifier Expression
---    -- Definitions
---    | StDeclaration [Declaration]
---    | StFunction    Signature [Statements]
---    | StReturn      Expression
---    -- I/O
---    | StRead  [Identifier]
---    | StPrint [Expression]
---    -- Conditional
---    | StIf   Expression [Statement] [Statement]
---    | StCase Expression [Case]      [Statement]
---    -- Loops
---    | StWhile Expression [Statement]
---    | StFor   Identifier Expression [Statement]
---    | StBreak
---    | StContinue
---    deriving (Show, Typeable)
+    deriving (Show, Eq)
 
 data Statement where
     -- Language
@@ -62,10 +30,22 @@ data Statement where
     StFor      :: Identifier -> Expression  -> [Statement] -> Statement
     StBreak    :: Statement
     StContinue :: Statement
-    deriving (Show, Typeable)
+    deriving (Show)
+
+
+data Declaration = Declaration Identifier DataType Category
+    deriving (Show)
+
+data Category = CatVariable
+              | CatFunction
+              | CatParameter
+              | CatRecordField
+              | CatUnionField
+              | CatDataType             -- Que es esto?? no será CatDeclaration? En verdad no tengo idea
+              deriving (Eq, Show)
 
 data Case = Case Expression [Statement]
-    deriving (Show, Typeable)
+    deriving (Show)
 
 data Binary
     = OpPlus  | OpMinus | OpTimes | OpDivide | OpModulo | OpPower | OpFromTo
@@ -120,7 +100,7 @@ data Range = FromTo Expression Expression
 --    | ExpUnary  Unary  Expression            DataType
 --    | ExpError  DataType
 ----    | ExpArray ExpressionArray
---    deriving (Show, Typeable)
+--    deriving (Show)
 
 data Expression where
     -- Variable
@@ -137,7 +117,7 @@ data Expression where
     ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
     --ExpError  :: DataType -> Expression
     --ExpArray  :: ExpressionArray
-    deriving (Show, Typeable)
+    deriving (Show)
 
 
 --dataType :: Expression -> DataType
@@ -160,7 +140,7 @@ data Expression where
 --rep :: Int -> String
 --rep n = replicate n '\t'
 
---instance (Printer a, Typeable a, Show a) => Printer [a] where
+--instance (Printer a a, Show a) => Printer [a] where
 --    treePrint n ls
 --        | ((show $ typeOf ls) == "[Char]") = rep n ++ show ls ++ "\n"
 --        | otherwise = concat (map (treePrint n) ls)

@@ -11,15 +11,14 @@ import           Control.Monad.RWS
 import           Data.List              (sortBy)
 import           Prelude                hiding (lookup)
 
-type Program  = Checker [Statement]
-
---type Checker a = ErrorT LexerError (RWST CheckReader CheckWriter CheckState Identity) a
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
-data Flag = OutputFile String | SupressWarnings
 type CheckReader = [Flag]
+data Flag = OutputFile String | SupressWarnings
 
-----------------------------------------
+--------------------------------------------------------------------------------
+
+type CheckWriter = [CheckError]
 
 data CheckError where
     LError :: Position -> LexerError  -> CheckError
@@ -50,6 +49,7 @@ data StaticError where
     VariableNotDeclared    :: Identifier -> StaticError
     VariableNotInitialized :: Identifier -> StaticError
     InvalidAssignType      :: Identifier -> DataType -> DataType -> StaticError
+    AlreadyDeclared        :: Identifier -> Position -> StaticError
     -- Operators
     BinaryTypes :: Binary -> [DataType] -> StaticError
     UnaryTypes  :: Unary  -> DataType   -> StaticError
@@ -60,25 +60,22 @@ instance Show StaticError where
     show (VariableNotDeclared var)     = "Static error: variable '" ++ var ++ "' has not been declared"
     show (VariableNotInitialized var)  = "Static error: variable '" ++ var ++ "' has not been initialized"
     show (InvalidAssignType var vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
+    show (AlreadyDeclared var p)   = "Static error: variable '" ++ var ++ "' has already been declared at " ++ show p
     show (UnaryTypes op dt)   = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op dts) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show (head dts) ++ ", " ++ show (dts !! 1) ++ "'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    show (BinaryTypes op (dl:dr:[])) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
     show (StaticError msg)    = "Static error: " ++ msg
 
-----------------------------------------
-
-type CheckWriter = [CheckError]
+--------------------------------------------------------------------------------
 
 data CheckState = CheckState
     { table    :: SymTable
     , stack    :: Stack Scope
     , currtSc  :: ScopeNum
-    {-, ast   :: ()-- Program-}
+    , ast      :: Program
     , currPosn :: Position
     } deriving (Show)
 
---instance Error LexerError where
---    noMsg  = UnexpectedChar "Lexical error"
---    strMsg = UnexpectedChar
+--------------------------------------------------------------------------------
 
 flags :: CheckReader
 flags = []
@@ -88,11 +85,48 @@ initialState = CheckState
     { table    = emptyTable
     , stack    = emptyStack
     , currtSc  = 0
+    , ast      = Program []
     , currPosn = (1,1)
     }
 
-{-|
-    Entrando a un nuevo scope
+----------------------------------------
+
+runProgramChecker :: Checker a -> (CheckState, CheckWriter)
+runProgramChecker = (\(_,s,w) -> (s,w)) . runChecker
+
+runChecker :: Checker a -> (a, CheckState, CheckWriter)
+runChecker = runIdentity . flip (`runRWST` flags) initialState
+
+getWriter :: Checker a -> CheckWriter
+getWriter = (\(_,_,w) -> w) . runChecker
+
+getCheck :: Checker a -> a
+getCheck = (\(c,_,_) -> c) . runChecker
+
+getState :: Checker a -> CheckState
+getState = (\(_,s,_) -> s) . runChecker
+
+getErrors :: CheckWriter -> ([(LexerError, Position)], [(ParseError, Position)], [(StaticError, Position)])
+getErrors errors = (lexErrors, parseErrors, staticErrors)
+    where
+        lexErrors    = sortBy posSort . map (\(LError p e) -> (e,p)) $ filter funcLError errors
+        parseErrors  = sortBy posSort . map (\(PError p e) -> (e,p)) $ filter funcPError errors
+        staticErrors = sortBy posSort . map (\(SError p e) -> (e,p)) $ filter funcSError errors
+        posSort (_,l) (_,r) = l `compare` r
+        funcLError e = case e of
+            (LError _ _) -> True
+            _            -> False
+        funcPError e = case e of
+            (PError _ _) -> True
+            _            -> False
+        funcSError e = case e of
+            (SError _ _) -> True
+            _            -> False
+
+--------------------------------------------------------------------------------
+
+{- |
+    Entering a new scope
 -}
 enterScope :: Checker ()
 enterScope = do
@@ -101,19 +135,19 @@ enterScope = do
         newCs = cs + 1
     modify (\s -> s { stack = push sc (stack s), currtSc = cs + 1 })
 
-{-|
-    Saliendo de un scope ya recorrido completamente
+{- |
+    Exiting a scope that has just been checked
 -}
 exitScope :: Checker ()
 exitScope = modify (\s -> s { stack = snd . pop $ stack s })
 
-{-|
+{- |
     Adds a symbol to the Checker's symbol table
 -}
 addSymbol :: Identifier -> SymInfo -> Checker ()
 addSymbol var info = modify (\s -> s { table = insert var info (table s)})
 
-{-|
+{- |
     Gets a symbol's value if it has one or Nothing otherwise
 -}
 getSymInfoArg :: Identifier -> (SymInfo -> a) -> Checker (Maybe a)
@@ -127,12 +161,11 @@ getSymInfoArg var f = do
             tell [SError posn $ VariableNotDeclared var]
             return Nothing
 
-{-|
-    Cambia el valor de la variable var por el valor vn en
-    la tabla de simbolos
+{- |
+    Changes the value of the variable var to the value val in the symbol table
 -}
 modifyValue :: Identifier -> Value -> Checker ()
-modifyValue var v = do
+modifyValue var val = do
     tab <- gets table
     let mSym = lookup var tab
     case mSym of
@@ -142,25 +175,30 @@ modifyValue var v = do
             tell [SError posn $ VariableNotDeclared var]
     where
         func tab s = s { table = update var modValue tab }
-        modValue sy = sy { value = Just v }
+        modValue sy = sy { value = Just val }
 
+{- |
+    Marks the variable var as initialized.
+-}
 markInitialized :: Identifier -> Checker ()
-markInitialized var = modify (\s -> s { table = update var (\sym -> sym { initialized = True }) (table s) })
+markInitialized var = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
 
 
-{-|
+{- |
     Marcamos a la variable var como bloqueada en la tabla de simbolos
 -}
-{-marcarVariableOcupada :: Identifier -> Checker ()-}
-{-marcarVariableOcupada var = do-}
-    {-tabla <- gets tabla-}
-    {-case buscarInfoSim var tabla of-}
-        {-Just info -> do-}
-            {-eliminarDeclaracion $ Decl var (tipo info) -}
-            {-agregarSimbolo var $ info { ocupado = True } -}
-        {-otherwise -> continue-}
+--marcarVariableOcupada :: Identifier -> Checker ()
+--marcarVariableOcupada var = do
+--    tabla <- gets tabla
+--    case buscarInfoSim var tabla of
+--        Just info -> do
+--            eliminarDeclaracion $ Decl var (tipo info)
+--            agregarSimbolo var $ info { ocupado = True }
+--        otherwise -> continue
 
-{-|
+----------------------------------------
+
+{- |
     Adds the declaration of var to the symbol table
 -}
 processDeclaration :: Declaration -> Checker ()
@@ -175,10 +213,49 @@ processDeclaration (Declaration var t c) = do
                  declPosn = posn
                }
     case lookup var tab of
-        Nothing                              -> addSymbol var info
-        Just (SymInfo _ _ _ l _ _) | l == cs   -> return () --throwError $ MultipleDeclarations var
-                                 | otherwise -> addSymbol var info
+        Nothing -> addSymbol var info
+        Just (SymInfo _ _ _ sn op _)
+            | sn == cs  -> tell [SError posn $ AlreadyDeclared var op ]
+            | otherwise -> addSymbol var info
 
+----------------------------------------
+
+{- |
+    Checks the validity of each statement of the program, modifying the state.
+-}
+checkProgram :: Program -> Checker ()
+checkProgram pr@(Program sts) = do
+    modify (\s -> s {ast = pr})
+    mapM_ checkStatement sts
+
+{- |
+    Checks the validity of a statement, modifying the state.
+-}
+checkStatement :: Statement -> Checker () -- Capaz debería devolver otra cosa?
+checkStatement StNoop              = return ()
+checkStatement (StAssign var ex)   = do
+    mayVarDt <- getSymInfoArg var dataType
+    expDt    <- checkExpression ex
+    case mayVarDt of
+        Just varDt -> do
+            markInitialized var
+            unless (varDt == expDt) $ gets currPosn >>=
+                \pos -> tell [SError pos $ InvalidAssignType var varDt expDt]
+        Nothing -> return ()
+checkStatement (StDeclaration ds)  = mapM_ processDeclaration ds
+checkStatement (StReturn ex)       = undefined ex
+checkStatement (StRead vars)       = undefined vars
+checkStatement (StPrint exs)       = undefined exs
+checkStatement (StIf cnd tr el)    = undefined cnd tr el
+checkStatement (StCase ex cs def)  = undefined ex cs def
+checkStatement (StWhile cnd sts)   = undefined cnd sts
+checkStatement (StFor var rng sts) = undefined var rng sts
+checkStatement StBreak             = return ()
+checkStatement StContinue          = return ()
+
+{- |
+    Checks the validity of an expression and returns it's value.
+-}
 checkExpression :: Expression -> Checker DataType
 checkExpression (Variable var)   = do
     mayInf <- getSymInfoArg var (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
@@ -212,42 +289,3 @@ checkExpression (ExpUnary op e)    = do
             tell [SError posn $ UnaryTypes op dt]
             return . snd . head $ unaryOperation op
         else return . snd $ head dts
-
-
-----------------------------------------
-
-
---checkBinary :: Expression -> Expression -> Checker Program
-
---runChecker :: Checker a -> (Either LexerError a, CheckState, CheckWriter)
---runChecker = runIdentity . flip (`runRWST` flags) initialState . runErrorT
-runChecker :: Checker a -> (a, CheckState, CheckWriter)
-runChecker = runIdentity . flip (`runRWST` flags) initialState
-
-getWriter :: Checker a -> CheckWriter
-getWriter = (\(_,_,w) -> w) . runChecker
-
---getCheck :: Checker a -> Either LexerError a
---getCheck = (\(c,_,_) -> c) . runChecker
-getCheck :: Checker a -> a
-getCheck = (\(c,_,_) -> c) . runChecker
-
-getState :: Checker a -> CheckState
-getState = (\(_,s,_) -> s) . runChecker
-
-getErrors :: CheckWriter -> ([(LexerError, Position)], [(ParseError, Position)], [(StaticError, Position)])
-getErrors errors = (lexErrors, parseErrors, staticErrors)
-    where
-        lexErrors    = sortBy posSort . map (\(LError p e) -> (e,p)) $ filter funcLError errors
-        parseErrors  = sortBy posSort . map (\(PError p e) -> (e,p)) $ filter funcPError errors
-        staticErrors = sortBy posSort . map (\(SError p e) -> (e,p)) $ filter funcSError errors
-        posSort (_,l) (_,r) = l `compare` r
-        funcLError e = case e of
-            (LError _ _) -> True
-            _            -> False
-        funcPError e = case e of
-            (PError _ _) -> True
-            _            -> False
-        funcSError e = case e of
-            (SError _ _) -> True
-            _            -> False
