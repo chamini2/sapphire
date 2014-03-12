@@ -224,29 +224,30 @@ checkStatements = DF.mapM_ checkStatement
     Checks the validity of a statement, modifying the state.
 -}
 checkStatement :: Statement -> Checker () -- Capaz debería devolver otra cosa?
-checkStatement StNoop              = return ()
-checkStatement (StAssign var ex)   = do
-    mayVarDt <- getSymInfoArg var dataType
-    expDt    <- checkExpression ex
-    case mayVarDt of
-        Just varDt -> do
-            markInitialized var
-            unless (varDt == expDt) $ gets currPosn >>=
-                \pos -> tell [SError pos $ InvalidAssignType var varDt expDt]
-        Nothing -> return ()
-checkStatement (StDeclaration ds)  = DF.mapM_ processDeclaration ds
-checkStatement (StReturn ex)       = undefined ex
-checkStatement (StRead vars)       = undefined vars
-checkStatement (StPrint exs)       = undefined exs
-checkStatement (StIf cnd tr el)    = do
-    expDt <- checkExpression cnd
-    checkStatements tr
-    checkStatements el
-checkStatement (StCase ex cs def)  = undefined ex cs def
-checkStatement (StWhile cnd sts)   = undefined cnd sts
-checkStatement (StFor var rng sts) = undefined var rng sts
-checkStatement StBreak             = return ()
-checkStatement StContinue          = return ()
+checkStatement st = case st of 
+    StNoop          -> return ()
+    StAssign var ex -> do
+        mayVarDt <- getSymInfoArg var dataType
+        expDt    <- checkExpression ex
+        case mayVarDt of
+            Just varDt -> do
+                markInitialized var
+                unless (varDt == expDt) $ gets currPosn >>=
+                    \pos -> tell [SError pos $ InvalidAssignType var varDt expDt]
+            Nothing -> return ()
+    StDeclaration ds  -> DF.mapM_ processDeclaration ds
+    StReturn ex       -> undefined ex
+    StRead vars       -> return () --undefined vars
+    StPrint exs       -> DF.mapM_ checkExpression exs
+    StIf cnd tr el    -> do
+        _ <- checkExpression cnd
+        checkStatements tr
+        checkStatements el
+    StCase ex cs def  -> undefined ex cs def
+    StWhile cnd sts   -> undefined cnd sts
+    StFor var rng sts -> undefined var rng sts
+    StBreak           -> return ()
+    StContinue        -> return ()
 
 {- |
     Checks the validity of an expression and returns its data type.

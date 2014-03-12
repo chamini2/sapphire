@@ -7,7 +7,6 @@ print x,y,z
 
 if 3 > 4 then
     read x
-    print "NOOOO"
 else
     if true then end
 end

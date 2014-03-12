@@ -253,7 +253,7 @@ Statement :: { Statement }
     -- Definitions
     | DataType VariableList     { StDeclaration $ fmap (\var -> Declaration var $1 CatVariable) $2 }
 --    | FunctionDef               { {- NI IDEA -} }
---    | "return" Expression       { StReturn $2 }
+    | "return" Expression       { StReturn $2 }
 
     -- Conditional
     | "if" Expression "then" StatementList "end"                           { StIf $2           $4 empty }
@@ -264,8 +264,8 @@ Statement :: { Statement }
 --    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 $3 $5            }   
 
     -- I/O
---    | "read" VariableList       { StRead  $2 }
---    | "print" ExpressionList    { StPrint $2 }
+    | "read" VariableList       { StRead  $2 }
+    | "print" ExpressionList    { StPrint $2 }
 
     -- Loops
     | "while" Expression "do" StatementList "end"          { StWhile $2           $4 }
@@ -275,8 +275,8 @@ Statement :: { Statement }
 --    | "repeat" StatementList "until" ExpressionBool            { StRepeat $2 (ExpUnary OpNot $4) }
 
 --    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 $6          }
---    | "break"           { StBreak }
---    | "continue"        { StContinue }
+    | "break"           { StBreak }
+    | "continue"        { StContinue }
 --    | error         { parseError StNoop "Expecting a statement" }
 
 Separator :: { () }
@@ -352,7 +352,7 @@ Expression :: { Expression }
 
 ExpressionList :: { Seq Expression }
     : Expression                                { singleton $1 }
-    | ExpressionList Separator Expression       { $1 |> $3     }
+    | ExpressionList "," Expression       { $1 |> $3     }
 --    | error                                     { [parseError (ExpError Void) "Expecting an expression"] }
 
 {
