@@ -9,7 +9,7 @@ import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
 import           Data.Foldable as DF    (mapM_)
 import           Data.List              (sortBy)
-import           Data.Sequence          (empty)
+import           Data.Sequence as DS    (empty, Seq)
 import           Prelude                hiding (lookup)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
@@ -86,7 +86,7 @@ initialState = CheckState
     { table    = emptyTable
     , stack    = emptyStack
     , currtSc  = 0
-    , ast      = Program empty
+    , ast      = Program DS.empty
     , currPosn = (1,1)
     }
 
@@ -184,19 +184,6 @@ modifyValue var val = do
 markInitialized :: Identifier -> Checker ()
 markInitialized var = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
 
-
-{- |
-    Marcamos a la variable var como bloqueada en la tabla de simbolos
--}
---marcarVariableOcupada :: Identifier -> Checker ()
---marcarVariableOcupada var = do
---    tabla <- gets tabla
---    case buscarInfoSim var tabla of
---        Just info -> do
---            eliminarDeclaracion $ Decl var (tipo info)
---            agregarSimbolo var $ info { ocupado = True }
---        otherwise -> continue
-
 ----------------------------------------
 
 {- |
@@ -228,7 +215,10 @@ processDeclaration (Declaration var t c) = do
 checkProgram :: Program -> Checker ()
 checkProgram pr@(Program sts) = do
     modify (\s -> s {ast = pr})
-    DF.mapM_ checkStatement sts
+    checkStatements sts
+
+checkStatements :: Seq Statement -> Checker ()
+checkStatements = DF.mapM_ checkStatement 
 
 {- |
     Checks the validity of a statement, modifying the state.
@@ -248,7 +238,10 @@ checkStatement (StDeclaration ds)  = DF.mapM_ processDeclaration ds
 checkStatement (StReturn ex)       = undefined ex
 checkStatement (StRead vars)       = undefined vars
 checkStatement (StPrint exs)       = undefined exs
-checkStatement (StIf cnd tr el)    = undefined cnd tr el
+checkStatement (StIf cnd tr el)    = do
+    expDt <- checkExpression cnd
+    checkStatements tr
+    checkStatements el
 checkStatement (StCase ex cs def)  = undefined ex cs def
 checkStatement (StWhile cnd sts)   = undefined cnd sts
 checkStatement (StFor var rng sts) = undefined var rng sts
@@ -256,7 +249,7 @@ checkStatement StBreak             = return ()
 checkStatement StContinue          = return ()
 
 {- |
-    Checks the validity of an expression and returns it's value.
+    Checks the validity of an expression and returns its data type.
 -}
 checkExpression :: Expression -> Checker DataType
 checkExpression (Variable var)   = do

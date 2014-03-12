@@ -256,10 +256,10 @@ Statement :: { Statement }
 --    | "return" Expression       { StReturn $2 }
 
     -- Conditional
---    | "if" ExpressionBool "then" StatementList "end"                           { StIf $2           $4 empty }
---    | "if" ExpressionBool "then" StatementList "else" StatementList "end"      { StIf $2           $4 $6    }
---    | "unless" ExpressionBool "then" StatementList "end"                       { StIf (NotBool $2) $4 empty }
---    | "unless" ExpressionBool "then" StatementList "else" StatementList "end"  { StIf (NotBool $2) $4 $6    }
+    | "if" Expression "then" StatementList "end"                           { StIf $2           $4 empty }
+    | "if" Expression "then" StatementList "else" StatementList "end"      { StIf $2           $4 $6    }
+    | "unless" Expression "then" StatementList "end"                       { StIf (ExpUnary OpNot $2) $4 empty }
+    | "unless" Expression "then" StatementList "else" StatementList "end"  { StIf (ExpUnary OpNot $2) $4 $6    }
 --    | "case" ExpressionArit CaseList "end"                                     { StCase $2 $3 empty         }   
 --    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 $3 $5            }   
 
@@ -268,11 +268,11 @@ Statement :: { Statement }
 --    | "print" ExpressionList    { StPrint $2 }
 
     -- Loops
---    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           $4 }
---    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) $4 }
+    | "while" Expression "do" StatementList "end"          { StWhile $2           $4 }
+    | "until" Expression "do" StatementList "end"          { StWhile (ExpUnary OpNot $2) $4 }
 
 --    | "repeat" StatementList "while" ExpressionBool            { StRepeat $2 $4           }
---    | "repeat" StatementList "until" ExpressionBool            { StRepeat $2 (NotBool $4) }
+--    | "repeat" StatementList "until" ExpressionBool            { StRepeat $2 (ExpUnary OpNot $4) }
 
 --    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 $6          }
 --    | "break"           { StBreak }
@@ -283,12 +283,12 @@ Separator :: { () }
     : ";"           {}
     | newline       {}
 
---CaseList --:: { Seq Case }
---    : Case              { singleton $1 }
---    | CaseList Case     { $1 |> $2     }
+CaseList --:: { Seq Case }
+    : Case              { singleton $1 }
+    | CaseList Case     { $1 |> $2     }
 
---Case --:: { Case }
---    : "when" Expression "do" StatementList      { Case $2 $4 }
+Case :: { Case }
+    : "when" Expression "do" StatementList      { Case $2 $4 }
 
 ---------------------------------------
 
