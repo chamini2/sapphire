@@ -193,7 +193,6 @@ printStatement st = case st of
         lowerTabs
     StBreak    -> printNonTerminal "BREAK"
     StContinue -> printNonTerminal "CONTINUE"
-    otherwise -> return ()
 
 --
 --  Expressions printing
