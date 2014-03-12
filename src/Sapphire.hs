@@ -5,6 +5,7 @@ import           Checker            (CheckState (..), checkProgram, getErrors,
 import           Language           (Program (..))
 import           Parser
 
+import qualified Data.Foldable as DF
 import           Prelude
 import           System.Environment (getArgs)
 
@@ -25,12 +26,12 @@ printProgram pr = do
     -- TEMPORAL
     print state
     mapM_ print writer
-    mapM_ print prog
+    DF.mapM_ print prog
     putStrLn "--------------------------------------------------------------------------------"
     -- /TEMPORAL
 
     if null writer
-        then mapM_ print prog
+        then DF.mapM_ print prog
         else do
             let (lexErrors,parseErrors,staticErrors) = getErrors writer
             mapM_ print lexErrors

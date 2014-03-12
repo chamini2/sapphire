@@ -5,13 +5,13 @@ module Parser (parseProgram) where
 import           Lexer
 import           Language
 import           Checker
---import           SymbolTable
 
 import           Prelude
+import qualified Data.Foldable as DF
 import           Data.List (foldl')
+import           Data.Sequence
 --import           Control.Monad.RWS
 --import           Control.Monad
---import           Data.List (find)
 }
 
 %name parse
@@ -22,11 +22,6 @@ import           Data.List (foldl')
 %lexer { lexWrap } { TkEOF }
 -- Without this we get a type error
 %error { happyError }
-
---%attributetype       { Attribute a }
---%attribute value     { a }
---%attribute data_type { DataType }
---%attribute len       { Int }
 
 %token
 
@@ -244,12 +239,12 @@ import           Data.List (foldl')
 -- Grammar
 
 Program :: { Program }
-    : StatementList         { Program $ reverse $1 }
+    : StatementList         { Program $1 }
 --    | error                 { [parseError StNoop "Expecting a statement"] }
 
-StatementList :: { [Statement] }
-    : Statement                             { $1 : [] }
-    | StatementList Separator Statement     { $3 : $1 }
+StatementList :: { Seq Statement }
+    : Statement                             { singleton $1 }
+    | StatementList Separator Statement     { $1 |> $3 }
 --    | error                                 { [parseError StNoop "Expecting a statement"] }
 
 Statement :: { Statement }
@@ -269,13 +264,14 @@ Statement :: { Statement }
     --    }
 
 --    -- Definitions
-    | DataType VariableList     { StDeclaration $ foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2 }
-    --| DataType VariableList
-    --    { do
-    --        let decls = foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2
-    --        mapM_ processDeclaration decls
-    --        return $ StDeclaration decls
-    --    }
+    | DataType VariableList     { StDeclaration $ fmap (\var -> Declaration var $1 CatVariable) $2 }
+--  | DataType VariableList     { StDeclaration $ foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2 }
+--    | DataType VariableList
+--        { do
+--            let decls = fmap (\var -> Declaration var $1 CatVariable) $2
+--            DF.mapM_ processDeclaration decls
+--            return $ StDeclaration decls
+--        }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
@@ -331,9 +327,9 @@ DataType :: { DataType }
 ----DataTypeArray
 ----    : "[" DataType "]" "<-" "[" int "]"
 
-VariableList :: { [Identifier] }
-    : varid                         { $1 : [] }
-    | VariableList "," varid        { $3 : $1 }
+VariableList :: { Seq Identifier }
+    : varid                         { singleton $1 }
+    | VariableList "," varid        { $1 |> $3 }
 
 --FunctionDef --:: { Function }
 --    : "def" varid "::" Signature

@@ -18,7 +18,7 @@ module SymbolTable
     , Value(..)
 
     , Stack
-    , initialStack
+    , emptyStack
     , pop
     , push
     ) where
@@ -127,5 +127,5 @@ pop :: Stack a -> (a, Stack a)
 pop (Stack [])      = error "SymbolTable.pop: Empty stack"
 pop (Stack (x : s)) = (x, Stack s)
 
-initialStack :: Stack Scope
-initialStack = Stack [initialScope]
+emptyStack :: Stack Scope
+emptyStack = Stack [initialScope]

@@ -7,7 +7,9 @@ import           SymbolTable
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
+import           Data.Foldable as DF    (mapM_)
 import           Data.List              (sortBy)
+import           Data.Sequence          (empty)
 import           Prelude                hiding (lookup)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
@@ -84,7 +86,7 @@ initialState = CheckState
     { table    = emptyTable
     , stack    = emptyStack
     , currtSc  = 0
-    , ast      = Program []
+    , ast      = Program empty
     , currPosn = (1,1)
     }
 
@@ -225,7 +227,7 @@ processDeclaration (Declaration var t c) = do
 checkProgram :: Program -> Checker ()
 checkProgram pr@(Program sts) = do
     modify (\s -> s {ast = pr})
-    mapM_ checkStatement sts
+    DF.mapM_ checkStatement sts
 
 {- |
     Checks the validity of a statement, modifying the state.
@@ -241,7 +243,7 @@ checkStatement (StAssign var ex)   = do
             unless (varDt == expDt) $ gets currPosn >>=
                 \pos -> tell [SError pos $ InvalidAssignType var varDt expDt]
         Nothing -> return ()
-checkStatement (StDeclaration ds)  = mapM_ processDeclaration ds
+checkStatement (StDeclaration ds)  = DF.mapM_ processDeclaration ds
 checkStatement (StReturn ex)       = undefined ex
 checkStatement (StRead vars)       = undefined vars
 checkStatement (StPrint exs)       = undefined exs
