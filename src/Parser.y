@@ -8,6 +8,7 @@ import           Checker
 --import           SymbolTable
 
 import           Prelude
+import           Data.List (foldl')
 --import           Control.Monad.RWS
 --import           Control.Monad
 --import           Data.List (find)
@@ -246,7 +247,7 @@ Program :: { Program }
     : StatementList         { Program $ reverse $1 }
 --    | error                 { [parseError StNoop "Expecting a statement"] }
 
-StatementList :: { [Statement] }    -- ARMANDOLO AL REVES
+StatementList :: { [Statement] }
     : Statement                             { $1 : [] }
     | StatementList Separator Statement     { $3 : $1 }
 --    | error                                 { [parseError StNoop "Expecting a statement"] }
@@ -268,10 +269,10 @@ Statement :: { Statement }
     --    }
 
 --    -- Definitions
-    | DataType VariableList     { StDeclaration $ map (\var -> Declaration var $1 CatVariable) (reverse $2) }
+    | DataType VariableList     { StDeclaration $ foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2 }
     --| DataType VariableList
     --    { do
-    --        let decls = map (\id -> Declaration id $1 CatVariable) (reverse $2)
+    --        let decls = foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2
     --        mapM_ processDeclaration decls
     --        return $ StDeclaration decls
     --    }
