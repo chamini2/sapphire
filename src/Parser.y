@@ -340,7 +340,7 @@ Expression :: { Expression }
     | Expression "or"  Expression  { ExpBinary OpOr      $1 $3 {-Void-} }
     | Expression "and" Expression  { ExpBinary OpAnd     $1 $3 {-Void-} }
     | Expression "=="  Expression  { ExpBinary OpEqual   $1 $3 {-Void-} }
-    | Expression "/="  Expression  { ExpBinary OpUnEqual $1 $3 {-Void-} }
+    | Expression "/="  Expression  { ExpBinary OpUnequal $1 $3 {-Void-} }
     | Expression "<"   Expression  { ExpBinary OpLess    $1 $3 {-Void-} }
     | Expression "<="  Expression  { ExpBinary OpLessEq  $1 $3 {-Void-} }
     | Expression ">"   Expression  { ExpBinary OpGreat   $1 $3 {-Void-} }
