@@ -3,11 +3,11 @@
 -}
 
 module Lexer
-    ( Alex(..)
-    , AlexPosn(..)
-    , Token(..)
-    , Lexeme(..)
-    , AlexUserState(..)
+    ( Alex (..)
+    , AlexPosn (..)
+    , Token (..)
+    , Lexeme (..)
+    , AlexUserState (..)
     , alexMonadScan
     , runAlex'
     , addLexerError
@@ -15,7 +15,7 @@ module Lexer
     , alexShowPosn
     ) where
 
-import           Checker
+import           Checker (LexerError (..))
 
 import           Prelude hiding (lex)
 }

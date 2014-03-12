@@ -1,7 +1,6 @@
 {-# LANGUAGE GADTs #-}
 module Checker where
 
---import           Lexer
 import           Language
 import           SymbolTable
 

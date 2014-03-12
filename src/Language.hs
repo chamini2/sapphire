@@ -12,6 +12,8 @@ type Identifier = String
 data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Array
     deriving (Show, Eq)
 
+----------------------------------------
+
 data Statement where
     -- Language
     StNoop   :: Statement
@@ -45,6 +47,27 @@ data Category = CatVariable
               deriving (Eq, Show)
 
 data Case = Case Expression [Statement]
+    deriving (Show)
+
+----------------------------------------
+
+data Expression where
+    -- Variable
+    Variable :: Identifier -> Expression
+    -- Literals
+    LitInt    :: Int    -> Expression
+    LitFloat  :: Float  -> Expression
+    LitBool   :: Bool   -> Expression
+    LitChar   :: Char   -> Expression
+    LitString :: String -> Expression
+    --LitRange  :: Range  -> Expression
+    -- Operators
+    ExpBinary :: Binary   -> Expression -> Expression {- -> DataType -} -> Expression
+    ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
+    --ExpArray  :: ExpressionArray
+    deriving (Show)
+
+data Range = FromTo Expression Expression
     deriving (Show)
 
 data Binary
@@ -81,56 +104,6 @@ unaryOperation :: Unary -> [(DataType, DataType)]
 unaryOperation op = case op of
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
-
-data Range = FromTo Expression Expression
-    deriving (Show)
-
---data Expression
---    -- Variable
---    = Variable Identifier
---    -- Literals
---    | LitInt    Int
---    | LitFloat  Float
---    | LitBool   Bool
---    | LitChar   Char
---    | LitString String
---   -- | LitRange  Range
---    -- Operators
---    | ExpBinary Binary Expression Expression DataType
---    | ExpUnary  Unary  Expression            DataType
---    | ExpError  DataType
-----    | ExpArray ExpressionArray
---    deriving (Show)
-
-data Expression where
-    -- Variable
-    Variable :: Identifier -> Expression
-    -- Literals
-    LitInt    :: Int    -> Expression
-    LitFloat  :: Float  -> Expression
-    LitBool   :: Bool   -> Expression
-    LitChar   :: Char   -> Expression
-    LitString :: String -> Expression
-    --LitRange  :: Range
-    -- Operators
-    ExpBinary :: Binary   -> Expression -> Expression {- -> DataType -} -> Expression
-    ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
-    --ExpError  :: DataType -> Expression
-    --ExpArray  :: ExpressionArray
-    deriving (Show)
-
-
---dataType :: Expression -> DataType
---dataType (Variable _)        = undefined
---dataType (LitInt _)          = Int
---dataType (LitFloat _)        = Float
---dataType (LitBool _)         = Bool
---dataType (LitChar _)         = Char
---dataType (LitString _)       = String
---dataType (ExpBinary _ _ _ d) = d
---dataType (ExpUnary _ _ d)    = d
---dataType (ExpError d)        = d
-
 
 --------------------------------------------------------------------------------
 

@@ -1,7 +1,8 @@
 module Main where
 
-import           Checker
-import           Language
+import           Checker            (CheckState (..), checkProgram, getErrors,
+                                     runProgramChecker)
+import           Language           (Program (..))
 import           Parser
 
 import           Prelude
@@ -15,7 +16,6 @@ main = do
         else readFile $ head args
     case parseProgram input of
         Right program -> printProgram program
-        --_             -> putStrLn "IMPOSSIBLE ERROR!"
         Left errors   -> mapM_ print $ reverse errors
 
 printProgram :: Program -> IO ()

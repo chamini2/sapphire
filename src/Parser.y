@@ -294,6 +294,10 @@ Statement :: { Statement }
 --    -- Loops
 --    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           (reverse $4) }
 --    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) (reverse $4) }
+
+    --| "repeat" StatementList "while" ExpressionBool            { StRepeat (reverse $2) $4           }
+    --| "repeat" StatementList "until" ExpressionBool            { StRepeat (reverse $2) (NotBool $4) }
+
 --    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 (reverse $6)          }
 --    | "break"           { StBreak }
 --    | "continue"        { StContinue }

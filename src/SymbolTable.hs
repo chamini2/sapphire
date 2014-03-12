@@ -18,13 +18,13 @@ module SymbolTable
     , Value(..)
 
     , Stack
-    , emptyStack
+    , initialStack
     , pop
     , push
     ) where
 
 import           Language      (Category (CatVariable), DataType (Void),
-                                Expression, Identifier)
+                                Identifier)
 
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (empty, update)
@@ -59,33 +59,18 @@ initialScope = Scope { serial = 0 }
 
 type ScopeNum = Int
 
-newtype Stack a = Stack [a]
-    deriving (Show)
-
-push :: a -> Stack a -> Stack a
-push element (Stack s) = Stack $ element : s
-
-pop :: Stack a -> (a, Stack a)
-pop (Stack [])      = error "SymbolTable.pop: Empty stack"
-pop (Stack (x : s)) = (x, Stack s)
-
-emptyStack :: Stack Scope
-emptyStack = Stack [initialScope]
-
 data Value
     = ValInt  Int
     | ValBool Bool
     | ValChar Char
     | ValFloat Float
-    | ValExpression Expression
-    --deriving (Eq)
+    deriving (Eq)
 
 instance Show Value where
     show (ValInt v)        = show v
     show (ValBool v)       = show v
     show (ValChar v)       = show v
     show (ValFloat v)      = show v
-    show (ValExpression e) = show e
 
 {-|
     Symbol Table
@@ -98,6 +83,8 @@ data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
  -}
 emptyTable :: SymTable
 emptyTable = SymTable DM.empty
+
+----------------------------------------
 
 {-|
     Adds a symbol to the symbol table along with its information
@@ -127,3 +114,18 @@ update var f (SymTable m) = SymTable $ DM.alter func var m
         func (Just is) = case viewl is of
             i :< iss  -> Just $ f i <| iss
             _         -> error "SymbolTable.update: No value to update"
+
+--------------------------------------------------------------------------------
+
+newtype Stack a = Stack [a]
+    deriving (Show)
+
+push :: a -> Stack a -> Stack a
+push element (Stack s) = Stack $ element : s
+
+pop :: Stack a -> (a, Stack a)
+pop (Stack [])      = error "SymbolTable.pop: Empty stack"
+pop (Stack (x : s)) = (x, Stack s)
+
+initialStack :: Stack Scope
+initialStack = Stack [initialScope]
