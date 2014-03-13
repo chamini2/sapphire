@@ -246,10 +246,10 @@ checkStatement (Lex st posn) = case st of
     StReturn ex                  ->  undefined ex
     StRead vars                  ->  undefined vars
     StPrint exs                  ->  DF.mapM_ checkExpression exs
-    StIf cnd tr el               -> undefined cnd tr el --do
-        --_ <- checkExpression cnd
-        --checkStatements tr
-        --checkStatements el
+    StIf cnd tr el               -> do
+        _ <- checkExpression cnd
+        checkStatements tr
+        checkStatements el
     StCase ex cs def             -> undefined ex cs def
     StWhile cnd sts              -> undefined cnd sts
     StFor var rng sts            -> undefined var rng sts

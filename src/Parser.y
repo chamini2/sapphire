@@ -162,12 +162,12 @@ Statement :: { Lexeme Statement }
 --    | "return" Expression       { StReturn $2 }
 
 --    -- Conditional
-------------------------------    --| "if" Expression "then" StatementList "end"                           { StIf $2           $4 empty }
-------------------------------    --| "if" Expression "then" StatementList "else" StatementList "end"      { StIf $2           $4 $6    }
-------------------------------    --| "unless" Expression "then" StatementList "end"                       { StIf (ExpUnary OpNot $2) $4 empty }
-------------------------------    --| "unless" Expression "then" StatementList "else" StatementList "end"  { StIf (ExpUnary OpNot $2) $4 $6    }
---    | "case" ExpressionArit CaseList "end"                                     { StCase $2 $3 empty         }
---    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 $3 $5            }
+    | "if" Expression "then" StatementList "end"                            { putLex $1 $ StIf $2 $4 empty }
+    | "if" Expression "then" StatementList "else" StatementList "end"       { putLex $1 $ StIf $2 $4 $6    }
+    | "unless" Expression "then" StatementList "end"                        { putLex $1 $ StIf (putLex $2 $ ExpUnary (putLex $1 OpNot) $2) $4 empty }
+    | "unless" Expression "then" StatementList "else" StatementList "end"   { putLex $1 $ StIf (putLex $2 $ ExpUnary (putLex $1 OpNot) $2) $4 $6    }
+--    | "case" ExpressionArit CaseList "end"                                  { StCase $2 $3 empty         }
+--    | "case" ExpressionArit CaseList "else" StatementList "end"             { StCase $2 $3 $5            }
 
 --    -- I/O
 ------------------------------    --| "read" VariableList       { StRead  $2 }
