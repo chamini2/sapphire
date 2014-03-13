@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 module Checker where
 
 import           Language
@@ -8,6 +7,7 @@ import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
 import           Data.Foldable as DF    (mapM_)
+import           Data.Function          (on)
 import           Data.List              (sortBy)
 import           Data.Sequence as DS    (empty, Seq)
 import           Prelude                hiding (lookup)
@@ -21,60 +21,56 @@ data Flag = OutputFile String | SupressWarnings
 
 type CheckWriter = [CheckError]
 
-data CheckError where
-    LError :: Position -> LexerError  -> CheckError
-    PError :: Position -> ParseError  -> CheckError
-    SError :: Position -> StaticError -> CheckError
+data CheckError
+    = LError Position LexerError
+    | PError Position ParseError
+    | SError Position StaticError
+
+errorPos :: CheckError -> Position
+errorPos (LError p _) = p
+errorPos (PError p _) = p
+errorPos (SError p _) = p
 
 instance Show CheckError where
     show (LError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
     show (PError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
     show (SError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
 
-
 instance Eq CheckError where
-    l == r = pos l == pos r
-        where
-            pos (LError p _) = p
-            pos (PError p _) = p
-            pos (SError p _) = p
+    (==) = (==) `on` errorPos
 
 instance Ord CheckError where
-    compare l r = pos l `compare` pos r
-        where
-            pos (LError p _) = p
-            pos (PError p _) = p
-            pos (SError p _) = p
+    compare = compare `on` errorPos
 
-data LexerError where
-    UnexpectedChar :: Char   -> LexerError
-    StringError    :: String -> LexerError
-    LexerError     :: String -> LexerError
+data LexerError
+    = UnexpectedChar Char
+    | StringError    String
+    | LexerError     String
 
 instance Show LexerError where
     show (UnexpectedChar c) = "Unexpected character: '" ++ [c] ++ "'"
     show (StringError str)  = "Missing matching '\"' for string '" ++ str ++ "'"
     show (LexerError  msg)  = "Lexing error: " ++ msg
 
-data ParseError where
-    UnexpectedToken :: {-Token-} String  -> ParseError
-    ParseError      :: String -> ParseError
+data ParseError
+    = UnexpectedToken String{-Token-}
+    | ParseError      String
 
 instance Show ParseError where
     show (UnexpectedToken tok) = "Parsing error on Token: " ++ show tok
     show (ParseError msg)      = "Parsing error: " ++ msg
 
-data StaticError where
+data StaticError
     -- Variables
-    VariableNotDeclared    :: Identifier -> StaticError
-    VariableNotInitialized :: Identifier -> StaticError
-    InvalidAssignType      :: Identifier -> DataType -> DataType -> StaticError
-    AlreadyDeclared        :: Identifier -> Position -> StaticError
+    = VariableNotDeclared    Identifier
+    | VariableNotInitialized Identifier
+    | InvalidAssignType      Identifier DataType DataType
+    | AlreadyDeclared        Identifier Position
     -- Operators
-    BinaryTypes :: Binary -> [DataType] -> StaticError
-    UnaryTypes  :: Unary  -> DataType   -> StaticError
+    | BinaryTypes Binary (DataType, DataType)
+    | UnaryTypes  Unary  DataType
     -- General
-    StaticError :: String -> StaticError
+    | StaticError String
 
 instance Show StaticError where
     show (VariableNotDeclared var)     = "Static error: variable '" ++ var ++ "' has not been declared"
@@ -82,7 +78,7 @@ instance Show StaticError where
     show (InvalidAssignType var vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
     show (AlreadyDeclared var p)   = "Static error: variable '" ++ var ++ "' has already been declared at " ++ show p
     show (UnaryTypes op dt)   = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op (dl:dr:[])) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    show (BinaryTypes op (dl,dr)) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
     show (StaticError msg)    = "Static error: " ++ msg
 
 --------------------------------------------------------------------------------
@@ -283,11 +279,11 @@ checkExpression (Lex e posn) = case e of
         let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
         if null dts
             then do
-                tell [SError posn $ BinaryTypes op [ldt,rdt]]
+                tell [SError posn $ BinaryTypes op (ldt,rdt)]
                 return . snd . head $ binaryOperation op
             else return . snd $ head dts
-    ExpUnary (Lex op _) e     -> do
-        dt   <- checkExpression e
+    ExpUnary (Lex op _) expr  -> do
+        dt   <- checkExpression expr
         let dts = filter ((dt==) . fst) $ unaryOperation op
         if null dts
             then do

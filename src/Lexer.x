@@ -1,5 +1,6 @@
 {
-{-| Lexer for programming language SAPPHIRE.
+{-|
+    Lexer for programming language SAPPHIRE.
 -}
 
 module Lexer

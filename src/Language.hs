@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 module Language where
 
 import           Prelude
@@ -17,7 +16,7 @@ showPosn (line, col) = "line " ++ show line ++ ", column " ++ show col ++ ": "
 
 data Lexeme a = Lex
     { lexInfo :: a
-    , posn :: Position
+    , lexPosn :: Position
     }
     deriving (Eq)
 
@@ -40,71 +39,70 @@ data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Arr
 
 ----------------------------------------
 
-data Statement where
+data Statement
     -- Language
-    StNoop   :: Statement
-    StAssign :: Lexeme Identifier -> Lexeme Expression -> Statement
+    = StNoop
+    | StAssign (Lexeme Identifier) (Lexeme Expression)
     -- Definitions
-    StDeclaration :: Seq (Lexeme Declaration) -> Statement
-    StReturn      :: Lexeme Expression    -> Statement
+    | StDeclaration (Seq (Lexeme Declaration))
+    | StReturn      (Lexeme Expression)
     -- I/O
-    StRead  :: Seq (Lexeme Identifier) -> Statement
-    StPrint :: Seq (Lexeme Expression) -> Statement
+    | StRead  (Seq (Lexeme Identifier))
+    | StPrint (Seq (Lexeme Expression))
     -- Conditional
-    StIf   :: Lexeme Expression -> Seq (Lexeme Statement) -> Seq (Lexeme Statement) -> Statement
-    StCase :: Lexeme Expression -> Seq (Lexeme Case)      -> Seq (Lexeme Statement) -> Statement
+    | StIf   (Lexeme Expression) (Seq (Lexeme Statement)) (Seq (Lexeme Statement))
+    | StCase (Lexeme Expression) (Seq (Lexeme Case))      (Seq (Lexeme Statement))
     -- Loops
-    StWhile    :: Lexeme Expression -> Seq (Lexeme Statement) ->  Statement
-    StFor      :: Lexeme Identifier -> Lexeme Expression  -> Seq (Lexeme Statement) -> Statement
-    StBreak    :: Statement
-    StContinue :: Statement
+    | StWhile    (Lexeme Expression) (Seq (Lexeme Statement))
+    | StFor      (Lexeme Identifier) (Lexeme Expression)      (Seq (Lexeme Statement))
+    | StBreak
+    | StContinue
 
 instance Show Statement where
     show = runPrinter . printStatement
 
 ----------------------------------------
 
-data Declaration where
-    Declaration :: Lexeme Identifier -> Lexeme DataType -> Category -> Declaration
+data Declaration = Declaration (Lexeme Identifier) (Lexeme DataType) Category
     deriving (Show)
 
-data Category = CatVariable
-              | CatFunction
-              | CatParameter
-              | CatRecordField
-              | CatUnionField
-              | CatDataType
-              deriving (Eq, Show)
+data Category
+    = CatVariable
+    | CatFunction
+    | CatParameter
+    | CatRecordField
+    | CatUnionField
+    | CatDataType
+    deriving (Eq, Show)
 
 data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
     deriving (Show)
 
 ----------------------------------------
 
-data Expression where
+data Expression
     -- Variable
-    Variable :: Lexeme Identifier -> Expression
+    = Variable (Lexeme Identifier)
     -- Literals
-    LitInt    :: Lexeme Int    -> Expression
-    LitFloat  :: Lexeme Float  -> Expression
-    LitBool   :: Lexeme Bool   -> Expression
-    LitChar   :: Lexeme Char   -> Expression
-    LitString :: Lexeme String -> Expression
-    --LitRange  :: Lexeme Range  -> Expression
+    | LitInt    (Lexeme Int)
+    | LitFloat  (Lexeme Float)
+    | LitBool   (Lexeme Bool)
+    | LitChar   (Lexeme Char)
+    | LitString (Lexeme String)
+--    | LitRange  (Lexeme Range)
     -- Operators
-    ExpBinary :: Lexeme Binary   -> Lexeme Expression -> Lexeme Expression -> {-DataType ->-} Expression
-    ExpUnary  :: Lexeme Unary    -> Lexeme Expression -> {-DataType   ->-} Expression
-    --ExpArray  :: ExpressionArray
+    | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
+    | ExpUnary  (Lexeme Unary)  (Lexeme Expression) {-DataType-}
+--    | ExpArray  ExpressionArray
     deriving (Show)
 
-data Range where
-    FromTo :: Lexeme Expression -> Lexeme Expression -> Range
+data Range = FromTo (Lexeme Expression) (Lexeme Expression)
     deriving (Show)
 
 data Binary
-    = OpPlus  | OpMinus | OpTimes | OpDivide | OpModulo | OpPower | OpFromTo
+    = OpPlus  | OpMinus   | OpTimes | OpDivide | OpModulo | OpPower   | OpFromTo
+    | OpEqual | OpUnequal | OpLess  | OpLessEq | OpGreat  | OpGreatEq | OpBelongs
     | OpOr    | OpAnd
-    | OpEqual | OpUnequal | OpLess | OpLessEq | OpGreat | OpGreatEq | OpBelongs
 
 instance Show Binary where
     show op = case op of
@@ -149,18 +147,20 @@ binaryOperation op = case op of
 data Unary = OpNegate | OpNot
 
 instance Show Unary where
-    show OpNegate = "Arithmetic negation"
-    show OpNot    = "Logical negation"
+    show op = case op of
+        OpNegate -> "Arithmetic negation"
+        OpNot    -> "Logical negation"
 
 unaryOperation :: Unary -> [(DataType, DataType)]
 unaryOperation op = case op of
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
 
+--------------------------------------------------------------------------------
+
 --
 --  Pretty printer for Statments and Expressions
 --
-
 data PrintState = PrintState { tabs :: Int } deriving (Show)
 
 initialPState :: PrintState
@@ -171,6 +171,9 @@ runPrinter = DF.foldr (++) "" . snd . runIdentity . runWriterT . flip runStateT 
 
 type Printer a = StateT PrintState (WriterT (Seq String) Identity) a
 
+----
+----  Statements printing
+----
 printStatement :: Statement -> Printer ()
 printStatement st = case st of
     StNoop         -> return ()
