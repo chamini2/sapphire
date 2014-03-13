@@ -23,7 +23,26 @@ data CheckError where
     LError :: Position -> LexerError  -> CheckError
     PError :: Position -> ParseError  -> CheckError
     SError :: Position -> StaticError -> CheckError
-    deriving (Show)
+
+instance Show CheckError where
+    show (LError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+    show (PError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+    show (SError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+
+
+instance Eq CheckError where
+    l == r = pos l == pos r
+        where
+            pos (LError p _) = p
+            pos (PError p _) = p
+            pos (SError p _) = p
+
+instance Ord CheckError where
+    compare l r = pos l `compare` pos r
+        where
+            pos (LError p _) = p
+            pos (PError p _) = p
+            pos (SError p _) = p
 
 data LexerError where
     UnexpectedChar :: Char   -> LexerError
@@ -82,7 +101,7 @@ flags = []
 initialState :: CheckState
 initialState = CheckState
     { table    = emptyTable
-    , stack    = emptyStack
+    , stack    = initialStack
     , currtSc  = 0
     , ast      = Program []
     , currPosn = (1,1)
@@ -105,20 +124,17 @@ getCheck = (\(c,_,_) -> c) . runChecker
 getState :: Checker a -> CheckState
 getState = (\(_,s,_) -> s) . runChecker
 
-getErrors :: CheckWriter -> ([(LexerError, Position)], [(ParseError, Position)], [(StaticError, Position)])
-getErrors errors = (lexErrors, parseErrors, staticErrors)
+getErrors :: CheckWriter -> ([CheckError], [CheckError], [CheckError])
+getErrors errors = (only lexical, only parsing, only static)
     where
-        lexErrors    = sortBy posSort . map (\(LError p e) -> (e,p)) $ filter funcLError errors
-        parseErrors  = sortBy posSort . map (\(PError p e) -> (e,p)) $ filter funcPError errors
-        staticErrors = sortBy posSort . map (\(SError p e) -> (e,p)) $ filter funcSError errors
-        posSort (_,l) (_,r) = l `compare` r
-        funcLError e = case e of
+        only f = sortBy compare $ filter f errors
+        lexical e = case e of
             (LError _ _) -> True
             _            -> False
-        funcPError e = case e of
+        parsing e = case e of
             (PError _ _) -> True
             _            -> False
-        funcSError e = case e of
+        static e = case e of
             (SError _ _) -> True
             _            -> False
 
@@ -131,7 +147,6 @@ enterScope :: Checker ()
 enterScope = do
     cs <- gets currtSc
     let sc    = Scope { serial = cs + 1 }
-        newCs = cs + 1
     modify (\s -> s { stack = push sc (stack s), currtSc = cs + 1 })
 
 {- |
@@ -143,35 +158,33 @@ exitScope = modify (\s -> s { stack = snd . pop $ stack s })
 {- |
     Adds a symbol to the Checker's symbol table
 -}
-addSymbol :: Identifier -> SymInfo -> Checker ()
-addSymbol var info = modify (\s -> s { table = insert var info (table s)})
-
+addSymbol :: Lexeme Identifier -> SymInfo -> Checker ()
+addSymbol (Lex var _) info = modify func
+    where
+        func s = s { table = insert var info (table s)}
 {- |
     Gets a symbol's value if it has one or Nothing otherwise
 -}
-getSymInfoArg :: Identifier -> (SymInfo -> a) -> Checker (Maybe a)
-getSymInfoArg var f = do
+getSymInfoArg :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
+getSymInfoArg (Lex var posn) f = do
     tab <- gets table
     maybe failure success $ lookup var tab
     where
         success = return . Just . f
         failure = do
-            posn <- gets currPosn
             tell [SError posn $ VariableNotDeclared var]
             return Nothing
 
 {- |
     Changes the value of the variable var to the value val in the symbol table
 -}
-modifyValue :: Identifier -> Value -> Checker ()
-modifyValue var val = do
+modifyValue :: Lexeme Identifier -> Value -> Checker ()
+modifyValue (Lex var posn) val = do
     tab <- gets table
     let mSym = lookup var tab
     case mSym of
         Just _  -> modify $ func tab
-        Nothing -> do
-            posn <- gets currPosn
-            tell [SError posn $ VariableNotDeclared var]
+        Nothing -> tell [SError posn $ VariableNotDeclared var]
     where
         func tab s = s { table = update var modValue tab }
         modValue sy = sy { value = Just val }
@@ -179,8 +192,8 @@ modifyValue var val = do
 {- |
     Marks the variable var as initialized.
 -}
-markInitialized :: Identifier -> Checker ()
-markInitialized var = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
+markInitialized :: Lexeme Identifier -> Checker ()
+markInitialized (Lex var _) = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
 
 
 {- |
@@ -200,9 +213,8 @@ markInitialized var = modify $ \s -> s { table = update var (\sym -> sym { initi
 {- |
     Adds the declaration of var to the symbol table
 -}
-processDeclaration :: Declaration -> Checker ()
-processDeclaration (Declaration var t c) = do
-    posn <- gets currPosn
+processDeclaration :: Lexeme Declaration -> Checker ()
+processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
     tab  <- gets table
     cs   <- gets currtSc
     let info = emptySymInfo {
@@ -212,10 +224,10 @@ processDeclaration (Declaration var t c) = do
                  declPosn = posn
                }
     case lookup var tab of
-        Nothing -> addSymbol var info
+        Nothing -> addSymbol varL info
         Just (SymInfo _ _ _ sn op _)
             | sn == cs  -> tell [SError posn $ AlreadyDeclared var op ]
-            | otherwise -> addSymbol var info
+            | otherwise -> addSymbol varL info
 
 ----------------------------------------
 
@@ -230,61 +242,58 @@ checkProgram pr@(Program sts) = do
 {- |
     Checks the validity of a statement, modifying the state.
 -}
-checkStatement :: Statement -> Checker () -- Capaz debería devolver otra cosa?
-checkStatement StNoop              = return ()
-checkStatement (StAssign var ex)   = do
-    mayVarDt <- getSymInfoArg var dataType
+checkStatement :: Lexeme Statement -> Checker () -- Capaz debería devolver otra cosa?
+checkStatement (Lex StNoop _) = return ()
+checkStatement (Lex (StAssign varL@(Lex var _) ex) posn) = do
+    mayVarDt <- getSymInfoArg varL dataType
     expDt    <- checkExpression ex
     case mayVarDt of
         Just varDt -> do
-            markInitialized var
-            unless (varDt == expDt) $ gets currPosn >>=
-                \pos -> tell [SError pos $ InvalidAssignType var varDt expDt]
+            markInitialized varL
+            unless (varDt == expDt) $
+                tell [SError posn $ InvalidAssignType var varDt expDt]
         Nothing -> return ()
-checkStatement (StDeclaration ds)  = mapM_ processDeclaration ds
-checkStatement (StReturn ex)       = undefined ex
-checkStatement (StRead vars)       = undefined vars
-checkStatement (StPrint exs)       = undefined exs
-checkStatement (StIf cnd tr el)    = undefined cnd tr el
-checkStatement (StCase ex cs def)  = undefined ex cs def
-checkStatement (StWhile cnd sts)   = undefined cnd sts
-checkStatement (StFor var rng sts) = undefined var rng sts
-checkStatement StBreak             = return ()
-checkStatement StContinue          = return ()
+checkStatement (Lex (StDeclaration ds) _) = mapM_ processDeclaration ds
+checkStatement (Lex (StReturn ex) posn) = undefined ex posn
+checkStatement (Lex (StRead vars) posn) = undefined vars posn
+checkStatement (Lex (StPrint exs) posn) = undefined exs posn
+checkStatement (Lex (StIf cnd tr el) posn) = undefined cnd tr el posn
+checkStatement (Lex (StCase ex cs def) posn) = undefined ex cs def posn
+checkStatement (Lex (StWhile cnd sts) posn) = undefined cnd sts posn
+checkStatement (Lex (StFor var rng sts) posn) = undefined var rng sts posn
+checkStatement (Lex StBreak _) = return ()
+checkStatement (Lex StContinue _) = return ()
 
 {- |
     Checks the validity of an expression and returns it's value.
 -}
-checkExpression :: Expression -> Checker DataType
-checkExpression (Variable var)   = do
-    mayInf <- getSymInfoArg var (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
+checkExpression :: Lexeme Expression -> Checker DataType
+checkExpression (Lex (Variable varL@(Lex var _)) posn)   = do
+    mayInf <- getSymInfoArg varL (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
     case mayInf of
         Just (ini, dt) -> do
-            unless ini $ gets currPosn >>=
-                \pos -> tell [SError pos $ VariableNotInitialized var]
+            unless ini $ tell [SError posn $ VariableNotInitialized var]
             return dt
         Nothing         -> return Void
-checkExpression (LitInt _)      = return Int
-checkExpression (LitFloat _)    = return Float
-checkExpression (LitBool _)     = return Bool
-checkExpression (LitChar _)     = return Char
-checkExpression (LitString _)   = return String
-checkExpression (ExpBinary op l r) = do
-    ldt  <- checkExpression l
-    rdt  <- checkExpression r
+checkExpression (Lex (LitInt _) _)    = return Int
+checkExpression (Lex (LitFloat _) _)  = return Float
+checkExpression (Lex (LitBool _) _)   = return Bool
+checkExpression (Lex (LitChar _) _)   = return Char
+checkExpression (Lex (LitString _) _) = return String
+checkExpression (Lex (ExpBinary (Lex op _) l r) posn) = do
+    ldt <- checkExpression l
+    rdt <- checkExpression r
     let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
     if null dts
         then do
-            posn <- gets currPosn
             tell [SError posn $ BinaryTypes op [ldt,rdt]]
             return . snd . head $ binaryOperation op
         else return . snd $ head dts
-checkExpression (ExpUnary op e)    = do
+checkExpression (Lex (ExpUnary (Lex op _) e) posn)    = do
     dt   <- checkExpression e
     let dts = filter ((dt==) . fst) $ unaryOperation op
     if null dts
         then do
-            posn <- gets currPosn
             tell [SError posn $ UnaryTypes op dt]
             return . snd . head $ unaryOperation op
         else return . snd $ head dts
