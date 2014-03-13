@@ -188,7 +188,7 @@ Separator :: { () }
     : ";"           { }
     | newline       { }
 
-CaseList --:: { Seq Case }
+CaseList :: { Seq Case }
     : Case              { singleton $1 }
     | CaseList Case     { $1 |> $2     }
 
@@ -198,13 +198,13 @@ Case :: { Case }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"         { putLex $1 Int }
-    | "Float"       { putLex $1 Float }
-    | "Bool"        { putLex $1 Bool }
-    | "Char"        { putLex $1 Char }
+    : "Int"         { putLex $1 Int    }
+    | "Float"       { putLex $1 Float  }
+    | "Bool"        { putLex $1 Bool   }
+    | "Char"        { putLex $1 Char   }
     | "String"      { putLex $1 String }
-    | "Range"       { putLex $1 Range }
-    | "Type"        { putLex $1 Type }
+    | "Range"       { putLex $1 Range  }
+    | "Type"        { putLex $1 Type   }
 --    | "Union" typeid
 --    | "Record" typeid
 -------------------------------- FALTA ARREGLOS

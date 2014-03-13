@@ -5,7 +5,7 @@ import           Checker            (CheckState (..), checkProgram, getErrors,
 import           Language           (Program (..))
 import           Parser
 
-import qualified Data.Foldable as DF (mapM_)
+import qualified Data.Foldable      as DF (mapM_)
 import           Prelude
 import           System.Environment (getArgs)
 
@@ -31,7 +31,7 @@ printProgram pr = do
     print stCurrLex
     DF.mapM_ print prog
     mapM_ print writer
-    putStrLn "--------------------------------------------------------------------------------"
+    putStrLn "-----------------------------------------------------------------"
     -- /TEMPORAL
 
     if null writer
