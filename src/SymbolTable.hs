@@ -3,7 +3,6 @@
  -}
 module SymbolTable
     ( SymTable
-    , Position
     , emptyTable
     , insert
     , lookup
@@ -24,14 +23,11 @@ module SymbolTable
     ) where
 
 import           Language      (Category (CatVariable), DataType (Void),
-                                Identifier)
+                                Identifier, Position)
 
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (empty, update)
 import           Prelude       hiding (lookup)
-
-
-type Position = (Int, Int) -- (Fila, Columna)
 
 data SymInfo = SymInfo
     { dataType    :: DataType
