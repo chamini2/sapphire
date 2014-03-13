@@ -3,8 +3,24 @@ module Language where
 
 import           Prelude
 
---type Program = StFunction
-newtype Program = Program [Statement]
+type Position = (Int, Int) -- (Fila, Columna)
+
+showPosn :: Position -> String
+showPosn (line, col) = "line " ++ show line ++ ", column " ++ show (col - 1) ++ ": "
+
+----------------------------------------
+
+data Lexeme a = Lex a Position
+    deriving (Eq)
+
+instance (Show a) => Show (Lexeme a) where
+    show (Lex a p) = show p ++ show a
+
+--newtype Program = StFunction
+--    deriving (Show)
+--newtype Program = Program [Statement]
+--    deriving (Show)
+newtype Program = Program [Lexeme Statement]
     deriving (Show)
 
 type Identifier = String
@@ -14,28 +30,47 @@ data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Arr
 
 ----------------------------------------
 
+--data Statement where
+--    -- Language
+--    StNoop   :: Statement
+--    StAssign :: Identifier -> Expression -> Statement
+--    -- Definitions
+--    StDeclaration :: [Declaration] -> Statement
+--    StReturn      :: Expression    -> Statement
+--    -- I/O
+--    StRead  :: [Identifier] -> Statement
+--    StPrint :: [Expression] -> Statement
+--    -- Conditional
+--    StIf   :: Expression -> [Statement] -> [Statement] -> Statement
+--    StCase :: Expression -> [Case]      -> [Statement] -> Statement
+--    -- Loops
+--    StWhile    :: Expression -> [Statement] ->  Statement
+--    StFor      :: Identifier -> Expression  -> [Statement] -> Statement
+--    StBreak    :: Statement
+--    StContinue :: Statement
+--    deriving (Show)
 data Statement where
     -- Language
     StNoop   :: Statement
-    StAssign :: Identifier -> Expression -> Statement
+    StAssign :: Lexeme Identifier -> Lexeme Expression -> Statement
     -- Definitions
-    StDeclaration :: [Declaration] -> Statement
-    StReturn      :: Expression    -> Statement
+    StDeclaration :: [Lexeme Declaration] -> Statement
+    StReturn      :: Lexeme Expression    -> Statement
     -- I/O
-    StRead  :: [Identifier] -> Statement
-    StPrint :: [Expression] -> Statement
+    StRead  :: [Lexeme Identifier] -> Statement
+    StPrint :: [Lexeme Expression] -> Statement
     -- Conditional
-    StIf   :: Expression -> [Statement] -> [Statement] -> Statement
-    StCase :: Expression -> [Case]      -> [Statement] -> Statement
+    StIf   :: Lexeme Expression -> [Lexeme Statement] -> [Lexeme Statement] -> Statement
+    StCase :: Lexeme Expression -> [Lexeme Case]      -> [Lexeme Statement] -> Statement
     -- Loops
-    StWhile    :: Expression -> [Statement] ->  Statement
-    StFor      :: Identifier -> Expression  -> [Statement] -> Statement
+    StWhile    :: Lexeme Expression -> [Lexeme Statement] ->  Statement
+    StFor      :: Lexeme Identifier -> Lexeme Expression  -> [Lexeme Statement] -> Statement
     StBreak    :: Statement
     StContinue :: Statement
     deriving (Show)
 
-
-data Declaration = Declaration Identifier DataType Category
+data Declaration where
+    Declaration :: Lexeme Identifier -> Lexeme DataType -> Category -> Declaration
     deriving (Show)
 
 data Category = CatVariable
@@ -51,23 +86,39 @@ data Case = Case Expression [Statement]
 
 ----------------------------------------
 
+--data Expression where
+--    -- Variable
+--    Variable :: Identifier -> Expression
+--    -- Literals
+--    LitInt    :: Int    -> Expression
+--    LitFloat  :: Float  -> Expression
+--    LitBool   :: Bool   -> Expression
+--    LitChar   :: Char   -> Expression
+--    LitString :: String -> Expression
+--    --LitRange  :: Range  -> Expression
+--    -- Operators
+--    ExpBinary :: Binary   -> Expression -> Expression {- -> DataType -} -> Expression
+--    ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
+--    --ExpArray  :: ExpressionArray
+--    deriving (Show)
 data Expression where
     -- Variable
-    Variable :: Identifier -> Expression
+    Variable :: Lexeme Identifier -> Expression
     -- Literals
-    LitInt    :: Int    -> Expression
-    LitFloat  :: Float  -> Expression
-    LitBool   :: Bool   -> Expression
-    LitChar   :: Char   -> Expression
-    LitString :: String -> Expression
-    --LitRange  :: Range  -> Expression
+    LitInt    :: Lexeme Int    -> Expression
+    LitFloat  :: Lexeme Float  -> Expression
+    LitBool   :: Lexeme Bool   -> Expression
+    LitChar   :: Lexeme Char   -> Expression
+    LitString :: Lexeme String -> Expression
+    --LitRange  :: Lexeme Range  -> Expression
     -- Operators
-    ExpBinary :: Binary   -> Expression -> Expression {- -> DataType -} -> Expression
-    ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
+    ExpBinary :: Lexeme Binary   -> Lexeme Expression -> Lexeme Expression -> {-DataType ->-} Expression
+    ExpUnary  :: Lexeme Unary    -> Lexeme Expression -> {-DataType   ->-} Expression
     --ExpArray  :: ExpressionArray
     deriving (Show)
 
-data Range = FromTo Expression Expression
+data Range where
+    FromTo :: Lexeme Expression -> Lexeme Expression -> Range
     deriving (Show)
 
 data Binary
