@@ -4,7 +4,6 @@
 
 module Lexer
     ( Alex (..)
-    , AlexPosn (..)
     , Token (..)
     , Lexeme (..)
     , AlexUserState (..)
@@ -12,12 +11,13 @@ module Lexer
     , runAlex'
     , addLexerError
     , alexGetPosn
-    , alexShowPosn
     ) where
 
-import           Checker (LexerError (..))
+import           Checker  (LexerError (..))
+import           Language (Position, Lexeme (..))
 
-import           Prelude hiding (lex)
+import           Prelude  hiding (lex)
+
 }
 
 --%wrapper "monad"
@@ -163,8 +163,6 @@ tokens :-
 
 --------------------------------------------------------------------------------
 
-data Lexeme = Lex Token AlexPosn deriving (Eq, Show)
-
 data Token
 
     -- Language
@@ -226,7 +224,7 @@ data Token
 
 --------------------------------------------------------------------------------
 
-data AlexUserState = AlexUSt { lexerErrors :: [(LexerError, Lexeme)] }
+data AlexUserState = AlexUSt { lexerErrors :: [(LexerError, Lexeme Token)] }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUSt []
@@ -245,9 +243,10 @@ getUserState = Alex (\s -> Right (s,alex_ust s))
 --       push l (AlexUSt ls) = AlexUSt $ l : ls
 
 
-addLexerError :: Token -> Alex ()
-addLexerError t = do
-    p <- alexGetPosn
+--addLexerError :: Token -> Alex ()
+--addLexerError t = do
+addLexerError :: Lexeme Token -> Alex ()
+addLexerError (Lex t p) = do
     let error = case t of
             TkError c       -> (UnexpectedChar c, Lex t p)
             TkStringError s -> (StringError s   , Lex t p)
@@ -255,32 +254,32 @@ addLexerError t = do
 
 ----------------------------------------
 
---alexEOF :: Alex Lexeme
---alexEOF = alexGetPosn >>= return . Lex TkEOF
-alexEOF :: Alex Token
-alexEOF = return TkEOF
+toPosition :: AlexPosn -> Position
+toPosition (AlexPn _ line col) = (line,col)
+
+alexEOF :: Alex (Lexeme Token)
+alexEOF = alexGetPosn >>= return . Lex TkEOF
+--alexEOF :: Alex Token
+--alexEOF = return TkEOF
 
 -- Unfortunately, we have to extract the matching bit of string
 -- ourselves...
---lex :: (String -> Token) -> AlexAction Lexeme
---lex f = \(p,_,_,s) i -> return $ Lex (f $ take i s) p
-lex :: (String -> a) -> AlexAction a
-lex f = \(_,_,_,s) i -> return (f (take i s))
+lex :: (String -> Token) -> AlexAction (Lexeme Token)
+lex f = \(p,_,_,s) i -> return $ Lex (f $ take i s) (toPosition p)
+--lex :: (String -> a) -> AlexAction a
+--lex f = \(_,_,_,s) i -> return (f (take i s))
 
 -- For constructing tokens that do not depend on
 -- the input
---lex' :: Token -> AlexAction Lexeme
---lex' = lex . const
-lex' :: a -> AlexAction a
+lex' :: Token -> AlexAction (Lexeme Token)
 lex' = lex . const
+--lex' :: a -> AlexAction a
+--lex' = lex . const
 
-alexGetPosn :: Alex AlexPosn
-alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return p
+alexGetPosn :: Alex Position
+alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
 
-alexShowPosn :: AlexPosn -> String
-alexShowPosn (AlexPn _ line col) = show line ++ ':' : show (col - 1) ++ ": "
-
-runAlex' :: String -> Alex a -> Either [(LexerError,Lexeme)] a
+runAlex' :: String -> Alex a -> Either [(LexerError,Lexeme Token)] a
 runAlex' input (Alex f)
    = case f (AlexState
             { alex_pos = alexStartPos
@@ -294,4 +293,5 @@ runAlex' input (Alex f)
                     in if null ust
                         then Right a
                         else Left ust
+
 }
