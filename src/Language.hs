@@ -15,7 +15,10 @@ showPosn (line, col) = "line " ++ show line ++ ", column " ++ show col ++ ": "
 
 ----------------------------------------
 
-data Lexeme a = Lex a Position
+data Lexeme a = Lex
+    { lexInfo :: a
+    , posn :: Position
+    }
     deriving (Eq)
 
 instance (Show a) => Show (Lexeme a) where
@@ -171,97 +174,97 @@ type Printer a = StateT PrintState (WriterT (Seq String) Identity) a
 printStatement :: Statement -> Printer ()
 printStatement st = case st of
     StNoop         -> return ()
---    StAssign var e -> do
---        printNonTerminal "ASSIGNMENT"
---        raiseTabs
---        printNonTerminal $     "- variable: " ++ var
---        printExpressionWithTag "- value: " e
---        lowerTabs
---    StDeclaration ds -> do
---        printNonTerminal "DECLARATION"
---        raiseTabs
---        printNonTerminal "DECLARATION LIST"
---        lowerTabs
---    StReturn e -> printExpressionWithTag "RETURN" e
+    StAssign (Lex var _) (Lex expr _) -> do
+        printNonTerminal "ASSIGNMENT"
+        raiseTabs
+        printNonTerminal $ "- variable: " ++ var
+        printExpressionWithTag "- value: " expr
+        lowerTabs
+    StDeclaration ds -> do
+        printNonTerminal "DECLARATION"
+        raiseTabs
+        printNonTerminal "DECLARATION LIST"
+        lowerTabs
+    StReturn (Lex expr _) -> printExpressionWithTag "RETURN" expr
 --    -- I/O
---    StRead vs -> do
---        printNonTerminal "READ"
---        raiseTabs
---        DF.mapM_ (printExpression . Variable) vs
---        lowerTabs
---    StPrint es -> printExpressions "PRINT" es
+    StRead vars -> do
+        printNonTerminal "READ"
+        raiseTabs
+        DF.mapM_ (printExpression . Variable) vars
+        lowerTabs
+    StPrint exprs -> do
+        printNonTerminal "PRINT"
+        raiseTabs
+        DF.mapM_ (printExpression . lexInfo) exprs
+        lowerTabs
 --    -- Conditional
---    StIf g success fail -> do
---        printNonTerminal "IF"
---        raiseTabs
---        printExpressionWithTag "- guard: "   g
---        printStatements        "- success: " success
---        printStatements        "- fail: "    fail
---        lowerTabs
---    StCase e cs ss -> return ()
+    StIf cond success failure -> do
+        printNonTerminal "IF"
+        raiseTabs
+        printExpressionWithTag "- guard: " (lexInfo cond)
+        printStatements "- success: " success
+        printStatements "- failure: " failure
+        lowerTabs
+    StCase expr cases othrw -> printNonTerminal "CASE"
 --    -- Loops
---    StWhile g c -> do
---        printNonTerminal "WHILE"
---        raiseTabs
---        printExpressionWithTag "- guard: " g
---        printStatements        "- body: "  c
---        lowerTabs
---    StFor var r c -> do
---        printNonTerminal "FOR"
---        raiseTabs
---        printNonTerminal     $ "- variable: " ++ var
---        printExpressionWithTag "- range: "       r
---        printStatements        "- body: "        c
---        lowerTabs
---    StBreak    -> printNonTerminal "BREAK"
---    StContinue -> printNonTerminal "CONTINUE"
+    StWhile cond body -> do
+        printNonTerminal "WHILE"
+        raiseTabs
+        printExpressionWithTag "- guard: " (lexInfo cond)
+        printStatements "- body: " body
+        lowerTabs
+    StFor var range body -> do
+        printNonTerminal "FOR"
+        raiseTabs
+        printNonTerminal $ "- variable: " ++ lexInfo var
+        printExpressionWithTag "- range: " (lexInfo range)
+        printNonTerminal "- body: "
+        raiseTabs >> DF.mapM_ (printStatement . lexInfo) body >> lowerTabs
+        lowerTabs
+    StBreak    -> printNonTerminal "BREAK"
+    StContinue -> printNonTerminal "CONTINUE"
 
 ----
 ----  Expressions printing
 ----
---printExpression :: Expression -> Printer ()
---printExpression e = case e of
---    Variable  v      -> printNonTerminal $ "VARIABLE: " ++ show v
---    LitInt    c      -> printNonTerminal $ "INTEGER LITERAL: " ++ show c
---    LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: " ++ show b
---    LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "   ++ show f
---    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ s
---    ExpBinary op l r -> do
---        printNonTerminal "BINARY OPERATION"
---        raiseTabs
---        printNonTerminal $ "- operator: " ++ show op
---        printExpressionWithTag "- left operand:  " l
---        printExpressionWithTag "- right operand: " r
---        lowerTabs
---    ExpUnary op e -> do
---        printNonTerminal "UNARY OPERATION"
---        raiseTabs
---        printNonTerminal       ("- operator: " ++ show op)
---        printExpressionWithTag ("- operand: "  ++ show op) e
---        lowerTabs
+printExpression :: Expression -> Printer ()
+printExpression e = case e of
+    Variable  v      -> printNonTerminal $ "VARIABLE: " ++ show (lexInfo v)
+    LitInt    c      -> printNonTerminal $ "INTEGER LITERAL: " ++ show (lexInfo c)
+    LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: " ++ show (lexInfo b)
+    LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "   ++ show (lexInfo f)
+    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ lexInfo s
+    ExpBinary op l r -> do
+        printNonTerminal "BINARY OPERATION"
+        raiseTabs
+        printNonTerminal $ "- operator: " ++ show (lexInfo op)
+        printExpressionWithTag "- left operand:  " (lexInfo l)
+        printExpressionWithTag "- right operand: " (lexInfo r)
+        lowerTabs
+    ExpUnary op expr -> do
+        printNonTerminal "UNARY OPERATION"
+        raiseTabs
+        printNonTerminal $ "- operator: " ++ show (lexInfo op)
+        printExpressionWithTag "- operand: " (lexInfo expr)
+        lowerTabs
 
---raiseTabs :: Printer ()
---raiseTabs = modify (\s -> s { tabs = tabs s + 1 })
+raiseTabs :: Printer ()
+raiseTabs = modify (\s -> s { tabs = tabs s + 1 })
 
---lowerTabs :: Printer ()
---lowerTabs = modify (\s -> s { tabs = tabs s - 1 })
+lowerTabs :: Printer ()
+lowerTabs = modify (\s -> s { tabs = tabs s - 1 })
 
---printExpressionWithTag :: String -> Expression -> Printer ()
---printExpressionWithTag tag e = do
---    printNonTerminal tag
---    raiseTabs >> printExpression e >> lowerTabs
+printExpressionWithTag :: String -> Expression -> Printer ()
+printExpressionWithTag tag e = do
+    printNonTerminal tag
+    raiseTabs >> printExpression e >> lowerTabs
 
---printNonTerminal :: String -> Printer ()
---printNonTerminal str = do
---    t <- gets tabs
---    tell $ DS.singleton $ replicate t '\t' ++ str ++ "\n"
+printNonTerminal :: String -> Printer ()
+printNonTerminal str = do
+    t <- gets tabs
+    tell $ DS.singleton $ replicate t '\t' ++ str ++ "\n"
 
---printStatements :: String -> Seq Statement -> Printer ()
---printStatements tag is = do
---    printNonTerminal tag
---    raiseTabs >> DF.mapM_ printStatement is >> lowerTabs
-
---printExpressions :: String -> Seq Expression -> Printer ()
---printExpressions tag es = do
---    printNonTerminal tag
---    raiseTabs >> DF.mapM_ printExpression es >> lowerTabs
+printStatements :: String -> Seq (Lexeme Statement) -> Printer ()
+printStatements tag is = do
+    printNonTerminal tag
+    raiseTabs >> DF.mapM_ (printStatement . lexInfo) is >> lowerTabs
