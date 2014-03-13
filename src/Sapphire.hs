@@ -21,11 +21,15 @@ main = do
 printProgram :: Program -> IO ()
 printProgram pr = do
     let (state,writer) = runProgramChecker $ checkProgram pr
-        (Program prog) = ast state
+        CheckState stTable stStack stCurrtSc stAst stCurrLex = state
+        Program prog = stAst
     -- TEMPORAL
-    print state
+    print stTable
+    print stStack
+    print stCurrtSc
+    print stCurrLex
+    print prog
     mapM_ print writer
-    mapM_ print prog
     putStrLn "--------------------------------------------------------------------------------"
     -- /TEMPORAL
 
