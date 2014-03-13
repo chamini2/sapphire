@@ -5,6 +5,7 @@ import           Checker            (CheckState (..), checkProgram, getErrors,
 import           Language           (Program (..))
 import           Parser
 
+import qualified Data.Foldable as DF (mapM_)
 import           Prelude
 import           System.Environment (getArgs)
 
@@ -28,13 +29,13 @@ printProgram pr = do
     print stStack
     print stCurrtSc
     print stCurrLex
-    print prog
+    DF.mapM_ print prog
     mapM_ print writer
     putStrLn "--------------------------------------------------------------------------------"
     -- /TEMPORAL
 
     if null writer
-        then mapM_ print prog
+        then DF.mapM_ print prog
         else do
             let (lexErrors,parseErrors,staticErrors) = getErrors writer
             mapM_ print lexErrors

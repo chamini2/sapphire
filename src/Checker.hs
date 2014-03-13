@@ -7,7 +7,9 @@ import           SymbolTable
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
+import           Data.Foldable as DF    (mapM_)
 import           Data.List              (sortBy)
+import           Data.Sequence as DS    (empty, Seq)
 import           Prelude                hiding (lookup)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
@@ -103,7 +105,7 @@ initialState = CheckState
     { table    = emptyTable
     , stack    = initialStack
     , currtSc  = 0
-    , ast      = Program []
+    , ast      = Program DS.empty
     , currPosn = (1,1)
     }
 
@@ -195,19 +197,6 @@ modifyValue (Lex var posn) val = do
 markInitialized :: Lexeme Identifier -> Checker ()
 markInitialized (Lex var _) = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
 
-
-{- |
-    Marcamos a la variable var como bloqueada en la tabla de simbolos
--}
---marcarVariableOcupada :: Identifier -> Checker ()
---marcarVariableOcupada var = do
---    tabla <- gets tabla
---    case buscarInfoSim var tabla of
---        Just info -> do
---            eliminarDeclaracion $ Decl var (tipo info)
---            agregarSimbolo var $ info { ocupado = True }
---        otherwise -> continue
-
 ----------------------------------------
 
 {- |
@@ -237,63 +226,71 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
 checkProgram :: Program -> Checker ()
 checkProgram pr@(Program sts) = do
     modify (\s -> s {ast = pr})
-    mapM_ checkStatement sts
+    checkStatements sts
+
+checkStatements :: Seq (Lexeme Statement) -> Checker ()
+checkStatements = DF.mapM_ checkStatement
 
 {- |
     Checks the validity of a statement, modifying the state.
 -}
 checkStatement :: Lexeme Statement -> Checker () -- Capaz debería devolver otra cosa?
-checkStatement (Lex StNoop _) = return ()
-checkStatement (Lex (StAssign varL@(Lex var _) ex) posn) = do
-    mayVarDt <- getSymInfoArg varL dataType
-    expDt    <- checkExpression ex
-    case mayVarDt of
-        Just varDt -> do
-            markInitialized varL
-            unless (varDt == expDt) $
-                tell [SError posn $ InvalidAssignType var varDt expDt]
-        Nothing -> return ()
-checkStatement (Lex (StDeclaration ds) _) = mapM_ processDeclaration ds
-checkStatement (Lex (StReturn ex) posn) = undefined ex posn
-checkStatement (Lex (StRead vars) posn) = undefined vars posn
-checkStatement (Lex (StPrint exs) posn) = undefined exs posn
-checkStatement (Lex (StIf cnd tr el) posn) = undefined cnd tr el posn
-checkStatement (Lex (StCase ex cs def) posn) = undefined ex cs def posn
-checkStatement (Lex (StWhile cnd sts) posn) = undefined cnd sts posn
-checkStatement (Lex (StFor var rng sts) posn) = undefined var rng sts posn
-checkStatement (Lex StBreak _) = return ()
-checkStatement (Lex StContinue _) = return ()
+checkStatement (Lex st posn) = case st of
+    StNoop                       -> return ()
+    StAssign varL@(Lex var _) ex -> do
+        mayVarDt <- getSymInfoArg varL dataType
+        expDt    <- checkExpression ex
+        case mayVarDt of
+            Just varDt -> do
+                markInitialized varL
+                unless (varDt == expDt) $
+                    tell [SError posn $ InvalidAssignType var varDt expDt]
+            Nothing -> return ()
+    StDeclaration ds             -> DF.mapM_ processDeclaration ds
+    StReturn ex                  ->  undefined ex
+    StRead vars                  ->  undefined vars
+    StPrint exs                  ->  DF.mapM_ checkExpression exs
+    StIf cnd tr el               -> undefined cnd tr el --do
+        --_ <- checkExpression cnd
+        --checkStatements tr
+        --checkStatements el
+    StCase ex cs def             -> undefined ex cs def
+    StWhile cnd sts              -> undefined cnd sts
+    StFor var rng sts            -> undefined var rng sts
+    StBreak -> return ()
+    StContinue -> return ()
 
 {- |
     Checks the validity of an expression and returns it's value.
 -}
 checkExpression :: Lexeme Expression -> Checker DataType
-checkExpression (Lex (Variable varL@(Lex var _)) posn)   = do
-    mayInf <- getSymInfoArg varL (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
-    case mayInf of
-        Just (ini, dt) -> do
-            unless ini $ tell [SError posn $ VariableNotInitialized var]
-            return dt
-        Nothing         -> return Void
-checkExpression (Lex (LitInt _) _)    = return Int
-checkExpression (Lex (LitFloat _) _)  = return Float
-checkExpression (Lex (LitBool _) _)   = return Bool
-checkExpression (Lex (LitChar _) _)   = return Char
-checkExpression (Lex (LitString _) _) = return String
-checkExpression (Lex (ExpBinary (Lex op _) l r) posn) = do
-    ldt <- checkExpression l
-    rdt <- checkExpression r
-    let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
-    if null dts
-        then do
-            tell [SError posn $ BinaryTypes op [ldt,rdt]]
-            return . snd . head $ binaryOperation op
-        else return . snd $ head dts
-checkExpression (Lex (ExpUnary (Lex op _) e) posn)    = do
-    dt   <- checkExpression e
-    let dts = filter ((dt==) . fst) $ unaryOperation op
-    if null dts
-        then do
-            tell [SError posn $ UnaryTypes op dt]
-            return . snd . head $ unaryOperation op
-        else return . snd $ head dts
+checkExpression (Lex e posn) = case e of
+    Variable varL@(Lex var _) -> do
+        mayInf <- getSymInfoArg varL (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
+        case mayInf of
+            Just (ini, dt) -> do
+                unless ini $ tell [SError posn $ VariableNotInitialized var]
+                return dt
+            Nothing -> return Void
+    LitInt _                  -> return Int
+    LitFloat _                -> return Float
+    LitBool _                 -> return Bool
+    LitChar _                 -> return Char
+    LitString _               -> return String
+    ExpBinary (Lex op _) l r  -> do
+        ldt <- checkExpression l
+        rdt <- checkExpression r
+        let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
+        if null dts
+            then do
+                tell [SError posn $ BinaryTypes op [ldt,rdt]]
+                return . snd . head $ binaryOperation op
+            else return . snd $ head dts
+    ExpUnary (Lex op _) e     -> do
+        dt   <- checkExpression e
+        let dts = filter ((dt==) . fst) $ unaryOperation op
+        if null dts
+            then do
+                tell [SError posn $ UnaryTypes op dt]
+                return . snd . head $ unaryOperation op
+            else return . snd $ head dts

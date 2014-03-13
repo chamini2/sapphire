@@ -48,12 +48,16 @@ emptySymInfo = SymInfo {
                  initialized = False
                }
 
+--------------------------------------------------------------------------------
+
 data Scope = Scope { serial :: ScopeNum } deriving (Show)
 
 initialScope :: Scope
 initialScope = Scope { serial = 0 }
 
 type ScopeNum = Int
+
+--------------------------------------------------------------------------------
 
 data Value
     = ValInt  Int
@@ -68,6 +72,8 @@ instance Show Value where
     show (ValChar v)       = show v
     show (ValFloat v)      = show v
 
+----------------------------------------
+
 {-|
     Symbol Table
 -}
@@ -79,8 +85,6 @@ data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
  -}
 emptyTable :: SymTable
 emptyTable = SymTable DM.empty
-
-----------------------------------------
 
 {-|
     Adds a symbol to the symbol table along with its information

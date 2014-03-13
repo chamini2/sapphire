@@ -5,13 +5,13 @@ module Parser (parseProgram) where
 import           Lexer
 import           Language
 import           Checker
---import           SymbolTable
 
 import           Prelude
 import           Data.List (foldl')
+import qualified Data.Foldable as DF
+import           Data.Sequence
 --import           Control.Monad.RWS
 --import           Control.Monad
---import           Data.List (find)
 }
 
 %name parse
@@ -22,11 +22,6 @@ import           Data.List (foldl')
 --%lexer { lexWrap } { TkEOF }
 -- Without this we get a type error
 %error { happyError }
-
---%attributetype       { Attribute a }
---%attribute value     { a }
---%attribute data_type { DataType }
---%attribute len       { Int }
 
 %token
 
@@ -122,100 +117,6 @@ import           Data.List (foldl')
         varid           { Lex (TkVarId  _)  _ }
         typeid          { Lex (TkTypeId _)  _ }
 
-
-
-        -- Language
-        --newline         { TkNewLine    }
-        --"main"          { TkMain       }
-        --"begin"         { TkBegin      }
-        --"end"           { TkEnd        }
-        --"return"        { TkReturn     }
-        --";"             { TkSemicolon  }
-        --","             { TkComma      }
-
-        -- -- Brackets
-        --"("             { TkLParen     }
-        --")"             { TkRParen     }
-        --"["             { TkLBrackets  }
-        --"]"             { TkRBrackets  }
-        --"{"             { TkLBraces    }
-        --"}"             { TkRBraces    }
-
-        -- Types
-        --"Void"          { TkVoidType   }
-        --"Int"           { TkIntType    }
-        --"Bool"          { TkBoolType   }
-        --"Float"         { TkFloatType  }
-        --"Char"          { TkCharType   }
-        --"String"        { TkStringType }
-        --"Range"         { TkRangeType  }
-        --"Union"         { TkUnionType  }
-        --"Record"        { TkRecordType }
-        --"Type"          { TkTypeType   }
-
-        -- Statements
-        -- -- Declarations
-        --"="             { TkAssign     }
-        --"def"           { TkDef        }
-        --"as"            { TkAs         }
-        --"::"            { TkSignature  }
-        --"->"            { TkArrow      }
-
-        -- -- In/Out
-        --"read"          { TkRead       }
-        --"print"         { TkPrint      }
-
-        -- -- Conditionals
-        --"if"            { TkIf         }
-        --"then"          { TkThen       }
-        --"else"          { TkElse       }
-        --"unless"        { TkUnless     }
-        --"case"          { TkCase       }
-        --"when"          { TkWhen       }
-
-        -- -- Loops
-        --"for"           { TkFor        }
-        --"in"            { TkIn         }
-        --".."            { TkFromTo     }
-        --"do"            { TkDo         }
-        --"while"         { TkWhile      }
-        --"until"         { TkUntil      }
-        --"break"         { TkBreak      }
-        --"continue"      { TkContinue   }
-
-        -- Expressions/Operators
-        -- -- Literals
-        --int             { TkInt    $$  }
-        --"true"          { TkTrue   $$  }
-        --"false"         { TkFalse  $$  }
-        --float           { TkFloat  $$  }
-        --string          { TkString $$  }
-        --char            { TkChar   $$  }
-
-        -- -- Num
-        --"+"             { TkPlus       }
-        --"-"             { TkMinus      }
-        --"*"             { TkTimes      }
-        --"/"             { TkDivide     }
-        --"%"             { TkModulo     }
-        --"^"             { TkPower      }
-
-        -- -- Bool
-        --"or"            { TkOr         }
-        --"and"           { TkAnd        }
-        --"not"           { TkNot        }
-        --"@"             { TkBelongs    }
-        --"=="            { TkEqual      }
-        --"/="            { TkUnequal    }
-        --"<"             { TkLess       }
-        --">"             { TkGreat      }
-        --"<="            { TkLessEq     }
-        --">="            { TkGreatEq    }
-
-        -- -- Identifiers
-        --varid           { TkVarId  $$  }
-        --typeid          { TkTypeId $$  }
-
 --------------------------------------------------------------------------------
 -- Precedence
 -- -- Language
@@ -244,56 +145,55 @@ import           Data.List (foldl')
 -- Grammar
 
 Program :: { Program }
-    : StatementList         { Program $ reverse $1 }
+    : StatementList         { Program $1 }
 
-StatementList :: { [Lexeme Statement] }
-    : Statement                             { $1 : [] }
-    | StatementList Separator Statement     { $3 : $1 }
+StatementList :: { Seq (Lexeme Statement) }
+    : Statement                             { singleton $1 }
+    | StatementList Separator Statement     { $1 |> $3     }
 
 Statement :: { Lexeme Statement }
     :                           { Lex StNoop (0,0) }      -- λ, no-operation
-    --| varid "=" Expression      { StAssign $1 $3 }
     | varid "=" Expression      { liftLex $1 $ \(TkVarId v) -> StAssign (putLex $1 v) $3 }
 
 --    -- Definitions
-    --| DataType VariableList     { StDeclaration $ foldl' (\r var -> (Declaration var $1 CatVariable) : r) [] $2 }
-    | DataType VariableList     { putLex $1 . StDeclaration $ foldl' (\r var -> (putLex $1 $ Declaration var $1 CatVariable) : r) [] $2 }
+    | DataType VariableList     { putLex $1 . StDeclaration $ fmap (\var -> putLex $1 $ Declaration var $1 CatVariable) $2 }
+    --| DataType VariableList     { putLex $1 . StDeclaration $ foldl' (\r var -> (putLex $1 $ Declaration var $1 CatVariable) : r) [] $2 }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
---    -- I/O
---    | "read" VariableList       { StRead  (reverse $2) }
---    | "print" ExpressionList    { StPrint (reverse $2) }
-
 --    -- Conditional
---    | "if" ExpressionBool "then" StatementList "end"                           { StIf $2           (reverse $4) []           }
---    | "if" ExpressionBool "then" StatementList "else" StatementList "end"      { StIf $2           (reverse $4) (reverse $6) }
---    | "unless" ExpressionBool "then" StatementList "end"                       { StIf (NotBool $2) (reverse $4) []           }
---    | "unless" ExpressionBool "then" StatementList "else" StatementList "end"  { StIf (NotBool $2) (reverse $4) (reverse $6) }
---    | "case" ExpressionArit CaseList "end"                                     { StCase $2 (reverse $3) []                   }
---    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 (reverse $3) (reverse $5)         }
+------------------------------    --| "if" Expression "then" StatementList "end"                           { StIf $2           $4 empty }
+------------------------------    --| "if" Expression "then" StatementList "else" StatementList "end"      { StIf $2           $4 $6    }
+------------------------------    --| "unless" Expression "then" StatementList "end"                       { StIf (ExpUnary OpNot $2) $4 empty }
+------------------------------    --| "unless" Expression "then" StatementList "else" StatementList "end"  { StIf (ExpUnary OpNot $2) $4 $6    }
+--    | "case" ExpressionArit CaseList "end"                                     { StCase $2 $3 empty         }
+--    | "case" ExpressionArit CaseList "else" StatementList "end"                { StCase $2 $3 $5            }
+
+--    -- I/O
+------------------------------    --| "read" VariableList       { StRead  $2 }
+------------------------------    --| "print" ExpressionList    { StPrint $2 }
 
 --    -- Loops
---    | "while" ExpressionBool "do" StatementList "end"          { StWhile $2           (reverse $4) }
---    | "until" ExpressionBool "do" StatementList "end"          { StWhile (NotBool $2) (reverse $4) }
+------------------------------    --| "while" Expression "do" StatementList "end"          { StWhile $2           $4 }
+------------------------------    --| "until" Expression "do" StatementList "end"          { StWhile (ExpUnary OpNot $2) $4 }
 
-    --| "repeat" StatementList "while" ExpressionBool            { StRepeat (reverse $2) $4           }
-    --| "repeat" StatementList "until" ExpressionBool            { StRepeat (reverse $2) (NotBool $4) }
+--    | "repeat" StatementList "while" ExpressionBool            { StRepeat $2 $4           }
+--    | "repeat" StatementList "until" ExpressionBool            { StRepeat $2 (ExpUnary OpNot $4) }
 
---    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 (reverse $6)          }
---    | "break"           { StBreak }
---    | "continue"        { StContinue }
+--    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 $6          }
+------------------------------    --| "break"           { StBreak }
+------------------------------    --| "continue"        { StContinue }
 
 Separator :: { () }
     : ";"           { }
     | newline       { }
 
---CaseList --:: { [Case] }
---    : Case              { [$1]    }
---    | CaseList Case     { $2 : $1 }
+CaseList --:: { Seq Case }
+    : Case              { singleton $1 }
+    | CaseList Case     { $1 |> $2     }
 
---Case --:: { Case }
---    : "when" Expression "do" StatementList      { Case $2 (reverse $4) }
+Case :: { Case }
+    : "when" Expression "do" StatementList      { Case $2 $4 }
 
 ---------------------------------------
 
@@ -312,9 +212,9 @@ DataType :: { Lexeme DataType }
 ----DataTypeArray
 ----    : "[" DataType "]" "<-" "[" int "]"
 
-VariableList :: { [Lexeme Identifier] }
-    : varid                         { (liftLex $1 $ \(TkVarId v) -> v) : [] }
-    | VariableList "," varid        { (liftLex $3 $ \(TkVarId v) -> v) : $1 }
+VariableList :: { Seq (Lexeme Identifier) }
+    : varid                         { singleton (liftLex $1 $ \(TkVarId v) -> v) }
+    | VariableList "," varid        { $1 |> (liftLex $3 $ \(TkVarId v) -> v)     }
 
 --FunctionDef --:: { Function }
 --    : "def" varid "::" Signature
@@ -337,22 +237,6 @@ Expression :: { Lexeme Expression }
     | "true"                       { liftPutLex $1 (\(TkTrue   v) -> v) LitBool   }
     | "false"                      { liftPutLex $1 (\(TkFalse  v) -> v) LitBool   }
     -- Operators
-    --| Expression "+"   Expression  { ExpBinary OpPlus    $1 $3 {-Void-} }
-    --| Expression "-"   Expression  { ExpBinary OpMinus   $1 $3 {-Void-} }
-    --| Expression "*"   Expression  { ExpBinary OpTimes   $1 $3 {-Void-} }
-    --| Expression "/"   Expression  { ExpBinary OpDivide  $1 $3 {-Void-} }
-    --| Expression "%"   Expression  { ExpBinary OpModulo  $1 $3 {-Void-} }
-    --| Expression "^"   Expression  { ExpBinary OpPower   $1 $3 {-Void-} }
-    --| Expression ".."  Expression  { ExpBinary OpFromTo  $1 $3 {-Void-} }
-    --| Expression "or"  Expression  { ExpBinary OpOr      $1 $3 {-Void-} }
-    --| Expression "and" Expression  { ExpBinary OpAnd     $1 $3 {-Void-} }
-    --| Expression "=="  Expression  { ExpBinary OpEqual   $1 $3 {-Void-} }
-    --| Expression "/="  Expression  { ExpBinary OpUnEqual $1 $3 {-Void-} }
-    --| Expression "<"   Expression  { ExpBinary OpLess    $1 $3 {-Void-} }
-    --| Expression "<="  Expression  { ExpBinary OpLessEq  $1 $3 {-Void-} }
-    --| Expression ">"   Expression  { ExpBinary OpGreat   $1 $3 {-Void-} }
-    --| Expression ">="  Expression  { ExpBinary OpGreatEq $1 $3 {-Void-} }
-    --| Expression "@"   Expression  { ExpBinary OpBelongs $1 $3 {-Void-} }
     | Expression "+"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpPlus   ) $1 $3 }
     | Expression "-"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpMinus  ) $1 $3 }
     | Expression "*"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpTimes  ) $1 $3 }
@@ -363,67 +247,23 @@ Expression :: { Lexeme Expression }
     | Expression "or"  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpOr     ) $1 $3 }
     | Expression "and" Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpAnd    ) $1 $3 }
     | Expression "=="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpEqual  ) $1 $3 }
-    | Expression "/="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpUnEqual) $1 $3 }
+    | Expression "/="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpUnequal) $1 $3 }
     | Expression "<"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpLess   ) $1 $3 }
     | Expression "<="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpLessEq ) $1 $3 }
     | Expression ">"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpGreat  ) $1 $3 }
     | Expression ">="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpGreatEq) $1 $3 }
     | Expression "@"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpBelongs) $1 $3 }
-    --| "-"   Expression             { ExpUnary OpNegate $2 {-Void-} }
-    --| "not" Expression             { ExpUnary OpNot    $2 {-Void-} }
     | "-"   Expression             { putLex $1 $ ExpUnary (liftLex $2 (const OpNegate)) $2 }
     | "not" Expression             { putLex $1 $ ExpUnary (liftLex $2 (const OpNot   )) $2 }
 
-ExpressionList :: { [Lexeme Expression] }
-    : Expression                                { $1 : [] }
-    | ExpressionList Separator Expression       { $3 : $1 }
+ExpressionList :: { Seq (Lexeme Expression) }
+    : Expression                          { singleton $1 }
+    | ExpressionList "," Expression       { $1 |> $3     }
 
 {
 
 --------------------------------------------------------------------------------
 -- Functions
-
---binaryM :: Binary -> Checker Expression -> Checker Expression -> Checker Expression
---binaryM op leftM rightM = do
---    left  <- leftM
---    right <- rightM
---    let checking = checkBinaryType left right
---    case op of
---        OpOr      -> checking [(Bool,Bool,Bool)]
---        OpAnd     -> checking [(Bool,Bool,Bool)]
---        OpEqual   -> checking ((Bool,Bool,Bool) : numbers)
---        OpUnEqual -> checking ((Bool,Bool,Bool) : numbers)
---        OpFromTo  -> checking [(Int, Int, Range)]
---        OpBelongs -> checking [(Int, Range, Bool)]
---        _         -> checking numbers -- OpPlus OpMinus OpTimes OpDivide OpModulo OpPower OpLess OpLessEq OpGreat OpGreatEq
---    where
---        numbers = [(Int, Int, Int), (Float, Float, Float)]
---        checkBinaryType :: Expression -> Expression -> [(DataType,DataType,DataType)] -> Checker Expression
---        checkBinaryType left right types = do
---            let cond (l,r,_) = dataType left == l && dataType right == r
---                defaultType  = (\(_,_,r) -> r) $ head types -- We have to calculate better the defaultType
---            case find cond types of
---                Just (_,_,r) -> return $ ExpBinary op left right r
---                Nothing      -> expError defaultType $ "Static Error: operator " ++ show op ++ " doesn't work with arguments " ++
---                                           show (dataType left) ++ ", " ++ show (dataType right) ++ "\n"
-
---unaryM :: Unary -> Checker Expression -> Checker Expression
---unaryM op operandM = do
---    operand <- operandM
---    let checking = checkUnaryType operand
---    case op of
---        OpNegate -> checking [(Int, Int), (Float, Float)]
---        OpNot    -> checking [(Bool,Bool)]
---    where
---        checkUnaryType :: Expression -> [(DataType,DataType)] -> Checker Expression
---        checkUnaryType operand types = do
---            let cond (u,_)  = dataType operand == u
---                defaultType = snd $ head types -- We have to calculate better the defaultType
---            case find cond types of
---                Just (_,r) -> return $ ExpUnary op operand r
---                Nothing    -> expError defaultType $ "Static Error: operator " ++ show op ++ "doesn't work with arguments " ++
---                                         show (dataType operand) ++ "\n"
-
 
 --expError :: DataType -> String -> Checker Expression
 --expError dt str = do
@@ -434,14 +274,6 @@ ExpressionList :: { [Lexeme Expression] }
 --parseError identity str = do
 --    tell [PError $ UnexpectedToken str]
 --    return identity
-
---continueChecker :: Checker a -> (a -> b) -> Checker b
---continueChecker extract func = do
---    let (check, state, writer) = runChecker extract
---    tell writer
---    put state
---    return $ func check
-
 
 --------------------------------------------------------------------------------
 
@@ -454,32 +286,19 @@ liftLex (Lex t p) f = Lex (f t) p
 putLex :: Lexeme a -> b -> Lexeme b
 putLex l a = liftLex l $ const a
 
+----------------------------------------
 
---unLex :: Lexeme -> (Token -> a) -> Posn a
---unLex (Lex t p) f = Posn (f t) p
-
---positionPosn :: Posn b -> a -> Posn a
---positionPosn (Posn _ p) a = Posn a p
-
---positionLex :: Lexeme -> a -> Posn a
---positionLex l a = unLex l $ const a
-
-
-lexWrap :: (Lexeme Token -> Alex a) -> Alex a
 --lexWrap :: (Token -> Alex a) -> Alex a
+lexWrap :: (Lexeme Token -> Alex a) -> Alex a
 lexWrap cont = do
     t <- alexMonadScan
     case t of
         Lex (TkError c) p -> do
-        --TkError c -> do
             p <- alexGetPosn
-            --fail $ showPosn p ++ "Unexpected character: '" ++ [c] ++ "'\n"
             addLexerError t
             lexWrap cont
         Lex (TkStringError str) p -> do
-        --TkStringError str -> do
             p <- alexGetPosn
-            --fail $ showPosn p ++ "Missing matching '\"' for string\n"
             addLexerError t
             lexWrap cont
         _         -> cont t

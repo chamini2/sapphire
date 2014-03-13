@@ -2,11 +2,16 @@
 module Language where
 
 import           Prelude
+import           Control.Monad.State
+import           Control.Monad.Writer
+import           Control.Monad.Identity
+import qualified Data.Foldable as DF (mapM_, foldr)
+import           Data.Sequence as DS (Seq, singleton)
 
 type Position = (Int, Int) -- (Fila, Columna)
 
 showPosn :: Position -> String
-showPosn (line, col) = "line " ++ show line ++ ", column " ++ show (col - 1) ++ ": "
+showPosn (line, col) = "line " ++ show line ++ ", column " ++ show col ++ ": "
 
 ----------------------------------------
 
@@ -14,13 +19,15 @@ data Lexeme a = Lex a Position
     deriving (Eq)
 
 instance (Show a) => Show (Lexeme a) where
-    show (Lex a p) = show p ++ show a
+    show (Lex a p) = showPosn p ++ show a
+
+--------------------------------------------------------------------------------
 
 --newtype Program = StFunction
 --    deriving (Show)
 --newtype Program = Program [Statement]
 --    deriving (Show)
-newtype Program = Program [Lexeme Statement]
+newtype Program = Program (Seq (Lexeme Statement))
     deriving (Show)
 
 type Identifier = String
@@ -30,44 +37,29 @@ data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Arr
 
 ----------------------------------------
 
---data Statement where
---    -- Language
---    StNoop   :: Statement
---    StAssign :: Identifier -> Expression -> Statement
---    -- Definitions
---    StDeclaration :: [Declaration] -> Statement
---    StReturn      :: Expression    -> Statement
---    -- I/O
---    StRead  :: [Identifier] -> Statement
---    StPrint :: [Expression] -> Statement
---    -- Conditional
---    StIf   :: Expression -> [Statement] -> [Statement] -> Statement
---    StCase :: Expression -> [Case]      -> [Statement] -> Statement
---    -- Loops
---    StWhile    :: Expression -> [Statement] ->  Statement
---    StFor      :: Identifier -> Expression  -> [Statement] -> Statement
---    StBreak    :: Statement
---    StContinue :: Statement
---    deriving (Show)
 data Statement where
     -- Language
     StNoop   :: Statement
     StAssign :: Lexeme Identifier -> Lexeme Expression -> Statement
     -- Definitions
-    StDeclaration :: [Lexeme Declaration] -> Statement
+    StDeclaration :: Seq (Lexeme Declaration) -> Statement
     StReturn      :: Lexeme Expression    -> Statement
     -- I/O
-    StRead  :: [Lexeme Identifier] -> Statement
-    StPrint :: [Lexeme Expression] -> Statement
+    StRead  :: Seq (Lexeme Identifier) -> Statement
+    StPrint :: Seq (Lexeme Expression) -> Statement
     -- Conditional
-    StIf   :: Lexeme Expression -> [Lexeme Statement] -> [Lexeme Statement] -> Statement
-    StCase :: Lexeme Expression -> [Lexeme Case]      -> [Lexeme Statement] -> Statement
+    StIf   :: Lexeme Expression -> Seq (Lexeme Statement) -> Seq (Lexeme Statement) -> Statement
+    StCase :: Lexeme Expression -> Seq (Lexeme Case)      -> Seq (Lexeme Statement) -> Statement
     -- Loops
-    StWhile    :: Lexeme Expression -> [Lexeme Statement] ->  Statement
-    StFor      :: Lexeme Identifier -> Lexeme Expression  -> [Lexeme Statement] -> Statement
+    StWhile    :: Lexeme Expression -> Seq (Lexeme Statement) ->  Statement
+    StFor      :: Lexeme Identifier -> Lexeme Expression  -> Seq (Lexeme Statement) -> Statement
     StBreak    :: Statement
     StContinue :: Statement
-    deriving (Show)
+
+instance Show Statement where
+    show = runPrinter . printStatement
+
+----------------------------------------
 
 data Declaration where
     Declaration :: Lexeme Identifier -> Lexeme DataType -> Category -> Declaration
@@ -78,29 +70,14 @@ data Category = CatVariable
               | CatParameter
               | CatRecordField
               | CatUnionField
-              | CatDataType             -- Que es esto?? no será CatDeclaration? En verdad no tengo idea
+              | CatDataType
               deriving (Eq, Show)
 
-data Case = Case Expression [Statement]
+data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
     deriving (Show)
 
 ----------------------------------------
 
---data Expression where
---    -- Variable
---    Variable :: Identifier -> Expression
---    -- Literals
---    LitInt    :: Int    -> Expression
---    LitFloat  :: Float  -> Expression
---    LitBool   :: Bool   -> Expression
---    LitChar   :: Char   -> Expression
---    LitString :: String -> Expression
---    --LitRange  :: Range  -> Expression
---    -- Operators
---    ExpBinary :: Binary   -> Expression -> Expression {- -> DataType -} -> Expression
---    ExpUnary  :: Unary    -> Expression -> Expression {- -> DataType -}
---    --ExpArray  :: ExpressionArray
---    deriving (Show)
 data Expression where
     -- Variable
     Variable :: Lexeme Identifier -> Expression
@@ -124,8 +101,26 @@ data Range where
 data Binary
     = OpPlus  | OpMinus | OpTimes | OpDivide | OpModulo | OpPower | OpFromTo
     | OpOr    | OpAnd
-    | OpEqual | OpUnEqual | OpLess | OpLessEq | OpGreat | OpGreatEq | OpBelongs
-    deriving (Show)
+    | OpEqual | OpUnequal | OpLess | OpLessEq | OpGreat | OpGreatEq | OpBelongs
+
+instance Show Binary where
+    show op = case op of
+        OpPlus    -> "'Arithmetic addition'"
+        OpMinus   -> "'Arithmetic substraction'"
+        OpTimes   -> "'Arithmetic multiplication'"
+        OpDivide  -> "'Arithmetic division'"
+        OpModulo  -> "'Arithmetic Modulo'"
+        OpPower   -> "'Arithmetic power'"
+        OpFromTo  -> "'Range construction operator'"
+        OpOr      -> "'Logical disjunction'"
+        OpAnd     -> "'Logical conjunction'"
+        OpEqual   -> "'Equal to'"
+        OpUnequal -> "'Not equal to'"
+        OpLess    -> "'Less than'"
+        OpLessEq  -> "'Less than or equal to'"
+        OpGreat   -> "'Greater than'"
+        OpGreatEq -> "'Greater than or equal to'"
+        OpBelongs -> "'Belongs to Range'"
 
 binaryOperation :: Binary -> [((DataType, DataType), DataType)]
 binaryOperation op = case op of
@@ -139,7 +134,7 @@ binaryOperation op = case op of
     OpOr      -> [((Bool,Bool),Bool)]
     OpAnd     -> [((Bool,Bool),Bool)]
     OpEqual   -> ((Bool,Bool),Bool) : zip numbers [Bool, Bool]
-    OpUnEqual -> ((Bool,Bool),Bool) : zip numbers [Bool, Bool]
+    OpUnequal -> ((Bool,Bool),Bool) : zip numbers [Bool, Bool]
     OpLess    -> zip numbers [Bool, Bool]
     OpLessEq  -> zip numbers [Bool, Bool]
     OpGreat   -> zip numbers [Bool, Bool]
@@ -149,96 +144,124 @@ binaryOperation op = case op of
         numbers = [(Int,Int), (Float,Float)]
 
 data Unary = OpNegate | OpNot
-    deriving (Show)
+
+instance Show Unary where
+    show OpNegate = "Arithmetic negation"
+    show OpNot    = "Logical negation"
 
 unaryOperation :: Unary -> [(DataType, DataType)]
 unaryOperation op = case op of
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
 
---------------------------------------------------------------------------------
+--
+--  Pretty printer for Statments and Expressions
+--
 
---class Printer p where
---    treePrint :: Int -> p -> String
+data PrintState = PrintState { tabs :: Int } deriving (Show)
 
---rep :: Int -> String
---rep n = replicate n '\t'
+initialPState :: PrintState
+initialPState = PrintState { tabs = 0 }
 
---instance (Printer a a, Show a) => Printer [a] where
---    treePrint n ls
---        | ((show $ typeOf ls) == "[Char]") = rep n ++ show ls ++ "\n"
---        | otherwise = concat (map (treePrint n) ls)
+runPrinter :: Printer () -> String
+runPrinter = DF.foldr (++) "" . snd . runIdentity . runWriterT . flip runStateT initialPState
 
---instance Printer Char where
---    treePrint n = show
+type Printer a = StateT PrintState (WriterT (Seq String) Identity) a
 
---instance Printer Int where
---    treePrint n i = rep n ++ show i ++ "\n"
+printStatement :: Statement -> Printer ()
+printStatement st = case st of
+    StNoop         -> return ()
+--    StAssign var e -> do
+--        printNonTerminal "ASSIGNMENT"
+--        raiseTabs
+--        printNonTerminal $     "- variable: " ++ var
+--        printExpressionWithTag "- value: " e
+--        lowerTabs
+--    StDeclaration ds -> do
+--        printNonTerminal "DECLARATION"
+--        raiseTabs
+--        printNonTerminal "DECLARATION LIST"
+--        lowerTabs
+--    StReturn e -> printExpressionWithTag "RETURN" e
+--    -- I/O
+--    StRead vs -> do
+--        printNonTerminal "READ"
+--        raiseTabs
+--        DF.mapM_ (printExpression . Variable) vs
+--        lowerTabs
+--    StPrint es -> printExpressions "PRINT" es
+--    -- Conditional
+--    StIf g success fail -> do
+--        printNonTerminal "IF"
+--        raiseTabs
+--        printExpressionWithTag "- guard: "   g
+--        printStatements        "- success: " success
+--        printStatements        "- fail: "    fail
+--        lowerTabs
+--    StCase e cs ss -> return ()
+--    -- Loops
+--    StWhile g c -> do
+--        printNonTerminal "WHILE"
+--        raiseTabs
+--        printExpressionWithTag "- guard: " g
+--        printStatements        "- body: "  c
+--        lowerTabs
+--    StFor var r c -> do
+--        printNonTerminal "FOR"
+--        raiseTabs
+--        printNonTerminal     $ "- variable: " ++ var
+--        printExpressionWithTag "- range: "       r
+--        printStatements        "- body: "        c
+--        lowerTabs
+--    StBreak    -> printNonTerminal "BREAK"
+--    StContinue -> printNonTerminal "CONTINUE"
 
---instance Printer Float where
---    treePrint n f = rep n ++ show f ++ "\n"
+----
+----  Expressions printing
+----
+--printExpression :: Expression -> Printer ()
+--printExpression e = case e of
+--    Variable  v      -> printNonTerminal $ "VARIABLE: " ++ show v
+--    LitInt    c      -> printNonTerminal $ "INTEGER LITERAL: " ++ show c
+--    LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: " ++ show b
+--    LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "   ++ show f
+--    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ s
+--    ExpBinary op l r -> do
+--        printNonTerminal "BINARY OPERATION"
+--        raiseTabs
+--        printNonTerminal $ "- operator: " ++ show op
+--        printExpressionWithTag "- left operand:  " l
+--        printExpressionWithTag "- right operand: " r
+--        lowerTabs
+--    ExpUnary op e -> do
+--        printNonTerminal "UNARY OPERATION"
+--        raiseTabs
+--        printNonTerminal       ("- operator: " ++ show op)
+--        printExpressionWithTag ("- operand: "  ++ show op) e
+--        lowerTabs
 
---instance Printer Bool where
---    treePrint n b = rep n ++ show b ++ "\n"
+--raiseTabs :: Printer ()
+--raiseTabs = modify (\s -> s { tabs = tabs s + 1 })
 
---instance Printer DataType where
---    treePrint n k = rep n ++ show k ++ "\n"
+--lowerTabs :: Printer ()
+--lowerTabs = modify (\s -> s { tabs = tabs s - 1 })
 
---instance Printer Declaration where
---    treePrint n (Declaration var typ) = rep n ++ "Declaration" ++ "\n" ++ treePrint (n+1) var ++ treePrint (n+1) typ ++ "\n"
+--printExpressionWithTag :: String -> Expression -> Printer ()
+--printExpressionWithTag tag e = do
+--    printNonTerminal tag
+--    raiseTabs >> printExpression e >> lowerTabs
 
---instance Printer Statement where
---    treePrint n StNoop = rep n ++ "StNoop" ++ "\n"
---    treePrint n (StAssign var expr)           = rep n ++ "StAssign" ++ "\n" ++ treePrint (n+1) var ++ treePrint (n+1) expr ++ "\n"
---    treePrint n (StDeclaration decls)         = rep n ++ "StDeclaration" ++ "\n" ++ treePrint (n+1) decls ++ "\n"
---    treePrint n (StReturn expr)               = rep n ++ "StReturn" ++ "\n" ++ treePrint (n+1) expr ++ "\n"
---    treePrint n (StRead   vars)               = rep n ++ "StRead"   ++ "\n" ++ treePrint (n+1) vars ++ "\n"
---    treePrint n (StPrint  exprs)              = rep n ++ "StPrint"  ++ "\n" ++ treePrint (n+1) exprs ++ "\n"
---    treePrint n (StIf     bool ifSts elseSts) = rep n ++ "StIf"     ++ "\n" ++ treePrint (n+1) bool ++ rep n ++ "then\n" ++ treePrint (n+1) ifSts ++ rep n ++ "else\n" ++ treePrint (n+1) elseSts ++ "\n"
---    treePrint n (StCase   arit cases elseSts) = rep n ++ "StCase"   ++ "\n" ++ treePrint (n+1) arit ++ treePrint (n+1) cases ++ treePrint (n+1) elseSts  ++ "\n"
---    treePrint n (StWhile  bool sts)           = rep n ++ "StWhile"  ++ "\n" ++ treePrint (n+1) bool ++ treePrint (n+1) sts ++ "\n"
---    treePrint n (StFor    var rang sts)       = rep n ++ "StFor"    ++ "\n" ++ treePrint (n+1) var  ++ treePrint (n+1) rang  ++ treePrint (n+1) sts  ++ "\n"
---    treePrint n StBreak    = rep n ++ "StBreak" ++ "\n"
---    treePrint n StContinue = rep n ++ "StContinue" ++ "\n"
+--printNonTerminal :: String -> Printer ()
+--printNonTerminal str = do
+--    t <- gets tabs
+--    tell $ DS.singleton $ replicate t '\t' ++ str ++ "\n"
 
---instance Printer Case where
---    treePrint n (Case expr sts) = rep n ++ "Case" ++ "\n" ++ treePrint (n+1) expr ++ treePrint (n+1) sts ++ "\n"
+--printStatements :: String -> Seq Statement -> Printer ()
+--printStatements tag is = do
+--    printNonTerminal tag
+--    raiseTabs >> DF.mapM_ printStatement is >> lowerTabs
 
---instance Printer Expression where
---    treePrint n (ExpressionId var)    = rep n ++ "ExpressionId"   ++ "\n" ++ treePrint (n+1) var ++ "\n"
---    treePrint n (ExpressionArit expr) = rep n ++ "ExpressionArit" ++ "\n" ++ treePrint (n+1) expr ++ "\n"
---    treePrint n (ExpressionBool expr) = rep n ++ "ExpressionBool" ++ "\n" ++ treePrint (n+1) expr ++ "\n"
---    treePrint n (ExpressionStrn expr) = rep n ++ "ExpressionStrn" ++ "\n" ++ treePrint (n+1) expr ++ "\n"
---    treePrint n (ExpressionRang expr) = rep n ++ "ExpressionRang" ++ "\n" ++ treePrint (n+1) expr ++ "\n"
-
---instance Printer ExpressionArit where
---    treePrint n (LiteralInt num)   = rep n ++ "LiteralInt"      ++ "\n" ++ treePrint (n+1) num ++ "\n"
---    treePrint n (LiteralFloat num) = rep n ++ "LiteralFloat"    ++ "\n" ++ treePrint (n+1) num ++ "\n"
---    treePrint n (PlusArit   left right) = rep n ++ "PlusArit"   ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (MinusArit  left right) = rep n ++ "MinusArit"  ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (TimesArit  left right) = rep n ++ "TimesArit"  ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (DivideArit left right) = rep n ++ "DivideArit" ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (ModuloArit left right) = rep n ++ "ModuloArit" ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (PowerArit  left right) = rep n ++ "PowerArit"  ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (NegateArit expr) = rep n ++ "NegateArit"       ++ "\n" ++ treePrint (n+1) expr ++ "\n"
-
---instance Printer ExpressionBool where
---    treePrint n (LiteralBool bool) = rep n ++ "LiteralBool" ++ "\n" ++ treePrint (n+1) bool ++ "\n"
---    treePrint n (OrBool      left right) = rep n ++ "OrBool"      ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (AndBool     left right) = rep n ++ "AndBool"     ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (NotBool     expr) = rep n ++ "NotBool" ++ "\n" ++ treePrint (n+1) expr ++ "\n"
---    treePrint n (EqualBool   left right) = rep n ++ "EqualBool"   ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (UnequalBool left right) = rep n ++ "UnequalBool" ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (LessBool    left right) = rep n ++ "LessBool"    ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (LessEqBool  left right) = rep n ++ "LessEqBool"  ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (GreatBool   left right) = rep n ++ "GreatBool"   ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (GreatEqBool left right) = rep n ++ "GreatEqBool" ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
---    treePrint n (BelongsBool left right) = rep n ++ "BelongsBool" ++ "\n" ++ treePrint (n+1) left ++ treePrint (n+1) right ++ "\n"
-
---instance Printer ExpressionStrn where
---    treePrint n (LiteralStrn s) = rep n ++ "LiteralStrn" ++ "\n" ++ treePrint (n+1) s ++ "\n"
-
---instance Printer ExpressionRang where
---    treePrint n (LiteralRang from to) = rep n ++ "LiteralRang" ++ "\n" ++ treePrint (n+1) from ++ treePrint (n+1) to ++ "\n"
-
-
+--printExpressions :: String -> Seq Expression -> Printer ()
+--printExpressions tag es = do
+--    printNonTerminal tag
+--    raiseTabs >> DF.mapM_ printExpression es >> lowerTabs
