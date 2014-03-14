@@ -1,13 +1,14 @@
 Int x,y,z
-x = 10
 y = 20
 z = 30
 
-print x,y,z
+print y,z
 
 if 3 > 4 then
-    read x
+    x = 10
     print "NOOOO"
 else
     if true then end
 end
+
+print x
