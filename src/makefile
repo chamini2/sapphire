@@ -16,10 +16,8 @@ happy: alex
 	happy -g Parser.y
 
 # Can be used as 'make run ../examples/sapphire/ejemplo.sp'
-run: ./Sapphire
+run:
 	./Sapphire $(RUN_ARGS)
-
-Sapphire: main
 
 ghci:
 	@ghci Sapphire

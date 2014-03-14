@@ -1,4 +1,4 @@
-{-|
+{- |
     Symbol table based on the LeBlanc-Cook symbol table abstraction
  -}
 module SymbolTable
@@ -7,6 +7,7 @@ module SymbolTable
     , insert
     , lookup
     , update
+    , accessible
 
     , SymInfo(..)
     , emptySymInfo
@@ -26,6 +27,7 @@ import           Language      (Category (CatVariable), DataType (Void),
                                 Identifier, Position)
 
 import qualified Data.Map      as DM
+import           Data.Maybe    (fromJust)
 import           Data.Sequence as DS hiding (empty, update)
 import           Prelude       hiding (lookup)
 
@@ -74,19 +76,19 @@ instance Show Value where
 
 ----------------------------------------
 
-{-|
+{- |
     Symbol Table
 -}
 data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
     deriving (Show)
 
-{-|
+{- |
     Empty symbol table
  -}
 emptyTable :: SymTable
 emptyTable = SymTable DM.empty
 
-{-|
+{- |
     Adds a symbol to the symbol table along with its information
  -}
 insert :: Identifier -> SymInfo -> SymTable -> SymTable
@@ -94,7 +96,7 @@ insert vn info (SymTable m) = SymTable $ DM.alter f vn m
     where f Nothing  = Just $ DS.singleton info
           f (Just x) = Just $ info <| x
 
-{-|
+{- |
     Looks up the symbol identified by var in the symbol table
  -}
 lookup :: Identifier -> SymTable -> Maybe SymInfo
@@ -104,7 +106,7 @@ lookup var (SymTable m) = do
         EmptyL    -> Nothing
         info :< _ -> Just info
 
-{-|
+{- |
     Update Actualiza el value de una variable, solo si la variable esta
     en la tabla de símbolos
  -}
@@ -114,6 +116,12 @@ update var f (SymTable m) = SymTable $ DM.alter func var m
         func (Just is) = case viewl is of
             i :< iss  -> Just $ f i <| iss
             _         -> error "SymbolTable.update: No value to update"
+
+{- |
+    Returns all the variables -----  MAYBE ONLY VISIBLE???
+ -}
+accessible :: SymTable -> Seq (Identifier, SymInfo)
+accessible st@(SymTable m) = fromList . map (\var -> (var, fromJust $ lookup var st)) $ DM.keys m
 
 --------------------------------------------------------------------------------
 

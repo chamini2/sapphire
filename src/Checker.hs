@@ -6,11 +6,11 @@ import           SymbolTable
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
-import           Data.Foldable as DF    (mapM_)
+import           Data.Foldable as DF    (mapM_, foldr)
 import           Data.Function          (on)
 import           Data.List              (sortBy)
-import           Data.Sequence as DS    (empty, Seq)
-import           Prelude                hiding (lookup)
+import           Data.Sequence as DS    (empty, singleton, Seq, (><))
+import           Prelude       as P     hiding (lookup, foldr, zipWith)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -66,6 +66,8 @@ data StaticError
     | VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
     | AlreadyDeclared        Identifier Position
+    -- Statements
+    | IfConditionDataType    DataType
     -- Operators
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
@@ -73,13 +75,18 @@ data StaticError
     | StaticError String
 
 instance Show StaticError where
+    -- Variables
     show (VariableNotDeclared var)     = "Static error: variable '" ++ var ++ "' has not been declared"
     show (VariableNotInitialized var)  = "Static error: variable '" ++ var ++ "' has not been initialized"
     show (InvalidAssignType var vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
-    show (AlreadyDeclared var p)   = "Static error: variable '" ++ var ++ "' has already been declared at " ++ show p
-    show (UnaryTypes op dt)   = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op (dl,dr)) = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
-    show (StaticError msg)    = "Static error: " ++ msg
+    show (AlreadyDeclared var p)       = "Static error: variable '" ++ var ++ "' has already been declared at " ++ show p
+    -- Statements
+    show (IfConditionDataType dt)      = "Static error: condition of if statement must be of type 'Bool', but is of type '" ++ show dt ++ "'"
+    -- Operators
+    show (UnaryTypes op dt)            = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
+    show (BinaryTypes op (dl,dr))      = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    -- General
+    show (StaticError msg)             = "Static error: " ++ msg
 
 --------------------------------------------------------------------------------
 
@@ -125,7 +132,7 @@ getState = (\(_,s,_) -> s) . runChecker
 getErrors :: CheckWriter -> ([CheckError], [CheckError], [CheckError])
 getErrors errors = (only lexical, only parsing, only static)
     where
-        only f = sortBy compare $ filter f errors
+        only f = sortBy compare $ P.filter f errors
         lexical e = case e of
             (LError _ _) -> True
             _            -> False
@@ -161,7 +168,7 @@ addSymbol (Lex var _) info = modify func
     where
         func s = s { table = insert var info (table s)}
 {- |
-    Gets a symbol's value if it has one or Nothing otherwise
+    Gets a symbol's value said value exists in the table, otherwise Nothing
 -}
 getSymInfoArg :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
 getSymInfoArg (Lex var posn) f = do
@@ -193,6 +200,19 @@ modifyValue (Lex var posn) val = do
 markInitialized :: Lexeme Identifier -> Checker ()
 markInitialized (Lex var _) = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
 
+{- |
+    Returns the variables in the current scope
+-}
+getScopeVariables :: Checker (Seq (Identifier, SymInfo))
+getScopeVariables = do
+    tab <- gets table
+    cs  <- gets currtSc
+    let vars = accessible tab
+    return $ foldr ((><) . func cs) empty vars
+    where
+        func cs v@(_, info) = if scopeNum info == cs then singleton v else empty
+
+
 ----------------------------------------
 
 {- |
@@ -200,8 +220,8 @@ markInitialized (Lex var _) = modify $ \s -> s { table = update var (\sym -> sym
 -}
 processDeclaration :: Lexeme Declaration -> Checker ()
 processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
-    tab  <- gets table
-    cs   <- gets currtSc
+    tab <- gets table
+    cs  <- gets currtSc
     let info = emptySymInfo {
                  dataType = t,
                  category = c,
@@ -246,10 +266,25 @@ checkStatement (Lex st posn) = case st of
     StReturn ex                  ->  undefined ex
     StRead vars                  ->  undefined vars
     StPrint exs                  ->  DF.mapM_ checkExpression exs
-    StIf cnd tr el               -> do
-        _ <- checkExpression cnd
-        checkStatements tr
-        checkStatements el
+    StIf cnd success failure     -> do
+        dt   <- checkExpression cnd
+        case dt of
+            Bool -> do
+                before <- getScopeVariables
+
+                enterScope
+                checkStatements success
+                exitScope
+                varSucc <- getScopeVariables
+
+                enterScope
+                checkStatements failure
+                exitScope
+                varFail <- getScopeVariables
+
+                return () -- para que compile
+                -- ((varSucc && varFail) || before) == INICIALIZADA!
+            _    -> tell [SError posn $ IfConditionDataType dt]
     StCase ex cs def             -> undefined ex cs def
     StWhile cnd sts              -> undefined cnd sts
     StFor var rng sts            -> undefined var rng sts
@@ -276,7 +311,7 @@ checkExpression (Lex e posn) = case e of
     ExpBinary (Lex op _) l r  -> do
         ldt <- checkExpression l
         rdt <- checkExpression r
-        let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
+        let dts = P.filter (((ldt,rdt)==) . fst) $ binaryOperation op
         if null dts
             then do
                 tell [SError posn $ BinaryTypes op (ldt,rdt)]
@@ -284,9 +319,33 @@ checkExpression (Lex e posn) = case e of
             else return . snd $ head dts
     ExpUnary (Lex op _) expr  -> do
         dt   <- checkExpression expr
-        let dts = filter ((dt==) . fst) $ unaryOperation op
+        let dts = P.filter ((dt==) . fst) $ unaryOperation op
         if null dts
             then do
                 tell [SError posn $ UnaryTypes op dt]
                 return . snd . head $ unaryOperation op
             else return . snd $ head dts
+
+--------------------------------------------------------------------------------
+
+getExpressionVariables :: Lexeme Expression -> Seq (Lexeme Identifier)
+getExpressionVariables (Lex e _) = case e of
+    Variable var     -> singleton var
+    ExpBinary _ l r  -> getExpressionVariables l >< getExpressionVariables r
+    ExpUnary _ expr  -> getExpressionVariables expr
+    -- (LitInt _) (LitFloat _) (LitBool _) (LitChar _) (LitString _)
+    _                -> empty
+
+-- esta mala porque no considera las variables DECLARADAS adentro de los bloques.
+--initializedInBlock :: Seq (Lexeme Statement) -> Seq (Lexeme Identifier)
+--initializedInBlock = foldr ((><) . func) empty
+--    where
+--        func :: Lexeme Statement -> Seq (Lexeme Identifier)
+--        func (Lex st _) = case st of
+--            (StAssign var _)         -> singleton var
+--            (StIf _ success failure) -> initializedInBlock success >< initializedInBlock failure
+--            (StCase _ cases othrw)   -> fromList (DF.concatMap unCase cases) >< initializedInBlock othrw
+--            (StWhile _ body)         -> initializedInBlock body
+--            (StFor var _ body)       -> DS.filter (var/=) $ initializedInBlock body
+--            _                        -> empty
+--        unCase (Lex (Case _ body) _) = toList $ initializedInBlock body

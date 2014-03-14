@@ -7,7 +7,6 @@ import           Language
 import           Checker
 
 import           Prelude
-import           Data.List (foldl')
 import qualified Data.Foldable as DF
 import           Data.Sequence
 --import           Control.Monad.RWS
@@ -155,13 +154,12 @@ Statement :: { Lexeme Statement }
     :                           { Lex StNoop (0,0) }      -- λ, no-operation
     | varid "=" Expression      { liftLex $1 $ \(TkVarId v) -> StAssign (putLex $1 v) $3 }
 
---    -- Definitions
+    -- Definitions
     | DataType VariableList     { putLex $1 . StDeclaration $ fmap (\var -> putLex $1 $ Declaration var $1 CatVariable) $2 }
-    --| DataType VariableList     { putLex $1 . StDeclaration $ foldl' (\r var -> (putLex $1 $ Declaration var $1 CatVariable) : r) [] $2 }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
---    -- Conditional
+    -- Conditional
     | "if" Expression "then" StatementList "end"                            { putLex $1 $ StIf $2 $4 empty }
     | "if" Expression "then" StatementList "else" StatementList "end"       { putLex $1 $ StIf $2 $4 $6    }
     | "unless" Expression "then" StatementList "end"                        { putLex $1 $ StIf (putLex $2 $ ExpUnary (putLex $1 OpNot) $2) $4 empty }
@@ -169,11 +167,11 @@ Statement :: { Lexeme Statement }
 --    | "case" ExpressionArit CaseList "end"                                  { StCase $2 $3 empty         }
 --    | "case" ExpressionArit CaseList "else" StatementList "end"             { StCase $2 $3 $5            }
 
---    -- I/O
-------------------------------    --| "read" VariableList       { StRead  $2 }
-------------------------------    --| "print" ExpressionList    { StPrint $2 }
+    -- I/O
+    | "read" VariableList       { putLex $1 $ StRead  $2 }
+    | "print" ExpressionList    { putLex $1 $ StPrint $2 }
 
---    -- Loops
+    -- Loops
 ------------------------------    --| "while" Expression "do" StatementList "end"          { StWhile $2           $4 }
 ------------------------------    --| "until" Expression "do" StatementList "end"          { StWhile (ExpUnary OpNot $2) $4 }
 
