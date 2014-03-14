@@ -1,23 +1,35 @@
-main: clean alex happy
+# If the first argument is "run"...
+ifeq (run,$(firstword $(MAKECMDGOALS)))
+  # use the rest as arguments for "run"
+  RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  # ...and turn them into do-nothing targets
+  $(eval $(RUN_ARGS):;@:)
+endif
+
+main: clean happy
 	ghc -O2 Sapphire.hs
 
 alex:
 	alex -g Lexer.x
 
-happy:
-	happy -g -s Parser.y
+happy: alex
+	happy -g Parser.y
 
-run:
-	./Sapphire $(file)
+# Can be used as 'make run ../examples/sapphire/ejemplo.sp'
+run: ./Sapphire
+	./Sapphire $(RUN_ARGS)
+
+Sapphire: main
 
 ghci:
-	ghci Sapphire
+	@ghci Sapphire
 
+# To set a specific file to run always
 file:
-	./Sapphire ../ejemplos/sapphire/ejemplo.sp
+	./Sapphire ../examples/sapphire/ejemplo.sp
 
 clean:
-	@rm *.hi *.o || true
-	@rm Lexer.hs || true
-	@rm Parser.hs || true
-	@rm Sapphire || true
+	@rm *.hi *.o 2> /dev/null || true
+	@rm Lexer.hs 2> /dev/null || true
+	@rm Parser.hs 2> /dev/null || true
+	@rm Sapphire 2> /dev/null || true
