@@ -5,14 +5,14 @@ z = 30
 print y,z
 
 if (y^2) > z then
-  Int x,y,v
+  Int v
   x = 10
   w = 5
   v = 2
 else
   Int a,b
   if true then
-    Int a,c,y
+    Int c
     w = 1
     x = 10
   else

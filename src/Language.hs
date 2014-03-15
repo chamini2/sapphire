@@ -17,8 +17,7 @@ showPosn (line, col) = "line " ++ show line ++ ", column " ++ show col ++ ": "
 data Lexeme a = Lex
     { lexInfo :: a
     , lexPosn :: Position
-    }
-    deriving (Eq)
+    } deriving (Eq)
 
 instance Show a => Show (Lexeme a) where
     show (Lex a p) = case p of
@@ -138,7 +137,7 @@ binaryOperation op = case op of
     OpTimes   -> zip numbers [Int, Float]
     OpDivide  -> zip numbers [Int, Float]
     OpModulo  -> zip numbers [Int, Float]
-    OpPower   -> zip numbers [Int, Float]
+    OpPower   -> zip [(Int,Int), (Float,Int)] [Int, Float]
     OpFromTo  -> [((Int,Int),Range)]
     OpOr      -> [((Bool,Bool),Bool)]
     OpAnd     -> [((Bool,Bool),Bool)]

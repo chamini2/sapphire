@@ -128,9 +128,11 @@ lookup var (SymTable m) = do
 update :: Identifier -> (SymInfo -> SymInfo) -> SymTable -> SymTable
 update var f (SymTable m) = SymTable $ DM.alter func var m
     where
-        func (Just is) = case viewl is of
-            i :< iss  -> Just $ f i <| iss
-            _         -> error "SymbolTable.update: No value to update"
+        func mayIs = case mayIs of
+            (Just is) -> case viewl is of
+                i :< iss  -> Just $ f i <| iss
+                _         -> error $ "SymbolTable.update: No value to update for '" ++ var ++ "'"
+            Nothing   -> error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
 
 {- |
     Returns all the variables -----  MAYBE ONLY VISIBLE???

@@ -282,40 +282,49 @@ checkStatement (Lex st posn) = case st of
                 before      <- getScopeVariables
                 stateBefore <- get
 
-                enterScope
                 checkStatements success
-                exitScope
                 varSucc <- getScopeVariables
 
                 -- Reiniciando el estado
                 stateSucc <- get
                 put stateBefore
 
-                enterScope
                 checkStatements failure
-                exitScope
                 varFail <- getScopeVariables
 
                 stateFail <- get
                 put stateBefore
 
-                let after = zipWith3 zipFunc varSucc varFail before
+                --let after = zipWith3 zipFunc varSucc varFail before
+                let after = foldr func [] $ sortBy (\(a,_) (b,_) -> compare a b) $ varSucc ++ varFail
+                    --final = foldr (func (||)) [] $ sortBy (\(a,_) (b,_) -> compare a b) $ before  ++ after
 
-                forM_ after $
-                    \(var,info) -> when (initialized info) $ markInitialized var
+                --forM_ after $
+                --    \(var,info) -> when (initialized info) $ markInitialized var
 
                 tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
                 --tell [SError posn $ StaticError ("stateBefore:\n" ++ show stateBefore)]
-                tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t"++) . show) varSucc)]
+                tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
                 --tell [SError posn $ StaticError ("stateSucc:\n" ++ show stateSucc)]
-                tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t"++) . show) varFail)]
+                tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
                 --tell [SError posn $ StaticError ("stateFail:\n" ++ show stateFail)]
                 tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
+                --tell [SError posn $ StaticError ("final:" ++ concatMap (("\n\t\t"++) . show) final)]
+                ----------
+                tell [SError posn $ StaticError "---------------------------"]
             _    -> tell [SError posn $ IfConditionDataType dt]
         where
-            -- ((varSucc && varFail) || before) == initialized
-            zipFunc (_,sI) (_,fI) (var,bI) = (var, bI { initialized =
-                    initialized sI && initialized fI || initialized bI })
+            -- before || (varSucc && varFail) == initialized
+            --zipFunc (_,sI) (_,fI) (var,bI) = (var, bI { initialized =
+            --        initialized bI || initialized sI && initialized fI })
+            func a@(aVar,aInfo) bs = case bs of
+                [] -> [a]
+                ((bVar, bInfo) : tbs) ->
+                    case (aVar == bVar, initialized aInfo, initialized bInfo) of
+                        (True,True,True) -> (aVar, aInfo { initialized = True  }) : tbs
+                        (False,_,_)      -> a : bs
+                        _                -> (aVar, aInfo { initialized = False }) : tbs
+
 
     StCase ex cs def             -> undefined ex cs def
     StWhile cnd sts              -> undefined cnd sts
