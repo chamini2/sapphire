@@ -4,7 +4,7 @@ import           Prelude
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Control.Monad.Identity
-import qualified Data.Foldable as DF (mapM_, foldr)
+import qualified Data.Foldable as DF (mapM_, foldr, toList)
 import           Data.Sequence as DS (Seq, singleton)
 
 type Position = (Int, Int) -- (Fila, Columna)
@@ -20,8 +20,14 @@ data Lexeme a = Lex
     }
     deriving (Eq)
 
-instance (Show a) => Show (Lexeme a) where
-    show (Lex a p) = showPosn p ++ show a
+instance Show a => Show (Lexeme a) where
+    show (Lex a p) = case p of
+        (0,0) -> ""
+        _     -> showPosn p ++ show a
+
+instance Functor Lexeme where
+    fmap f (Lex a p) = Lex (f a) p
+
 
 --------------------------------------------------------------------------------
 
@@ -30,7 +36,9 @@ instance (Show a) => Show (Lexeme a) where
 --newtype Program = Program [Statement]
 --    deriving (Show)
 newtype Program = Program (Seq (Lexeme Statement))
-    deriving (Show)
+
+instance Show Program where
+    show (Program sts) = concatMap show $ DF.toList sts
 
 type Identifier = String
 

@@ -26,10 +26,10 @@ module SymbolTable
 import           Language      (Category (CatVariable), DataType (Void),
                                 Identifier, Position)
 
+import qualified Data.Foldable as DF
 import qualified Data.Map      as DM
-import           Data.Maybe    (fromJust)
-import           Data.Sequence as DS hiding (empty, update)
-import           Prelude       hiding (lookup)
+import           Data.Sequence as DS hiding (empty, update, drop)
+import           Prelude       as P  hiding (lookup)
 
 data SymInfo = SymInfo
     { dataType    :: DataType
@@ -38,7 +38,18 @@ data SymInfo = SymInfo
     , scopeNum    :: ScopeNum
     , declPosn    :: Position
     , initialized :: Bool
-    } deriving (Show)
+    }
+
+instance Show SymInfo where
+    show (SymInfo dt ct v sn dp i) = showSN ++ showCT ++ showDT ++ showV ++ showDP
+        where
+            showDT = show dt
+            showCT = show ct ++ " | "
+            showV  = case v of
+                Just val -> " (" ++ show val ++ ") "
+                Nothing  -> " (" ++ show i ++ ") "
+            showSN = "Scope: " ++ show sn ++ ", "
+            showDP = show dp
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo {
@@ -80,8 +91,12 @@ instance Show Value where
     Symbol Table
 -}
 data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
-    deriving (Show)
 
+instance Show SymTable where
+    show (SymTable m) = concatMap shower $ DM.toList m
+        where
+            shower (var, info) = var ++ " -> " ++ showInfo info ++ "\n"
+            showInfo = concatMap ((++) "\n\t" . show) . DF.toList
 {- |
     Empty symbol table
  -}
@@ -120,13 +135,21 @@ update var f (SymTable m) = SymTable $ DM.alter func var m
 {- |
     Returns all the variables -----  MAYBE ONLY VISIBLE???
  -}
-accessible :: SymTable -> Seq (Identifier, SymInfo)
-accessible st@(SymTable m) = fromList . map (\var -> (var, fromJust $ lookup var st)) $ DM.keys m
+accessible :: SymTable -> Seq (Identifier, Seq SymInfo)
+accessible (SymTable m) = DS.fromList $ DM.toList m
 
 --------------------------------------------------------------------------------
 
 newtype Stack a = Stack [a]
-    deriving (Show)
+
+instance Show a => Show (Stack a) where
+    show (Stack s) = drop 1 $ concatMap ((++) "\n\t" . show) s
+
+instance Functor Stack where
+    fmap f (Stack s) = Stack $ map f s
+
+instance DF.Foldable Stack where
+    foldr f b (Stack s) = P.foldr f b s
 
 push :: a -> Stack a -> Stack a
 push element (Stack s) = Stack $ element : s

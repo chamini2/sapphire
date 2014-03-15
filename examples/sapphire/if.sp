@@ -1,14 +1,19 @@
-Int x,y,z
+Int x,y,z,w
 y = 20
 z = 30
 
 print y,z
 
-if 3 > 4 then
-    x = 10
-    print "NOOOO"
+if (y^2) > z then
+  Int x,y
+  x = 10
+  w = 5
 else
-    if true then end
+  if true then
+    w = 1
+  else
+    w = 2
+  end
 end
 
-print x
+print x, w

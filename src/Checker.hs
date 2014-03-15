@@ -3,14 +3,14 @@ module Checker where
 import           Language
 import           SymbolTable
 
-import           Control.Arrow          ((&&&))
+import           Control.Arrow          ((&&&), second)
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
-import           Data.Foldable as DF    (mapM_, foldr)
+import           Data.Foldable as DF    (mapM_, elem, toList)
 import           Data.Function          (on)
-import           Data.List              (sortBy)
+import           Data.List              (sortBy, find)
 import           Data.Sequence as DS    (empty, singleton, Seq, (><))
-import           Prelude       as P     hiding (lookup, foldr, zipWith)
+import           Prelude       as P     hiding (lookup, zipWith, elem)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -26,15 +26,10 @@ data CheckError
     | PError Position ParseError
     | SError Position StaticError
 
-errorPos :: CheckError -> Position
-errorPos (LError p _) = p
-errorPos (PError p _) = p
-errorPos (SError p _) = p
-
 instance Show CheckError where
-    show (LError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
-    show (PError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
-    show (SError p e) = "error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+    show (LError p e) = "Lexer error on "   ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+    show (PError p e) = "Parsing error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+    show (SError p e) = "Static error on "  ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
 
 instance Eq CheckError where
     (==) = (==) `on` errorPos
@@ -48,17 +43,17 @@ data LexerError
     | LexerError     String
 
 instance Show LexerError where
-    show (UnexpectedChar c) = "Unexpected character: '" ++ [c] ++ "'"
-    show (StringError str)  = "Missing matching '\"' for string '" ++ str ++ "'"
-    show (LexerError  msg)  = "Lexing error: " ++ msg
+    show (UnexpectedChar c) = "unexpected character'" ++ [c] ++ "'"
+    show (StringError str)  = "missing matching '\"' for string '" ++ str ++ "'"
+    show (LexerError  msg)  = msg
 
 data ParseError
     = UnexpectedToken String{-Token-}
     | ParseError      String
 
 instance Show ParseError where
-    show (UnexpectedToken tok) = "Parsing error on Token: " ++ show tok
-    show (ParseError msg)      = "Parsing error: " ++ msg
+    show (UnexpectedToken tok) = "unexpected token: '" ++ show tok ++ "'"
+    show (ParseError msg)      = msg
 
 data StaticError
     -- Variables
@@ -76,17 +71,17 @@ data StaticError
 
 instance Show StaticError where
     -- Variables
-    show (VariableNotDeclared var)     = "Static error: variable '" ++ var ++ "' has not been declared"
-    show (VariableNotInitialized var)  = "Static error: variable '" ++ var ++ "' has not been initialized"
-    show (InvalidAssignType var vt et) = "Static error: cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
-    show (AlreadyDeclared var p)       = "Static error: variable '" ++ var ++ "' has already been declared at " ++ show p
+    show (VariableNotDeclared var)     = "variable '" ++ var ++ "' has not been declared"
+    show (VariableNotInitialized var)  = "variable '" ++ var ++ "' has not been initialized"
+    show (InvalidAssignType var vt et) = "cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
+    show (AlreadyDeclared var p)       = "variable '" ++ var ++ "' has already been declared at " ++ show p
     -- Statements
-    show (IfConditionDataType dt)      = "Static error: condition of if statement must be of type 'Bool', but is of type '" ++ show dt ++ "'"
+    show (IfConditionDataType dt)      = "condition of if statement must be of type 'Bool', but is of type '" ++ show dt ++ "'"
     -- Operators
-    show (UnaryTypes op dt)            = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op (dl,dr))      = "Static error: operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    show (UnaryTypes op dt)            = "operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
+    show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
     -- General
-    show (StaticError msg)             = "Static error: " ++ msg
+    show (StaticError msg)             = msg
 
 --------------------------------------------------------------------------------
 
@@ -95,10 +90,22 @@ data CheckState = CheckState
     , stack    :: Stack Scope
     , currtSc  :: ScopeNum
     , ast      :: Program
-    , currPosn :: Position
-    } deriving (Show)
+    }
+
+instance Show CheckState where
+    show (CheckState t s c a) = showT ++ showS ++ showC ++ showA
+        where
+            showT = "Symbol Table:\n" ++ show t ++ "\n"
+            showS = "Scope Stack:\n"  ++ show s ++ "\n"
+            showC = "Scope Number:\t" ++ show c ++ "\n"
+            showA = "Program:\n"      ++ show a ++ "\n"
 
 --------------------------------------------------------------------------------
+
+errorPos :: CheckError -> Position
+errorPos (LError p _) = p
+errorPos (PError p _) = p
+errorPos (SError p _) = p
 
 flags :: CheckReader
 flags = []
@@ -109,7 +116,6 @@ initialState = CheckState
     , stack    = initialStack
     , currtSc  = 0
     , ast      = Program DS.empty
-    , currPosn = (1,1)
     }
 
 ----------------------------------------
@@ -132,7 +138,7 @@ getState = (\(_,s,_) -> s) . runChecker
 getErrors :: CheckWriter -> ([CheckError], [CheckError], [CheckError])
 getErrors errors = (only lexical, only parsing, only static)
     where
-        only f = sortBy compare $ P.filter f errors
+        only f = sortBy compare $ filter f errors
         lexical e = case e of
             (LError _ _) -> True
             _            -> False
@@ -203,15 +209,18 @@ markInitialized (Lex var _) = modify $ \s -> s { table = update var (\sym -> sym
 {- |
     Returns the variables in the current scope
 -}
-getScopeVariables :: Checker (Seq (Identifier, SymInfo))
+getScopeVariables :: Checker [(Identifier, SymInfo)]
 getScopeVariables = do
-    tab <- gets table
-    cs  <- gets currtSc
-    let vars = accessible tab
-    return $ foldr ((><) . func cs) empty vars
+    vars <- gets $ accessible . table
+    stc <- gets stack
+    let stcS = fmap serial stc
+    return $ foldr (func stcS) [] . fmap (second DF.toList) $ DF.toList vars
     where
-        func cs v@(_, info) = if scopeNum info == cs then singleton v else empty
-
+        --func stc (_, info) = scopeNum info `elem` stc
+        func stc a b = case funcFind stc a of
+            (v, Just x)  -> (v,x) : b
+            (_, Nothing) -> b
+        funcFind stc (v, infos) = (v, find (\i -> scopeNum i `elem` stc) infos)
 
 ----------------------------------------
 
@@ -267,24 +276,39 @@ checkStatement (Lex st posn) = case st of
     StRead vars                  ->  undefined vars
     StPrint exs                  ->  DF.mapM_ checkExpression exs
     StIf cnd success failure     -> do
-        dt   <- checkExpression cnd
+        dt <- checkExpression cnd
         case dt of
             Bool -> do
-                before <- getScopeVariables
+                before      <- getScopeVariables
+                stateBefore <- get
 
                 enterScope
                 checkStatements success
                 exitScope
                 varSucc <- getScopeVariables
 
+                -- Reiniciando el estado
+                stateSucc <- get
+                put stateBefore
+
                 enterScope
                 checkStatements failure
                 exitScope
                 varFail <- getScopeVariables
 
-                return () -- para que compile
-                -- ((varSucc && varFail) || before) == INICIALIZADA!
+                stateFail <- get
+                put stateBefore
+
+                -- ((varSucc && varFail) || before) == initialized
+                tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t"++) . show) before)]
+                --tell [SError posn $ StaticError ("stateBefore:\n" ++ show stateBefore)]
+                tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t"++) . show) varSucc)]
+                --tell [SError posn $ StaticError ("stateSucc:\n" ++ show stateSucc)]
+                tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t"++) . show) varFail)]
+                --tell [SError posn $ StaticError ("stateFail:\n" ++ show stateFail)]
             _    -> tell [SError posn $ IfConditionDataType dt]
+        where
+            zipFunc (lV, lI) (rV, rI) = lI == rI && lV == rV
     StCase ex cs def             -> undefined ex cs def
     StWhile cnd sts              -> undefined cnd sts
     StFor var rng sts            -> undefined var rng sts
@@ -311,7 +335,7 @@ checkExpression (Lex e posn) = case e of
     ExpBinary (Lex op _) l r  -> do
         ldt <- checkExpression l
         rdt <- checkExpression r
-        let dts = P.filter (((ldt,rdt)==) . fst) $ binaryOperation op
+        let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
         if null dts
             then do
                 tell [SError posn $ BinaryTypes op (ldt,rdt)]
@@ -319,7 +343,7 @@ checkExpression (Lex e posn) = case e of
             else return . snd $ head dts
     ExpUnary (Lex op _) expr  -> do
         dt   <- checkExpression expr
-        let dts = P.filter ((dt==) . fst) $ unaryOperation op
+        let dts = filter ((dt==) . fst) $ unaryOperation op
         if null dts
             then do
                 tell [SError posn $ UnaryTypes op dt]

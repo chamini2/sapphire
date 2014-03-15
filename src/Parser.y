@@ -8,6 +8,7 @@ import           Checker
 
 import           Prelude
 import qualified Data.Foldable as DF
+import           Data.Functor
 import           Data.Sequence
 --import           Control.Monad.RWS
 --import           Control.Monad
@@ -86,8 +87,8 @@ import           Data.Sequence
         -- Expressions/Operators
         -- -- Literals
         int             { Lex (TkInt    _)  _ }
-        "true"          { Lex (TkTrue   _)  _ }
-        "false"         { Lex (TkFalse  _)  _ }
+        "true"          { Lex (TkBool   _)  _ }
+        "false"         { Lex (TkBool   _)  _ }
         float           { Lex (TkFloat  _)  _ }
         string          { Lex (TkString _)  _ }
         char            { Lex (TkChar   _)  _ }
@@ -152,24 +153,24 @@ StatementList :: { Seq (Lexeme Statement) }
 
 Statement :: { Lexeme Statement }
     :                           { Lex StNoop (0,0) }      -- λ, no-operation
-    | varid "=" Expression      { liftLex $1 $ \(TkVarId v) -> StAssign (putLex $1 v) $3 }
+    | varid "=" Expression      { (flip StAssign $3 . (<$ $1) . unTkVarId) `fmap` $1 }
 
     -- Definitions
-    | DataType VariableList     { putLex $1 . StDeclaration $ fmap (\var -> putLex $1 $ Declaration var $1 CatVariable) $2 }
+    | DataType VariableList     { (StDeclaration $ fmap (\lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
 --    | FunctionDef               { {- NI IDEA -} }
 --    | "return" Expression       { StReturn $2 }
 
     -- Conditional
-    | "if" Expression "then" StatementList "end"                            { putLex $1 $ StIf $2 $4 empty }
-    | "if" Expression "then" StatementList "else" StatementList "end"       { putLex $1 $ StIf $2 $4 $6    }
-    | "unless" Expression "then" StatementList "end"                        { putLex $1 $ StIf (putLex $2 $ ExpUnary (putLex $1 OpNot) $2) $4 empty }
-    | "unless" Expression "then" StatementList "else" StatementList "end"   { putLex $1 $ StIf (putLex $2 $ ExpUnary (putLex $1 OpNot) $2) $4 $6    }
+    | "if" Expression "then" StatementList "end"                            { StIf $2 $4 empty <$ $1 }
+    | "if" Expression "then" StatementList "else" StatementList "end"       { StIf $2 $4 $6    <$ $1 }
+    | "unless" Expression "then" StatementList "end"                        { StIf ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 empty <$ $1 }
+    | "unless" Expression "then" StatementList "else" StatementList "end"   { StIf ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 $6    <$ $1 }
 --    | "case" ExpressionArit CaseList "end"                                  { StCase $2 $3 empty         }
 --    | "case" ExpressionArit CaseList "else" StatementList "end"             { StCase $2 $3 $5            }
 
     -- I/O
-    | "read" VariableList       { putLex $1 $ StRead  $2 }
-    | "print" ExpressionList    { putLex $1 $ StPrint $2 }
+    | "read" VariableList       { StRead  $2 <$ $1 }
+    | "print" ExpressionList    { StPrint $2 <$ $1 }
 
     -- Loops
 ------------------------------    --| "while" Expression "do" StatementList "end"          { StWhile $2           $4 }
@@ -196,13 +197,13 @@ Case :: { Case }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"         { putLex $1 Int    }
-    | "Float"       { putLex $1 Float  }
-    | "Bool"        { putLex $1 Bool   }
-    | "Char"        { putLex $1 Char   }
-    | "String"      { putLex $1 String }
-    | "Range"       { putLex $1 Range  }
-    | "Type"        { putLex $1 Type   }
+    : "Int"         { Int    <$ $1 }
+    | "Float"       { Float  <$ $1 }
+    | "Bool"        { Bool   <$ $1 }
+    | "Char"        { Char   <$ $1 }
+    | "String"      { String <$ $1 }
+    | "Range"       { Range  <$ $1 }
+    | "Type"        { Type   <$ $1 }
 --    | "Union" typeid
 --    | "Record" typeid
 -------------------------------- FALTA ARREGLOS
@@ -211,8 +212,8 @@ DataType :: { Lexeme DataType }
 ----    : "[" DataType "]" "<-" "[" int "]"
 
 VariableList :: { Seq (Lexeme Identifier) }
-    : varid                         { singleton (liftLex $1 $ \(TkVarId v) -> v) }
-    | VariableList "," varid        { $1 |> (liftLex $3 $ \(TkVarId v) -> v)     }
+    : varid                         { singleton $ unTkVarId `fmap` $1  }
+    | VariableList "," varid        { $1      |> (unTkVarId `fmap` $3) }
 
 --FunctionDef --:: { Function }
 --    : "def" varid "::" Signature
@@ -226,33 +227,34 @@ VariableList :: { Seq (Lexeme Identifier) }
 
 Expression :: { Lexeme Expression }
     -- Variable
-    : varid                        { liftPutLex $1 (\(TkVarId  v) -> v) Variable }
+    : varid                        { Variable (unTkVarId `fmap` $1) <$ $1 }
     -- Literals
-    | int                          { liftPutLex $1 (\(TkInt    v) -> v) LitInt    }
-    | float                        { liftPutLex $1 (\(TkFloat  v) -> v) LitFloat  }
-    | string                       { liftPutLex $1 (\(TkString v) -> v) LitString }
-    | char                         { liftPutLex $1 (\(TkChar   v) -> v) LitChar   }
-    | "true"                       { liftPutLex $1 (\(TkTrue   v) -> v) LitBool   }
-    | "false"                      { liftPutLex $1 (\(TkFalse  v) -> v) LitBool   }
+    | int                          { LitInt    (unTkInt    `fmap` $1) <$ $1 }
+    | float                        { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
+    | string                       { LitString (unTkString `fmap` $1) <$ $1 }
+    | char                         { LitChar   (unTkChar   `fmap` $1) <$ $1 }
+    | "true"                       { LitBool   (unTkBool   `fmap` $1) <$ $1 }
+    | "false"                      { LitBool   (unTkBool   `fmap` $1) <$ $1 }
     -- Operators
-    | Expression "+"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpPlus   ) $1 $3 }
-    | Expression "-"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpMinus  ) $1 $3 }
-    | Expression "*"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpTimes  ) $1 $3 }
-    | Expression "/"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpDivide ) $1 $3 }
-    | Expression "%"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpModulo ) $1 $3 }
-    | Expression "^"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpPower  ) $1 $3 }
-    | Expression ".."  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpFromTo ) $1 $3 }
-    | Expression "or"  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpOr     ) $1 $3 }
-    | Expression "and" Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpAnd    ) $1 $3 }
-    | Expression "=="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpEqual  ) $1 $3 }
-    | Expression "/="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpUnequal) $1 $3 }
-    | Expression "<"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpLess   ) $1 $3 }
-    | Expression "<="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpLessEq ) $1 $3 }
-    | Expression ">"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpGreat  ) $1 $3 }
-    | Expression ">="  Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpGreatEq) $1 $3 }
-    | Expression "@"   Expression  { putLex $1 $ ExpBinary (liftLex $2 $ const OpBelongs) $1 $3 }
-    | "-"   Expression             { putLex $1 $ ExpUnary (liftLex $2 (const OpNegate)) $2 }
-    | "not" Expression             { putLex $1 $ ExpUnary (liftLex $2 (const OpNot   )) $2 }
+    | Expression "+"   Expression  { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
+    | Expression "-"   Expression  { ExpBinary (OpMinus   <$ $2) $1 $3 <$ $1 }
+    | Expression "*"   Expression  { ExpBinary (OpTimes   <$ $2) $1 $3 <$ $1 }
+    | Expression "/"   Expression  { ExpBinary (OpDivide  <$ $2) $1 $3 <$ $1 }
+    | Expression "%"   Expression  { ExpBinary (OpModulo  <$ $2) $1 $3 <$ $1 }
+    | Expression "^"   Expression  { ExpBinary (OpPower   <$ $2) $1 $3 <$ $1 }
+    | Expression ".."  Expression  { ExpBinary (OpFromTo  <$ $2) $1 $3 <$ $1 }
+    | Expression "or"  Expression  { ExpBinary (OpOr      <$ $2) $1 $3 <$ $1 }
+    | Expression "and" Expression  { ExpBinary (OpAnd     <$ $2) $1 $3 <$ $1 }
+    | Expression "=="  Expression  { ExpBinary (OpEqual   <$ $2) $1 $3 <$ $1 }
+    | Expression "/="  Expression  { ExpBinary (OpUnequal <$ $2) $1 $3 <$ $1 }
+    | Expression "<"   Expression  { ExpBinary (OpLess    <$ $2) $1 $3 <$ $1 }
+    | Expression "<="  Expression  { ExpBinary (OpLessEq  <$ $2) $1 $3 <$ $1 }
+    | Expression ">"   Expression  { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
+    | Expression ">="  Expression  { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
+    | Expression "@"   Expression  { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
+    | "-"   Expression             { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
+    | "not" Expression             { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
+    | "(" Expression ")"           { let (Lex expr p) = $2 in expr <$ $1 }
 
 ExpressionList :: { Seq (Lexeme Expression) }
     : Expression                          { singleton $1 }
@@ -274,17 +276,6 @@ ExpressionList :: { Seq (Lexeme Expression) }
 --    return identity
 
 --------------------------------------------------------------------------------
-
-liftPutLex :: Lexeme a -> (a -> b) -> (Lexeme b -> c) -> Lexeme c
-liftPutLex a f g = putLex a . g $ liftLex a f
-
-liftLex :: Lexeme a -> (a -> b) -> Lexeme b
-liftLex (Lex t p) f = Lex (f t) p
-
-putLex :: Lexeme a -> b -> Lexeme b
-putLex l a = liftLex l $ const a
-
-----------------------------------------
 
 --lexWrap :: (Token -> Alex a) -> Alex a
 lexWrap :: (Lexeme Token -> Alex a) -> Alex a

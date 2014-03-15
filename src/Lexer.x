@@ -123,8 +123,8 @@ tokens :-
         -- Expressions/Operators
         -- -- Literals
         @int            { lex  (TkInt . read)   }
-        "true"          { lex' (TkTrue True)    }
-        "false"         { lex' (TkFalse False)  }
+        "true"          { lex' (TkBool True)    }
+        "false"         { lex' (TkBool False)   }
         @float          { lex  (TkFloat . read) }
         @string         { lex  TkString         }
         @char           { lex  (TkChar . read)  }
@@ -157,8 +157,8 @@ tokens :-
         @typeid         { lex TkTypeId          }
 
         -- Errors
-        .               { lex  (TkError . head) }
-        @stringerror    { lex TkStringError     }
+        .               { lex (TkError . head) }
+        @stringerror    { lex TkStringError    }
 
 {
 
@@ -195,12 +195,11 @@ data Token
 
     -- Expressions/Operators
     -- -- Literals
-    | TkInt    Int
-    | TkFloat  Float
-    | TkString String
-    | TkChar   Char
-    | TkTrue   Bool
-    | TkFalse  Bool
+    | TkInt    { unTkInt    :: Int    }
+    | TkFloat  { unTkFloat  :: Float  }
+    | TkString { unTkString :: String }
+    | TkChar   { unTkChar   :: Char   }
+    | TkBool   { unTkBool   :: Bool   }
 
     -- -- Num
     | TkPlus | TkMinus | TkTimes | TkDivide | TkModulo | TkPower
@@ -212,16 +211,14 @@ data Token
     | TkLess | TkGreat | TkLessEq | TkGreatEq
 
     -- -- Identifiers
-    | TkVarId String
-    | TkTypeId String
+    | TkVarId  { unTkVarId  :: String }
+    | TkTypeId { unTkTypeId :: String }
 
     -- Compiling
     | TkEOF
-    | TkError Char
-    | TkStringError String
+    | TkError       { unTkError       :: Char   }
+    | TkStringError { unTkStringError :: String }
     deriving (Eq, Show)
-
-
 
 --------------------------------------------------------------------------------
 
