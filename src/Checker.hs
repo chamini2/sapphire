@@ -203,8 +203,8 @@ modifyValue (Lex var posn) val = do
 {- |
     Marks the variable var as initialized.
 -}
-markInitialized :: Lexeme Identifier -> Checker ()
-markInitialized (Lex var _) = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
+markInitialized :: Identifier -> Checker ()
+markInitialized var = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
 
 {- |
     Returns the variables in the current scope
@@ -267,7 +267,7 @@ checkStatement (Lex st posn) = case st of
         expDt    <- checkExpression ex
         case mayVarDt of
             Just varDt -> do
-                markInitialized varL
+                markInitialized var
                 unless (varDt == expDt) $
                     tell [SError posn $ InvalidAssignType var varDt expDt]
             Nothing -> return ()
@@ -299,16 +299,24 @@ checkStatement (Lex st posn) = case st of
                 stateFail <- get
                 put stateBefore
 
-                -- ((varSucc && varFail) || before) == initialized
-                tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t"++) . show) before)]
+                let after = zipWith3 zipFunc varSucc varFail before
+
+                forM_ after $
+                    \(var,info) -> when (initialized info) $ markInitialized var
+
+                tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
                 --tell [SError posn $ StaticError ("stateBefore:\n" ++ show stateBefore)]
                 tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t"++) . show) varSucc)]
                 --tell [SError posn $ StaticError ("stateSucc:\n" ++ show stateSucc)]
                 tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t"++) . show) varFail)]
                 --tell [SError posn $ StaticError ("stateFail:\n" ++ show stateFail)]
+                tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
             _    -> tell [SError posn $ IfConditionDataType dt]
         where
-            zipFunc (lV, lI) (rV, rI) = lI == rI && lV == rV
+            -- ((varSucc && varFail) || before) == initialized
+            zipFunc (_,sI) (_,fI) (var,bI) = (var, bI { initialized =
+                    initialized sI && initialized fI || initialized bI })
+
     StCase ex cs def             -> undefined ex cs def
     StWhile cnd sts              -> undefined cnd sts
     StFor var rng sts            -> undefined var rng sts

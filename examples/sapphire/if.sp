@@ -10,8 +10,11 @@ if (y^2) > z then
   w = 5
   v = 2
 else
+  Int a,b
   if true then
+    Int a,c,y
     w = 1
+    x = 10
   else
     w = 2
   end
