@@ -243,7 +243,7 @@ printExpression e = case e of
     LitInt    c      -> printNonTerminal $ "INTEGER LITERAL: " ++ show (lexInfo c)
     LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: " ++ show (lexInfo b)
     LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "   ++ show (lexInfo f)
-    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ lexInfo s
+    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ show (lexInfo s)
     ExpBinary op l r -> do
         printNonTerminal "BINARY OPERATION"
         raiseTabs

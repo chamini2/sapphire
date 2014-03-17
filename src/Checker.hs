@@ -296,22 +296,17 @@ checkStatement (Lex st posn) = case st of
                 put stateBefore
 
                 --let after = zipWith3 zipFunc varSucc varFail before
-                let after = foldr func [] $ sortBy (\(a,_) (b,_) -> compare a b) $ varSucc ++ varFail
+                --let after = foldr func [] $ sortBy (\(a,_) (b,_) -> compare a b) $ varSucc ++ varFail
                     --final = foldr (func (||)) [] $ sortBy (\(a,_) (b,_) -> compare a b) $ before  ++ after
 
                 --forM_ after $
                 --    \(var,info) -> when (initialized info) $ markInitialized var
 
-                tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
-                --tell [SError posn $ StaticError ("stateBefore:\n" ++ show stateBefore)]
-                tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
-                --tell [SError posn $ StaticError ("stateSucc:\n" ++ show stateSucc)]
-                tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
-                --tell [SError posn $ StaticError ("stateFail:\n" ++ show stateFail)]
-                tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
-                --tell [SError posn $ StaticError ("final:" ++ concatMap (("\n\t\t"++) . show) final)]
-                ----------
-                tell [SError posn $ StaticError "---------------------------"]
+                --tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
+                --tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
+                --tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
+                --tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
+                --tell [SError posn $ StaticError "---------------------------"]
             _    -> tell [SError posn $ IfConditionDataType dt]
         where
             -- before || (varSucc && varFail) == initialized

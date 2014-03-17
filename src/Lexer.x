@@ -44,8 +44,8 @@ $idchar = [$alpha $digit]
 
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
-@string = \"($printable # [\"\\]|\\$printable|\\$newline)*\"
-@stringerror = \"($printable # [\"\\]|\\$printable|\\$newline)*
+@string = \"($printable # [\"\\]|\\[abfnrtv]|\\$newline)*\"
+@stringerror = \"($printable # [\"\\]|\\[abfnrtv]|\\$newline)*
 @char   = \'$printable\'
 
 --------------------------------------------------------------------------------
