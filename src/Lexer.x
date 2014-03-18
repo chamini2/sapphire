@@ -277,8 +277,6 @@ alexEOF = alexGetPosn >>= return . Lex TkEOF
 -- ourselves...
 lex :: (String -> Token) -> AlexAction (Lexeme Token)
 lex f = \(p,_,_,s) i -> return $ Lex (f $ take i s) (toPosition p)
---lex :: (String -> a) -> AlexAction a
---lex f = \(_,_,_,s) i -> return (f (take i s))
 
 -- For constructing tokens that do not depend on
 -- the input
