@@ -56,7 +56,7 @@ Un identificador en SAPPHIRE consiste de una cadena de caracteres de cualquier l
 
 Ejemplos:
 
-        -- esto es un comentario
+        # esto es un comentario
 
 En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Haskell. Al escribir `--` se ignorarán todos los caracteres que lo proceden en la línea.
 

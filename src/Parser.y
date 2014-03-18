@@ -277,7 +277,6 @@ ExpressionList :: { Seq (Lexeme Expression) }
 
 --------------------------------------------------------------------------------
 
---lexWrap :: (Token -> Alex a) -> Alex a
 lexWrap :: (Lexeme Token -> Alex a) -> Alex a
 lexWrap cont = do
     t <- alexMonadScan
@@ -294,10 +293,6 @@ lexWrap cont = do
 
 happyError :: Lexeme Token -> Alex a
 happyError (Lex t p) = fail $ showPosn p ++ "Parse error on Token: " ++ show t ++ "\n"
---happyError :: Token -> Alex a
---happyError t = do
---    p <- alexGetPosn
---    fail $ showPosn p ++ "Parse error on Token: " ++ show t ++ "\n"
 
 parseProgram :: String -> Either [(LexerError, Lexeme Token)] Program
 parseProgram input = runAlex' input parse

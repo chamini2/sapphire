@@ -22,7 +22,6 @@ import           Data.List (foldl')
 
 }
 
---%wrapper "monad"
 %wrapper "monadUserState"
 
 $newline   = [\n\r]
@@ -32,15 +31,13 @@ $newline   = [\n\r]
 
 $digit = 0-9
 
---$large = [A-Z \xc0-\xd6 \xd8-\xde]
---$small = [a-z \xdf-\xf6 \xf8-\xff \_]
 $large = [A-Z]
 $small = [a-z \_]
 $alpha = [$small $large]
 
 $idchar = [$alpha $digit]
 
-@varid    = $small $idchar*
+@varid  = $small $idchar*
 @typeid = $large $idchar*
 
 @int    = $digit+
@@ -55,10 +52,10 @@ tokens :-
 
         -- Whitespace/Comments
         @spaces+        ;
-        "--".*          ;
+        "#".*           ;
 
         -- Language
-        --$newline        { lex' TkNewLine        }
+        --$newline      { lex' TkNewLine        }
         @skip           { lex' TkNewLine        }
         "main"          { lex' TkMain           }
         "begin"         { lex' TkBegin          }
@@ -258,9 +255,9 @@ filterNewline :: String -> String
 filterNewline = init . tail . foldr func []
     where
         func c str = case (c,str) of
-            ('\\','\n':strs)      -> strs
             ('\\','\n':'\r':strs) -> strs
             ('\\','\r':'\n':strs) -> strs
+            ('\\','\n':strs)      -> strs
             ('\\','a':strs) -> '\a' : strs
             ('\\','b':strs) -> '\b' : strs
             ('\\','f':strs) -> '\f' : strs
@@ -275,8 +272,6 @@ toPosition (AlexPn _ line col) = (line,col)
 
 alexEOF :: Alex (Lexeme Token)
 alexEOF = alexGetPosn >>= return . Lex TkEOF
---alexEOF :: Alex Token
---alexEOF = return TkEOF
 
 -- Unfortunately, we have to extract the matching bit of string
 -- ourselves...
@@ -289,8 +284,6 @@ lex f = \(p,_,_,s) i -> return $ Lex (f $ take i s) (toPosition p)
 -- the input
 lex' :: Token -> AlexAction (Lexeme Token)
 lex' = lex . const
---lex' :: a -> AlexAction a
---lex' = lex . const
 
 alexGetPosn :: Alex Position
 alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p

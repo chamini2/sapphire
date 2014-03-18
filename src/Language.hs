@@ -193,6 +193,7 @@ printStatement st = case st of
     StDeclaration ds -> do
         printNonTerminal "DECLARATION"
         raiseTabs
+        {-mapM_ printNonTerminal "DECLARATION LIST"-}
         printNonTerminal "DECLARATION LIST"
         lowerTabs
     StReturn (Lex expr _) -> printExpressionWithTag "RETURN" expr
@@ -239,11 +240,11 @@ printStatement st = case st of
 ----
 printExpression :: Expression -> Printer ()
 printExpression e = case e of
-    Variable  v      -> printNonTerminal $ "VARIABLE: " ++ show (lexInfo v)
+    Variable  v      -> printNonTerminal $ "VARIABLE: "        ++ show (lexInfo v)
     LitInt    c      -> printNonTerminal $ "INTEGER LITERAL: " ++ show (lexInfo c)
     LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: " ++ show (lexInfo b)
     LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "   ++ show (lexInfo f)
-    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ lexInfo s
+    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ show (lexInfo s)
     ExpBinary op l r -> do
         printNonTerminal "BINARY OPERATION"
         raiseTabs
