@@ -157,7 +157,7 @@ Statement :: { Lexeme Statement }
 
     -- Definitions
     | DataType VariableList     { (StDeclaration $ fmap (\lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
---    | FunctionDef               { {- NI IDEA -} }
+    | FunctionDef               { $1 }
 --    | "return" Expression       { StReturn $2 }
 
     -- Conditional
@@ -206,8 +206,8 @@ DataType :: { Lexeme DataType }
     | "Type"        { Type   <$ $1 }
 --    | "Union" typeid
 --    | "Record" typeid
--------------------------------- FALTA ARREGLOS
 
+---- ARREGLOS
 ----DataTypeArray
 ----    : "[" DataType "]" "<-" "[" int "]"
 
@@ -215,13 +215,22 @@ VariableList :: { Seq (Lexeme Identifier) }
     : varid                         { singleton $ unTkVarId `fmap` $1  }
     | VariableList "," varid        { $1      |> (unTkVarId `fmap` $3) }
 
---FunctionDef --:: { Function }
---    : "def" varid "::" Signature
---    | "def" varid "(" VariableList ")" "::" Signature "as" StatementList "end" -- length(ParemeterList) == length(Signature) - 1
+FunctionDef :: { Lexeme Statement }
+    : "def" varid "::" Signature                                               { (StFunction (Just $4) empty) <$ $1 } -- Definir solo la firma sin la lista de parametros
+    | "def" varid "(" VariableList ")" "as" StatementList "end"                { (StFunction Nothing   $7)    <$ $1 } -- Implementar la funcion (debe haberse definido anteriormente)
+    | "def" varid "(" VariableList ")" "::" Signature "as" StatementList "end" { (StFunction (Just $7) $9)    <$ $1 } -- Definir e implementar la funcion al mismo tiempo
 
---Signature --:: { Signature }
---    : DataType
---    | Signature "->" DataType
+Signature :: { Lexeme Signature }
+    : "(" DataTypeList ")" FunctionReturn { (Signature $2             $4) <$ $1 }
+    | DataType FunctionReturn             { (Signature (singleton $1) $2) <$ $1 }
+
+DataTypeList :: { Seq (Lexeme DataType) }
+    : DataType                   { singleton $1 }
+    | DataTypeList "," DataType  { $1 |> $3     }
+    
+FunctionReturn :: { Lexeme DataType }
+    : "->" DataType                { $2 } 
+    |                              { Lex Void (0,0) }
 
 ---------------------------------------
 

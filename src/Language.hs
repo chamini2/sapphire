@@ -27,13 +27,8 @@ instance Show a => Show (Lexeme a) where
 instance Functor Lexeme where
     fmap f (Lex a p) = Lex (f a) p
 
-
 --------------------------------------------------------------------------------
 
---newtype Program = StFunction
---    deriving (Show)
---newtype Program = Program [Statement]
---    deriving (Show)
 newtype Program = Program (Seq (Lexeme Statement))
 
 instance Show Program where
@@ -53,6 +48,7 @@ data Statement
     -- Definitions
     | StDeclaration (Seq (Lexeme Declaration))
     | StReturn      (Lexeme Expression)
+    | StFunction    (Maybe (Lexeme Signature)) (Seq (Lexeme Statement))   
     -- I/O
     | StRead  (Seq (Lexeme Identifier))
     | StPrint (Seq (Lexeme Expression))
@@ -61,7 +57,7 @@ data Statement
     | StCase (Lexeme Expression) (Seq (Lexeme Case))      (Seq (Lexeme Statement))
     -- Loops
     | StWhile    (Lexeme Expression) (Seq (Lexeme Statement))
-    | StFor      (Lexeme Identifier) (Lexeme Expression)      (Seq (Lexeme Statement))
+    | StFor      (Lexeme Identifier) (Lexeme Expression)  (Seq (Lexeme Statement))
     | StBreak
     | StContinue
 
@@ -82,6 +78,8 @@ data Category
     | CatDataType
     deriving (Eq, Show)
 
+data Signature = Signature (Seq (Lexeme DataType)) (Lexeme DataType) | Empty
+
 data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
     deriving (Show)
 
@@ -101,7 +99,9 @@ data Expression
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression) {-DataType-}
 --    | ExpArray  ExpressionArray
-    deriving (Show)
+
+instance Show Expression where
+    show = runPrinter . printExpression 
 
 data Range = FromTo (Lexeme Expression) (Lexeme Expression)
     deriving (Show)
@@ -193,10 +193,25 @@ printStatement st = case st of
     StDeclaration ds -> do
         printNonTerminal "DECLARATION"
         raiseTabs
-        {-mapM_ printNonTerminal "DECLARATION LIST"-}
-        printNonTerminal "DECLARATION LIST"
+        DF.mapM_ ((\(Declaration ld _ _) -> printNonTerminal (show $ lexInfo ld)) . lexInfo) ds
         lowerTabs
     StReturn (Lex expr _) -> printExpressionWithTag "RETURN" expr
+    StFunction ls body    -> do
+        printNonTerminal "FUNCTION"
+        raiseTabs
+        case ls of
+            Just (Lex (Signature ds rt) _) -> do
+                printNonTerminal "SIGNATURE"
+                raiseTabs
+                DF.mapM_ (printNonTerminal . show) ds
+                lowerTabs
+                printNonTerminal "RETURN TYPE:"
+                raiseTabs
+                printNonTerminal $ show rt
+                lowerTabs
+            Nothing           -> printNonTerminal "NO SIGNATURE"
+        printStatements "BODY:" body
+        lowerTabs
 --    -- I/O
     StRead vars -> do
         printNonTerminal "READ"
