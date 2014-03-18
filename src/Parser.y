@@ -122,17 +122,17 @@ import           Data.Sequence
 -- -- Language
 %left ","
 
--- Bool
+-- -- Bool
 %left "or"
 %left "and"
 %right "not"
 
--- -- Compare
+-- -- -- Compare
 %nonassoc "@"
 %nonassoc "==" "/="
 %nonassoc "<" "<=" ">" ">="
 
--- Arithmetic
+-- -- Arithmetic
 %left "+" "-"
 %left "*" "/" "%"
 %left ".."

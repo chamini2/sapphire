@@ -18,6 +18,7 @@ import           Checker  (LexerError (..))
 import           Language (Position, Lexeme (..))
 
 import           Prelude  hiding (lex)
+import           Data.List (foldl')
 
 }
 
@@ -126,8 +127,9 @@ tokens :-
         "true"          { lex' (TkBool True)    }
         "false"         { lex' (TkBool False)   }
         @float          { lex  (TkFloat . read) }
-        @string         { lex  TkString         }
         @char           { lex  (TkChar . read)  }
+        -- -- -- Filtering newlines
+        @string         { lex  (TkString . filterNewline) }
 
         -- -- Num
         "+"             { lex' TkPlus           }
@@ -251,6 +253,22 @@ addLexerError (Lex t p) = do
     Alex $ \s -> let st = alex_ust s in Right (s { alex_ust = st { lexerErrors = error : (lexerErrors st) } } , () )
 
 ----------------------------------------
+
+filterNewline :: String -> String
+filterNewline = init . tail . foldr func []
+    where
+        func c str = case (c,str) of
+            ('\\','\n':strs)      -> strs
+            ('\\','\n':'\r':strs) -> strs
+            ('\\','\r':'\n':strs) -> strs
+            ('\\','a':strs) -> '\a' : strs
+            ('\\','b':strs) -> '\b' : strs
+            ('\\','f':strs) -> '\f' : strs
+            ('\\','n':strs) -> '\n' : strs
+            ('\\','r':strs) -> '\r' : strs
+            ('\\','t':strs) -> '\t' : strs
+            ('\\','v':strs) -> '\v' : strs
+            _               -> c : str
 
 toPosition :: AlexPosn -> Position
 toPosition (AlexPn _ line col) = (line,col)
