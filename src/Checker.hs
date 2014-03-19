@@ -261,7 +261,8 @@ checkStatements = DF.mapM_ checkStatement
 -}
 checkStatement :: Lexeme Statement -> Checker () -- Capaz debería devolver otra cosa?
 checkStatement (Lex st posn) = case st of
-    StNoop                       -> return ()
+    StNoop -> return ()
+
     StAssign varL@(Lex var _) ex -> do
         mayVarDt <- getSymInfoArg varL dataType
         expDt    <- checkExpression ex
@@ -271,13 +272,20 @@ checkStatement (Lex st posn) = case st of
                 unless (varDt == expDt) $
                     tell [SError posn $ InvalidAssignType var varDt expDt]
             Nothing -> return ()
-    StDeclaration ds             -> DF.mapM_ processDeclaration ds
-    StReturn ex                  -> undefined ex
-    StFunctionDef dcl dts        -> return ()
-    StFunctionImp iden args body -> DF.mapM_ checkStatement body
-    StRead vars                  -> undefined vars
-    StPrint exs                  -> DF.mapM_ checkExpression exs
-    StIf cnd success failure     -> do
+
+    StDeclaration ds      -> DF.mapM_ processDeclaration ds
+
+    StReturn ex           -> return ()
+
+    StFunctionDef dcl dts -> return ()
+
+    StFunctionImp iden args body -> return ()
+
+    StRead vars -> return ()
+
+    StPrint exs -> DF.mapM_ checkExpression exs
+
+    StIf cnd success failure -> do
         dt <- checkExpression cnd
         case dt of
             Bool -> do
@@ -322,11 +330,14 @@ checkStatement (Lex st posn) = case st of
                         (False,_,_)      -> a : bs
                         _                -> (aVar, aInfo { initialized = False }) : tbs
 
+    StCase ex cs def -> return ()
 
-    StCase ex cs def             -> undefined ex cs def
-    StWhile cnd sts              -> undefined cnd sts
-    StFor var rng sts            -> undefined var rng sts
+    StWhile cnd sts -> return ()
+
+    StFor var rng sts -> return ()
+
     StBreak -> return ()
+
     StContinue -> return ()
 
 {- |

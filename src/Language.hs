@@ -36,7 +36,10 @@ instance Show Program where
 
 type Identifier = String
 
-data DataType = Void | Int | Float | Bool | Char | String | Range | Type-- | Array
+data DataType
+    = Void | Int | Float | Bool | Char | String | Range | Type
+    | Array (Lexeme DataType)
+    | Union (Lexeme Identifier) | Record (Lexeme Identifier)
     deriving (Show, Eq)
 
 ----------------------------------------

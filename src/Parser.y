@@ -157,60 +157,57 @@ Statement :: { Lexeme Statement }
     -- Definitions
     | DataType VariableList         { (StDeclaration $ fmap (\lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
     | "return" Expression           { StReturn $2 <$ $1 }
-    -- -- Functions
-    | "def" varid "::" Signature    { let (dts,rt) = $4 in (StFunctionDef ((Declaration (unTkVarId `fmap` $2) rt CatFunction) <$ $2) dts) <$ $1 }
-    | "imp" varid "(" VariableList ")" "as" StatementList "end"        { (StFunctionImp (unTkVarId `fmap` $2) $4 $7)                      <$ $1 }
+
+    -- Functions
+    | "def" varid "::" Signature    { let (dts,rt) = $4 in StFunctionDef ((Declaration (unTkVarId `fmap` $2) rt CatFunction) <$ $2) dts <$ $1 }
+    | "imp" varid "(" VariableList ")" "as" StatementList "end"        { StFunctionImp (unTkVarId `fmap` $2) $4 $7                      <$ $1 }
 
     -- Conditional
     | "if" Expression "then" StatementList "end"                            { StIf $2 $4 empty <$ $1 }
     | "if" Expression "then" StatementList "else" StatementList "end"       { StIf $2 $4 $6    <$ $1 }
     | "unless" Expression "then" StatementList "end"                        { StIf ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 empty <$ $1 }
     | "unless" Expression "then" StatementList "else" StatementList "end"   { StIf ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 $6    <$ $1 }
---    | "case" ExpressionArit CaseList "end"                                  { StCase $2 $3 empty         }
---    | "case" ExpressionArit CaseList "else" StatementList "end"             { StCase $2 $3 $5            }
+    | "case" Expression CaseList "end"                                      { StCase $2 $3 empty <$ $1 }
+    | "case" Expression CaseList "else" StatementList "end"                 { StCase $2 $3 $5    <$ $1 }
 
     -- I/O
     | "read" VariableList       { StRead  $2 <$ $1 }
     | "print" ExpressionList    { StPrint $2 <$ $1 }
 
     -- Loops
-------------------------------    --| "while" Expression "do" StatementList "end"          { StWhile $2           $4 }
-------------------------------    --| "until" Expression "do" StatementList "end"          { StWhile (ExpUnary OpNot $2) $4 }
-
---    | "repeat" StatementList "while" ExpressionBool            { StRepeat $2 $4           }
---    | "repeat" StatementList "until" ExpressionBool            { StRepeat $2 (ExpUnary OpNot $4) }
-
---    | "for" varid "in" ExpressionRang "do" StatementList "end" { StFor $2 $4 $6          }
-------------------------------    --| "break"           { StBreak }
-------------------------------    --| "continue"        { StContinue }
+    | "while" Expression "do" StatementList "end"          { StWhile $2 $4 <$ $1 }
+    | "until" Expression "do" StatementList "end"          { StWhile ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 <$ $1 }
+--    | "repeat" StatementList "while" ExpressionBool        { StRepeat $2 $4           }
+--    | "repeat" StatementList "until" ExpressionBool        { StRepeat $2 (ExpUnary OpNot $4) }
+    | "for" varid "in" Expression "do" StatementList "end" { StFor (unTkVarId `fmap` $2) $4 $6 <$ $1 }
+    | "break"           { StBreak <$ $1    }
+    | "continue"        { StContinue <$ $1 }
 
 Separator :: { () }
     : ";"           { }
     | newline       { }
 
-CaseList :: { Seq Case }
+Case :: { Lexeme Case }
+    : "when" Expression "do" StatementList      { Case $2 $4 <$ $1 }
+
+CaseList :: { Seq (Lexeme Case) }
     : Case              { singleton $1 }
     | CaseList Case     { $1 |> $2     }
-
-Case :: { Case }
-    : "when" Expression "do" StatementList      { Case $2 $4 }
 
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"         { Int    <$ $1 }
-    | "Float"       { Float  <$ $1 }
-    | "Bool"        { Bool   <$ $1 }
-    | "Char"        { Char   <$ $1 }
-    | "String"      { String <$ $1 }
-    | "Range"       { Range  <$ $1 }
-    | "Type"        { Type   <$ $1 }
---    | "Union" typeid
---    | "Record" typeid
-
----- ARREGLOS
-----DataTypeArray
-----    : "[" DataType "]" "<-" "[" int "]"
+    : "Int"             { Int    <$ $1 }
+    | "Float"           { Float  <$ $1 }
+    | "Bool"            { Bool   <$ $1 }
+    | "Char"            { Char   <$ $1 }
+    | "String"          { String <$ $1 }
+    | "Range"           { Range  <$ $1 }
+    | "Type"            { Type   <$ $1 }
+    | "Union"  typeid   { Union  (unTkTypeId `fmap` $2) <$ $1 }
+    | "Record" typeid   { Record (unTkTypeId `fmap` $2) <$ $1 }
+--    | "[" DataType "]"  { Array $2 <$ $1}
+--    | "[" DataType "|" Expression "]"  { Array $2 $3 <$ $1}
 
 VariableList :: { Seq (Lexeme Identifier) }
     : varid                         { singleton $ unTkVarId `fmap` $1  }
