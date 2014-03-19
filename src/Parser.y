@@ -27,8 +27,6 @@ import           Data.Sequence
 
         -- Language
         newline         { Lex TkNewLine     _ }
-        "main"          { Lex TkMain        _ }
-        "begin"         { Lex TkBegin       _ }
         "end"           { Lex TkEnd         _ }
         "return"        { Lex TkReturn      _ }
         ";"             { Lex TkSemicolon   _ }
@@ -58,6 +56,7 @@ import           Data.Sequence
         -- -- Declarations
         "="             { Lex TkAssign      _ }
         "def"           { Lex TkDef         _ }
+        "imp"           { Lex TkImp         _ }
         "as"            { Lex TkAs          _ }
         "::"            { Lex TkSignature   _ }
         "->"            { Lex TkArrow       _ }
@@ -156,9 +155,11 @@ Statement :: { Lexeme Statement }
     | varid "=" Expression      { (flip StAssign $3 . (<$ $1) . unTkVarId) `fmap` $1 }
 
     -- Definitions
-    | DataType VariableList     { (StDeclaration $ fmap (\lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
-    | FunctionDef               { $1 }
---    | "return" Expression       { StReturn $2 }
+    | DataType VariableList         { (StDeclaration $ fmap (\lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
+    | "return" Expression           { StReturn $2 <$ $1 }
+    -- -- Functions
+    | "def" varid "::" Signature    { let (dts,rt) = $4 in (StFunctionDef ((Declaration (unTkVarId `fmap` $2) rt CatFunction) <$ $2) dts) <$ $1 }
+    | "imp" varid "(" VariableList ")" "as" StatementList "end"        { (StFunctionImp (unTkVarId `fmap` $2) $4 $7)                      <$ $1 }
 
     -- Conditional
     | "if" Expression "then" StatementList "end"                            { StIf $2 $4 empty <$ $1 }
@@ -215,22 +216,17 @@ VariableList :: { Seq (Lexeme Identifier) }
     : varid                         { singleton $ unTkVarId `fmap` $1  }
     | VariableList "," varid        { $1      |> (unTkVarId `fmap` $3) }
 
-FunctionDef :: { Lexeme Statement }
-    : "def" varid "::" Signature                                               { (StFunction (Just $4) empty) <$ $1 } -- Definir solo la firma sin la lista de parametros
-    | "def" varid "(" VariableList ")" "as" StatementList "end"                { (StFunction Nothing   $7)    <$ $1 } -- Implementar la funcion (debe haberse definido anteriormente)
-    | "def" varid "(" VariableList ")" "::" Signature "as" StatementList "end" { (StFunction (Just $7) $9)    <$ $1 } -- Definir e implementar la funcion al mismo tiempo
-
-Signature :: { Lexeme Signature }
-    : "(" DataTypeList ")" FunctionReturn { (Signature $2             $4) <$ $1 }
-    | DataType FunctionReturn             { (Signature (singleton $1) $2) <$ $1 }
-
 DataTypeList :: { Seq (Lexeme DataType) }
     : DataType                   { singleton $1 }
     | DataTypeList "," DataType  { $1 |> $3     }
-    
-FunctionReturn :: { Lexeme DataType }
-    : "->" DataType                { $2 } 
-    |                              { Lex Void (0,0) }
+
+Signature :: { (Seq (Lexeme DataType), Lexeme DataType) }
+    : "(" DataTypeList ")" SignatureReturn { ($2,$4) }
+    | DataTypeList         SignatureReturn { ($1,$2) }
+
+SignatureReturn :: { Lexeme DataType }
+    : "->" DataType         { $2 }
+    |                       { Lex Void (0,0) }
 
 ---------------------------------------
 
