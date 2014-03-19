@@ -80,6 +80,7 @@ import           Data.Sequence
         "do"            { Lex TkDo          _ }
         "while"         { Lex TkWhile       _ }
         "until"         { Lex TkUntil       _ }
+        "repeat"        { Lex TkRepeat      _ }
         "break"         { Lex TkBreak       _ }
         "continue"      { Lex TkContinue    _ }
 
@@ -166,8 +167,8 @@ Statement :: { Lexeme Statement }
     -- Conditional
     | "if" Expression "then" StatementList "end"                            { StIf $2 $4 empty <$ $1 }
     | "if" Expression "then" StatementList "else" StatementList "end"       { StIf $2 $4 $6    <$ $1 }
-    | "unless" Expression "then" StatementList "end"                        { StIf ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 empty <$ $1 }
-    | "unless" Expression "then" StatementList "else" StatementList "end"   { StIf ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 $6    <$ $1 }
+    | "unless" Expression "then" StatementList "end"                        { StIf (negateExp $2) $4 empty <$ $1 }
+    | "unless" Expression "then" StatementList "else" StatementList "end"   { StIf (negateExp $2) $4 $6    <$ $1 }
     | "case" Expression CaseList "end"                                      { StCase $2 $3 empty <$ $1 }
     | "case" Expression CaseList "else" StatementList "end"                 { StCase $2 $3 $5    <$ $1 }
 
@@ -176,10 +177,12 @@ Statement :: { Lexeme Statement }
     | "print" ExpressionList    { StPrint $2 <$ $1 }
 
     -- Loops
-    | "while" Expression "do" StatementList "end"          { StWhile $2 $4 <$ $1 }
-    | "until" Expression "do" StatementList "end"          { StWhile ((ExpUnary (OpNot <$ $2) $2) <$ $2) $4 <$ $1 }
---    | "repeat" StatementList "while" ExpressionBool        { StRepeat $2 $4           }
---    | "repeat" StatementList "until" ExpressionBool        { StRepeat $2 (ExpUnary OpNot $4) }
+    | "while"  Expression "do" StatementList "end"                                { StLoop empty $2 $4    <$ $1 }
+    | "repeat" StatementList "end" "while" Expression                             { StLoop $2    $5 empty <$ $1 }
+    | "repeat" StatementList "end" "while" Expression "do" StatementList "end"    { StLoop $2    $5 $7    <$ $1 }
+    | "until"  Expression "do" StatementList "end"                                { StLoop empty (negateExp $2) $4    <$ $1 }
+    | "repeat" StatementList "end" "until" Expression                             { StLoop $2    (negateExp $5) empty <$ $1 }
+    | "repeat" StatementList "end" "until" Expression "do" StatementList "end"    { StLoop $2    (negateExp $5) $7    <$ $1 }
     | "for" varid "in" Expression "do" StatementList "end" { StFor (unTkVarId `fmap` $2) $4 $6 <$ $1 }
     | "break"           { StBreak <$ $1    }
     | "continue"        { StContinue <$ $1 }
@@ -285,6 +288,9 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 
 --------------------------------------------------------------------------------
 -- Functions
+
+negateExp :: Lexeme Expression -> Lexeme Expression
+negateExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
 --expError :: DataType -> String -> Checker Expression
 --expError dt str = do

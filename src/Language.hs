@@ -62,7 +62,9 @@ data Statement
     | StIf   (Lexeme Expression) (Seq (Lexeme Statement)) (Seq (Lexeme Statement))
     | StCase (Lexeme Expression) (Seq (Lexeme Case))      (Seq (Lexeme Statement))
     -- Loops
-    | StWhile    (Lexeme Expression) (Seq (Lexeme Statement))
+    | StLoop     (Seq (Lexeme Statement)) (Lexeme Expression) (Seq (Lexeme Statement))
+--    | StWhile    (Lexeme Expression) (Seq (Lexeme Statement))
+--    | StRepeat   (Seq (Lexeme Statement)) (Lexeme Expression) (Seq (Lexeme Statement))
     | StFor      (Lexeme Identifier) (Lexeme Expression)  (Seq (Lexeme Statement))
     | StBreak
     | StContinue
@@ -275,9 +277,10 @@ printStatement st = case st of
 
     StCase expr cases othrw -> printNonTerminal "CASE"
 
-    StWhile cond body -> do
-        printNonTerminal "WHILE"
+    StLoop rep cond body -> do
+        printNonTerminal "LOOP"
         raiseTabs
+        printStatements "- repeat: " rep
         printExpressionWithTag "- guard: " (lexInfo cond)
         printStatements "- body: " body
         lowerTabs

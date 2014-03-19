@@ -334,7 +334,7 @@ checkStatement (Lex st posn) = case st of
 
     StCase ex cs def -> return ()
 
-    StWhile cnd sts -> return ()
+    StLoop rep cnd sts -> return ()
 
     StFor var rng sts -> return ()
 
@@ -386,17 +386,3 @@ getExpressionVariables (Lex e _) = case e of
     ExpUnary _ expr  -> getExpressionVariables expr
     -- (LitInt _) (LitFloat _) (LitBool _) (LitChar _) (LitString _)
     _                -> empty
-
--- esta mala porque no considera las variables DECLARADAS adentro de los bloques.
---initializedInBlock :: Seq (Lexeme Statement) -> Seq (Lexeme Identifier)
---initializedInBlock = foldr ((><) . func) empty
---    where
---        func :: Lexeme Statement -> Seq (Lexeme Identifier)
---        func (Lex st _) = case st of
---            (StAssign var _)         -> singleton var
---            (StIf _ success failure) -> initializedInBlock success >< initializedInBlock failure
---            (StCase _ cases othrw)   -> fromList (DF.concatMap unCase cases) >< initializedInBlock othrw
---            (StWhile _ body)         -> initializedInBlock body
---            (StFor var _ body)       -> DS.filter (var/=) $ initializedInBlock body
---            _                        -> empty
---        unCase (Lex (Case _ body) _) = toList $ initializedInBlock body

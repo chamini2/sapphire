@@ -113,6 +113,7 @@ tokens :-
 
         "while"         { lex' TkWhile          }
         "until"         { lex' TkUntil          }
+        "repeat"        { lex' TkRepeat         }
 
         "break"         { lex' TkBreak          }
         "continue"      { lex' TkContinue       }
@@ -188,7 +189,7 @@ data Token
 
     -- -- Loops
     | TkFor | TkIn | TkFromTo | TkDo
-    | TkWhile | TkUntil
+    | TkWhile | TkUntil | TkRepeat
     | TkBreak | TkContinue
 
     -- Expressions/Operators
