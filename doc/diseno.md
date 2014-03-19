@@ -58,7 +58,7 @@ En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Ruby. Al e
 Las palabras reservadas son las siguientes
 
 ~~~ruby
-    def, as, end, return
+    def, imp, as, end, return
     true, false, or, and, not
     if, then, else, unless, case, when
     for, in, while, do, until, break, continue
@@ -87,29 +87,41 @@ Las palabras reservadas son las siguientes
 
 Se dispone de los siguientes tipos de datos:
 
-**`Void`**    el *no-valor*, también usado para funciones que no devuelven valores *(aka. procedimientos)*.
+**`Void`**
+> el *no-valor*, también usado para funciones que no devuelven valores *(aka. procedimientos)*.
 
-**`Int`**     números enteros con signo de `N(32/64) bits`.
+**`Int`**
+> números enteros con signo de `N(32/64) bits`.
 
-**`Bool`**    representa un valor booleano o lógico, es decir `true` o `false`.
+**`Bool`**
+> representa un valor booleano o lógico, es decir `true` o `false`.
 
-**`Float`**   números flotantes de `N bits`, precisión y tal...
+**`Float`**
+> números flotantes de `N bits`, precisión y tal...
 
-**`Char`**    caracteres, `UTF-8`.
+**`Char`**
+> caracteres, `UTF-8`.
 
-**`String`**  cadenas de caracteres, esencialmente `[Char]`.
+**`String`**
+> cadenas de caracteres, esencialmente `[Char]`.
 
-**`[Array]`** arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
+**`[Array]`**
+> arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
 
-**`Union`**   unions arbitrarimente anidados, equivalentes a los unions de `C`.
+**`Union`**
+> unions arbitrarimente anidados, equivalentes a los unions de `C`.
 
-**`Record`**  records arbitrarimente anidados, equivalentes a los `struct` de `C`.
+**`Record`**
+> records arbitrarimente anidados, equivalentes a los `struct` de `C`.
 
-**`Range`**   rangos de enteros.
+**`Range`**
+> rangos de enteros.
 
-**`def id :: firma`** funciones, debe especificarse los tipos de entrada y salida.
+**`def id :: firma`**
+> funciones, debe especificarse los tipos de entrada y salida.
 
-**`{Range}`** enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
+**`{Range}`**
+> enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
 
 ***
 
@@ -235,7 +247,7 @@ Ejemplos:
 
 ~~~ruby
     def iguales :: (Int, Int) -> Bool
-    def iguales(a, b) as
+    imp iguales(a, b) as
         return a == b
     end
 ~~~
@@ -244,12 +256,12 @@ Ejemplos:
 
 ~~~ruby
     # definición
-    def iguales :: (Int, Int) -> Bool
+    def iguales :: Int, Int -> Bool
 
         # ...código...
 
     # implementación
-    def iguales(a, b) as
+    imp iguales(a, b) as
         return a == b;
     end
 ~~~
@@ -259,7 +271,7 @@ Sintaxis:
 ~~~ruby
     def <id> :: <firma>
 
-    def <id>(<ids..>) as
+    imp <id>(<ids..>) as
         <stats..>
     end
 ~~~
