@@ -15,13 +15,15 @@ Programa
 
 Ejemplos:
 
-        write "hello world!\n"
-
+~~~ruby
+    write "hello world!\n"
+~~~
 
 Sintaxis:
 
-        <stats..>
-
+~~~ruby
+    <stats..>
+~~~
 
 Es una lista de instrucciones a ejecutar una tras otra. Cada instrucción está terminada por punto y comas (`;`) o saltos de línea, *newlines*.  **Qué pasa si ponemos *backslash* al final de una línea?**
 
@@ -32,8 +34,10 @@ Estructura lexicográfica
 
 Ejemplos:
 
-        foo_
-        barBAZ
+~~~ruby
+    foo_
+    barBAZ
+~~~
 
 Un identificador en SAPPHIRE consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
 
@@ -42,7 +46,9 @@ Un identificador en SAPPHIRE consiste de una cadena de caracteres de cualquier l
 
 Ejemplos:
 
-        # esto es un comentario
+~~~ruby
+    # esto es un comentario
+~~~
 
 En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Ruby. Al escribir `#` se ignorarán todos los caracteres que lo proceden en la línea.
 
@@ -51,29 +57,28 @@ En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Ruby. Al e
 
 Las palabras reservadas son las siguientes
 
+~~~ruby
+    def, as, end, return
+    true, false, or, and, not
+    if, then, else, unless, case, when
+    for, in, while, do, until, break, continue
+    print, read
+    Void, Int, Bool, Float, Char
+    String, Array, Range, Union, Record
 
-        def, as, end, return
-        true, false, or, and, not
-        if, then, else, unless, case, when
-        for, in, while, do, until, break, continue
-        print, read
-        Void, Int, Bool, Float, Char
-        String, Array, Range, Union, Record
-
-        #
-        ::, ->
-        ;
-        ,
-        =
-        [, ]
-        ..
-        +, -, *, /, %, ^
-        (, )
-        ==
-        /=
-        >, <, >=, <=
-
-
+    #
+    ::, ->
+    ;
+    ,
+    =
+    [, ]
+    ..
+    +, -, *, /, %, ^
+    (, )
+    ==
+    /=
+    >, <, >=, <=
+~~~
 
 ***COMPLETAR Y ORDERNAR***
 
@@ -118,7 +123,9 @@ Instrucciones
 
 Ejemplos:
 
-        ;;
+~~~ruby
+    ;;
+~~~
 
 Instrucción que no hace nada, *noop*. En el ejemplo hay dos operaciones *noop*, una al principio y la otra entre los dos punto y coma (`;`).
 
@@ -126,12 +133,16 @@ Instrucción que no hace nada, *noop*. En el ejemplo hay dos operaciones *noop*,
 
 Ejemplos:
 
-        foo = bar
-        foo[0] = bar
+~~~ruby
+    foo = bar
+    foo[0] = bar
+~~~
 
 Sintaxis:
 
-        <var> = <expr>
+~~~ruby
+    <var> = <expr>
+~~~
 
 Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado derecho y almacenarla en la variable del lado izquierdo. La variable tiene que haber sido declarada previamente y su tipo debe coincidir con el tipo de la expresión, en caso contrario debe arrojarse un error.
 
@@ -139,11 +150,15 @@ Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado der
 
 Ejemplos:
 
-        foo += 42
+~~~ruby
+    foo += 42
+~~~
 
 Sintaxis:
 
-        <var> <op>= <expr>
+~~~ruby
+    <var> <op>= <expr>
+~~~
 
 Esta instrucción es equivalente a `<var> = <var> <op> <expr>`. El `<op>` puede ser cualquiera de los siguientes: `+`, `-`, `*`, `/`, `%`, `^`, `and`, `or`.
 
@@ -158,7 +173,9 @@ Ejemplos:
 
 Sintaxis:
 
-        <Type> <id> [, <id>..]
+~~~ruby
+    <Type> <id> [, <id>..]
+~~~
 
 Declara variables para el *alcance* actual.
 
@@ -168,11 +185,15 @@ Se escribe primero el `Tipo` de las variables a declarar y luego una lista de id
 
 Ejemplos:
 
-        [[Int]] array <- [10]*[10], veinte <- [20]*[2];
+~~~ruby
+    [[Int]] array <- [10]*[10], veinte <- [20]*[2];
+~~~
 
 Sintaxis:
 
-        [<Type>] <id> <- [<expr Int>] [, <id> <- [<expre Int>]..]
+~~~ruby
+    [<Type>] <id> <- [<expr Int>] [, <id> <- [<expre Int>]..]
+~~~
 
 Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`). Notar que el `[, <ids..>]` es opcional.
 
@@ -180,11 +201,15 @@ Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`
 
 Ejemplos:
 
-        Record Coordenada = { x :: Int, y :: String }
+~~~ruby
+    Record Coordenada = { x :: Int, y :: String }
+~~~
 
 Sintaxis:
 
-        Record <Id> = { <id> :: <Type> [, <id> <Type>..] }
+~~~ruby
+    Record <Id> = { <id> :: <Type> [, <id> <Type>..] }
+~~~
 
 Estructuras como `struct` del lenguaje `C`.
 
@@ -192,11 +217,15 @@ Estructuras como `struct` del lenguaje `C`.
 
 Ejemplos:
 
-        Union MaybeInt = { just :: Int, nothing :: Void }
+~~~ruby
+    Union MaybeInt = { just :: Int, nothing :: Void }
+~~~
 
 Sintaxis:
 
-        Union <id> = { <id> :: <Type> [, <id> :: <Type>..] }
+~~~ruby
+    Union <id> = { <id> :: <Type> [, <id> :: <Type>..] }
+~~~
 
 Uniones como `union` del lenguaje `C`.
 
@@ -204,30 +233,36 @@ Uniones como `union` del lenguaje `C`.
 
 Ejemplos:
 
-        def iguales :: (Int, Int) -> Bool
-        def iguales(a, b) as
-            return a == b
-        end
+~~~ruby
+    def iguales :: (Int, Int) -> Bool
+    def iguales(a, b) as
+        return a == b
+    end
+~~~
 
 > *es equivalente a:*
 
-        # definición
-        def iguales :: (Int, Int) -> Bool
+~~~ruby
+    # definición
+    def iguales :: (Int, Int) -> Bool
 
-            # ...código...
+        # ...código...
 
-        # implementación
-        def iguales(a, b) as
-            return a == b;
-        end
+    # implementación
+    def iguales(a, b) as
+        return a == b;
+    end
+~~~
 
 Sintaxis:
 
-        def <id> :: <firma>
+~~~ruby
+    def <id> :: <firma>
 
-        def <id>(<ids..>) as
-            <stats..>
-        end
+    def <id>(<ids..>) as
+        <stats..>
+    end
+~~~
 
 Declara una función, especificando parametros de entrada y de salida.
 
@@ -240,11 +275,15 @@ Nótese que la definir una función no obliga la implementación inmediata, pero
 
 Ejemplos:
 
-        return 3
+~~~ruby
+    return 3
+~~~
 
 Sintaxis:
 
-        return <expr>
+~~~ruby
+    return <expr>
+~~~
 
 Instrucción `return` típica.
 
@@ -253,11 +292,15 @@ Instrucción `return` típica.
 
 Ejemplos:
 
-        read valid, num
+~~~ruby
+    read valid, num
+~~~
 
 Sintaxis:
 
-        read <id> [, <ids..>]
+~~~ruby
+    read <id> [, <ids..>]
+~~~
 
 Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range????`).
 
@@ -265,11 +308,15 @@ Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más va
 
 Ejemplos:
 
-        print index, num
+~~~ruby
+    print index, num
+~~~
 
 Sintaxis:
 
-        print <expr> [, <exprs..>]
+~~~ruby
+    print <expr> [, <exprs..>]
+~~~
 
 Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<exprs..>` se evalúan completamente antes de imprimir los valores por pantalla.
 
@@ -277,21 +324,25 @@ Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<e
 
 Ejemplos:
 
-        if x%2==0 then
-            print "even\n"
-        else if x%3 == 0 then
-            print "threeven"    -- esto no existe.
-        else
-            print "I dunno\n"
-        end
+~~~ruby
+    if x%2==0 then
+        print "even\n"
+    else if x%3 == 0 then
+        print "threeven"    # esto no existe.
+    else
+        print "I dunno\n"
+    end
+~~~
 
 Sintaxis:
 
-        if <expr Bool> then
-            <stats..>
-        [else
-            <stats..>]
-        end
+~~~ruby
+    if <expr Bool> then
+        <stats..>
+    [else
+        <stats..>]
+    end
+~~~
 
 Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y en caso de ser cierta, se ejecuta la `<stat>` , sino se ejecuta la `<stat>` despues del `else` (en caso de haber).
 
@@ -299,50 +350,60 @@ Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y en
 
 Ejemplos:
 
-        unless tired then
-            work()
-        end
+~~~ruby
+    unless tired then
+        work()
+    end
+~~~
 
 Sintaxis:
 
-        unless <expr Bool> then
-            <stats..>
-        [else
-            <stats..>]
-        end
+~~~ruby
+    unless <expr Bool> then
+        <stats..>
+    [else
+        <stats..>]
+    end
+~~~
 
 
 Es opuesto a un condicional `if`. Es equivalente a:
 
-        if not (<expr Bool>) then
-            <stats..>
-        [else
-            <stats..>]
-        end
+~~~ruby
+    if not (<expr Bool>) then
+        <stats..>
+    [else
+        <stats..>]
+    end
+~~~
 
 ### Condicional por casos
 
 Ejemplos:
 
-        case age
-        when 0 .. 3 do
-            print "bebé"
-        when 4 .. 12 do
-            print "niño"
-        when 12 .. 17 do
-            -- notar que el 12 está en "niño" y "joven"
-            print "joven"
-        else
-            print "adulto"
-        end
+~~~ruby
+    case age
+    when 0 .. 3 do
+        print "bebé"
+    when 4 .. 12 do
+        print "niño"
+    when 12 .. 17 do
+        # notar que el 12 está en "niño" y "joven"
+        print "joven"
+    else
+        print "adulto"
+    end
+~~~
 
 Sintaxis:
 
-        case <expr>
-        when <expr> do <stats..>
-        [when <expr> do <stats..>..]
-        [else <stats..>]
-        end
+~~~ruby
+    case <expr>
+    when <expr> do <stats..>
+    [when <expr> do <stats..>..]
+    [else <stats..>]
+    end
+~~~
 
 Condicinal por casos, *case*.
 
@@ -350,16 +411,20 @@ Condicinal por casos, *case*.
 
 Ejemplos:
 
-        print 0
-        for i in 1 .. 10 do
-            print "," , i*2
-        end
+~~~ruby
+    print 0
+    for i in 1 .. 10 do
+        print "," , i*2
+    end
+~~~
 
 Sintaxis:
 
-        for <id> in <rango> do
-            <stats..>
-        end
+~~~ruby
+    for <id> in <rango> do
+        <stats..>
+    end
+~~~
 
 El campo para `<rango>` debe ser del estilo `Int..Int`, puede ser con identificadores o expresiones. El `<id>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración éste deja de existir.
 
@@ -367,16 +432,20 @@ El campo para `<rango>` debe ser del estilo `Int..Int`, puede ser con identifica
 
 Ejemplos:
 
-        while money > 0 do
-            spend(money)
-            print money
-        end
+~~~ruby
+    while money > 0 do
+        spend(money)
+        print money
+    end
+~~~
 
 Sintaxis:
 
-        while <expr Bool> do
-            <stats..>
-        end
+~~~ruby
+    while <expr Bool> do
+        <stats..>
+    end
+~~~
 
 Mientras la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`.
 
@@ -384,31 +453,41 @@ Mientras la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`.
 
 Ejemplos:
 
-        until understand("recursion") do
-            studies("recursion")
-        end
+~~~ruby
+    until understand("recursion") do
+        studies("recursion")
+    end
+~~~
 
 Sintaxis:
 
-        until <expr Bool> do
-            <stats..>
-        end
+~~~ruby
+    until <expr Bool> do
+        <stats..>
+    end
+~~~
 
 Hasta que la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`. Es equivalente a:
 
-        while not (<expr Bool>) do
-            <stats..>
-        end
+~~~ruby
+    while not (<expr Bool>) do
+        <stats..>
+    end
+~~~
 
 ### Terminación de iteración
 
-        break
+~~~ruby
+    break
+~~~
 
 Instrucción `break` típica.
 
 ### Continuación de iteración
 
-        continue
+~~~ruby
+    continue
+~~~
 
 Instrucción `continue` típica.
 
