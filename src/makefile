@@ -16,6 +16,9 @@ alex:
 happy: alex
 	happy -g Parser.y
 
+happyinfo:
+	happy -g Parser.y -iinfo.txt
+
 # Can be used as 'make run ../examples/sapphire/ejemplo.sp'
 run:
 	./Sapphire $(RUN_ARGS)
