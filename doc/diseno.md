@@ -17,25 +17,11 @@ Ejemplos:
 
         write "hello world!\n"
 
-***
-
-        main
-            write "hello world!\n"
-        end
 
 Sintaxis:
 
         <stats..>
 
-***
-
-        [<funcs..>]
-
-        main
-            <stats..>
-        end
-
-        [<funcs..>]
 
 Es una lista de instrucciones a ejecutar una tras otra. Cada instrucción está terminada por punto y comas (`;`) o saltos de línea, *newlines*.  **Qué pasa si ponemos *backslash* al final de una línea?**
 
@@ -46,8 +32,8 @@ Estructura lexicográfica
 
 Ejemplos:
 
-        foo
-        fooBar_baz
+        foo_
+        barBAZ
 
 Un identificador en SAPPHIRE consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
 
@@ -58,23 +44,24 @@ Ejemplos:
 
         # esto es un comentario
 
-En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Haskell. Al escribir `--` se ignorarán todos los caracteres que lo proceden en la línea.
+En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Ruby. Al escribir `#` se ignorarán todos los caracteres que lo proceden en la línea.
 
 
 ### Palabras reservadas y Símbolos
 
 Las palabras reservadas son las siguientes
 
-        main, begin, def, as, end, return
+
+        def, as, end, return
         true, false, or, and, not
         if, then, else, unless, case, when
         for, in, while, do, until, break, continue
         print, read
-        Void, Int, Bool, Float, Char, String, ¿¿¿¿¿Array??????, Range, Union, Record
-        toInt, toFloat, toString, length
+        Void, Int, Bool, Float, Char
+        String, Array, Range, Union, Record
 
+        #
         ::, ->
-        --
         ;
         ,
         =
@@ -83,44 +70,43 @@ Las palabras reservadas son las siguientes
         +, -, *, /, %, ^
         (, )
         ==
-        /= | !=
+        /=
         >, <, >=, <=
 
 
 
 ***COMPLETAR Y ORDERNAR***
-Union??? Record???
 
 
 ### Tipos de datos
 
 Se dispone de los siguientes tipos de datos:
 
-* **`Void`** para funciones que no devuelven valores *(aka. procedimientos)*.
+**`Void`**    el *no-valor*, también usado para funciones que no devuelven valores *(aka. procedimientos)*.
 
-* **`Int`** números enteros con signo de `N(32/64) bits`.
+**`Int`**     números enteros con signo de `N(32/64) bits`.
 
-* **`Bool`** representa un valor booleano o lógico, es decir `true` o `false`.
+**`Bool`**    representa un valor booleano o lógico, es decir `true` o `false`.
 
-* **`Float`** números flotantes de `N bits`, precisión y tal...
+**`Float`**   números flotantes de `N bits`, precisión y tal...
 
-* **`Char`** caracteres, `UTF-8`.
+**`Char`**    caracteres, `UTF-8`.
 
-* **`String`** cadenas de caracteres, esencialmente `[Char]`
+**`String`**  cadenas de caracteres, esencialmente `[Char]`.
 
-* **`[Array]`** arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
+**`[Array]`** arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
 
-* **`def id :: firma`** funciones, debe especificarse los tipos de entrada y salida.
+**`Union`**   unions arbitrarimente anidados, equivalentes a los unions de `C`.
 
-* **`Union`** unions arbitrarimente anidados, equivalentes a los unions de `C`.
+**`Record`**  records arbitrarimente anidados, equivalentes a los `struct` de `C`.
 
-* **`Record`** records arbitrarimente anidados, equivalentes a los `struct` de `C`.
+**`Range`**   rangos de enteros.
 
-* **`Range`** rangos de enteros.
+**`def id :: firma`** funciones, debe especificarse los tipos de entrada y salida.
+
+**`{Range}`** enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
 
 ***
-
-* **`{Range}`** enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
 
 El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, además todos los tipos de datos empiezan por una letra mayuscula.
 
@@ -161,34 +147,14 @@ Sintaxis:
 
 Esta instrucción es equivalente a `<var> = <var> <op> <expr>`. El `<op>` puede ser cualquiera de los siguientes: `+`, `-`, `*`, `/`, `%`, `^`, `and`, `or`.
 
-###Bloque
-
-***CAPAZ NO SE NECESITA LITERALMENTE UNA INSTRUCCIÓN BLOQUE***
-
-Ejemplos:
-
-        begin
-            x = 2
-            begin
-                y = 3; print x + y
-            end
-        end
-
-Sintaxis:
-
-        begin
-            <stats..>
-        end
-
-Permite colocar una secuencia de instrucciones donde se requiera *una* instrucción. Permite anidarlos arbitrariamente.
-
 ### Declaración de variables
 
 Ejemplos:
 
-        Bool valid
-        Int num, index
-
+~~~ruby
+    Bool valid
+    Int num, ind
+~~~
 
 Sintaxis:
 
@@ -230,7 +196,7 @@ Ejemplos:
 
 Sintaxis:
 
-        Union <id> = { <id> :: <Type> [, <id> <Type>..] }
+        Union <id> = { <id> :: <Type> [, <id> :: <Type>..] }
 
 Uniones como `union` del lenguaje `C`.
 
@@ -238,18 +204,19 @@ Uniones como `union` del lenguaje `C`.
 
 Ejemplos:
 
-        def iguales(a, b) :: (Int, Int) -> Bool as
+        def iguales :: (Int, Int) -> Bool
+        def iguales(a, b) as
             return a == b
         end
 
 > *es equivalente a:*
 
-        -- definición
+        # definición
         def iguales :: (Int, Int) -> Bool
 
-            -- ...código...
+            # ...código...
 
-        -- implementación
+        # implementación
         def iguales(a, b) as
             return a == b;
         end
@@ -258,7 +225,7 @@ Sintaxis:
 
         def <id> :: <firma>
 
-        def <id>(<lista de entradas>) :: <firma> as
+        def <id>(<ids..>) as
             <stats..>
         end
 
@@ -266,7 +233,7 @@ Declara una función, especificando parametros de entrada y de salida.
 
 Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`.
 
-Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego, en caso de no hacerlo se lanzaria un error si intenta hacerse una llamada a dicha funcion. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida. Un ejemplo es:
+Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego, en caso de no hacerlo se lanzaria un error si intenta hacerse una llamada a dicha funcion. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida.
 
 
 ### Retorno de valores
@@ -290,7 +257,7 @@ Ejemplos:
 
 Sintaxis:
 
-        read <ids..>
+        read <id> [, <ids..>]
 
 Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range????`).
 
@@ -302,7 +269,7 @@ Ejemplos:
 
 Sintaxis:
 
-        write/print <exprs..>
+        print <expr> [, <exprs..>]
 
 Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<exprs..>` se evalúan completamente antes de imprimir los valores por pantalla.
 
@@ -349,6 +316,8 @@ Es opuesto a un condicional `if`. Es equivalente a:
 
         if not (<expr Bool>) then
             <stats..>
+        [else
+            <stats..>]
         end
 
 ### Condicional por casos
@@ -381,9 +350,9 @@ Condicinal por casos, *case*.
 
 Ejemplos:
 
+        print 0
         for i in 1 .. 10 do
-            print i*2
-            print ","
+            print "," , i*2
         end
 
 Sintaxis:
@@ -415,8 +384,8 @@ Mientras la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`.
 
 Ejemplos:
 
-        until entiende("recursión") do
-            estudia("recursión")
+        until understand("recursion") do
+            studies("recursion")
         end
 
 Sintaxis:
@@ -509,7 +478,7 @@ Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
 * `def to_Float :: Int -> Float`
 
-* `def to_String :: b -> String`
+* `def to_String :: a -> String`
 
 * `def length :: [a] -> Int`
 
