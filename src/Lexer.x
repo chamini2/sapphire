@@ -57,8 +57,6 @@ tokens :-
         -- Language
         --$newline      { lex' TkNewLine        }
         @skip           { lex' TkNewLine        }
-        "main"          { lex' TkMain           }
-        "begin"         { lex' TkBegin          }
         "end"           { lex' TkEnd            }
         "return"        { lex' TkReturn         }
         ";"             { lex' TkSemicolon      }
@@ -88,6 +86,7 @@ tokens :-
         -- -- Declarations
         "="             { lex' TkAssign         }
         "def"           { lex' TkDef            }
+        "imp"           { lex' TkImp            }
         "as"            { lex' TkAs             }
         "::"            { lex' TkSignature      }
         "->"            { lex' TkArrow          }
@@ -166,7 +165,7 @@ tokens :-
 data Token
 
     -- Language
-    = TkNewLine | TkMain | TkBegin | TkEnd | TkReturn | TkSemicolon | TkComma
+    = TkNewLine | TkEnd | TkReturn | TkSemicolon | TkComma
 
     -- -- Brackets
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets | TkLBraces | TkRBraces
@@ -177,7 +176,7 @@ data Token
 
     -- Statements
     -- -- Declarations
-    | TkAssign | TkDef | TkAs | TkSignature | TkArrow | TkDot
+    | TkAssign | TkDef | TkImp | TkAs | TkSignature | TkArrow | TkDot
 
     -- -- In/Out
     | TkRead | TkPrint
