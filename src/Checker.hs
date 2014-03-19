@@ -354,11 +354,17 @@ checkExpression (Lex e posn) = case e of
                 unless ini $ tell [SError posn $ VariableNotInitialized var]
                 return dt
             Nothing -> return Void
-    LitInt _                  -> return Int
-    LitFloat _                -> return Float
-    LitBool _                 -> return Bool
-    LitChar _                 -> return Char
-    LitString _               -> return String
+
+    LitInt _    -> return Int
+
+    LitFloat _  -> return Float
+
+    LitBool _   -> return Bool
+
+    LitChar _   -> return Char
+
+    LitString _ -> return String
+
     ExpBinary (Lex op _) l r  -> do
         ldt <- checkExpression l
         rdt <- checkExpression r
@@ -368,6 +374,7 @@ checkExpression (Lex e posn) = case e of
                 tell [SError posn $ BinaryTypes op (ldt,rdt)]
                 return . snd . head $ binaryOperation op
             else return . snd $ head dts
+
     ExpUnary (Lex op _) expr  -> do
         dt   <- checkExpression expr
         let dts = filter ((dt==) . fst) $ unaryOperation op

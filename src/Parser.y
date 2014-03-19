@@ -10,17 +10,12 @@ import           Prelude
 import qualified Data.Foldable as DF
 import           Data.Functor
 import           Data.Sequence
---import           Control.Monad.RWS
---import           Control.Monad
 }
 
 %name parse
 %tokentype { Lexeme Token }
---%tokentype { Token }
 %monad { Alex }
 %lexer { lexWrap } { Lex TkEOF _ }
---%lexer { lexWrap } { TkEOF }
--- Without this we get a type error
 %error { happyError }
 
 %token
@@ -183,7 +178,7 @@ Statement :: { Lexeme Statement }
     | "until"  Expression "do" StatementList "end"                                { StLoop empty (negateExp $2) $4    <$ $1 }
     | "repeat" StatementList "end" "until" Expression                             { StLoop $2    (negateExp $5) empty <$ $1 }
     | "repeat" StatementList "end" "until" Expression "do" StatementList "end"    { StLoop $2    (negateExp $5) $7    <$ $1 }
-    | "for" varid "in" Expression "do" StatementList "end" { StFor (unTkVarId `fmap` $2) $4 $6 <$ $1 }
+    | "for" varid "in" Expression "do" StatementList "end"                        { StFor (unTkVarId `fmap` $2) $4 $6 <$ $1 }
     | "break"           { StBreak <$ $1    }
     | "continue"        { StContinue <$ $1 }
 
