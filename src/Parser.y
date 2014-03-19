@@ -155,12 +155,13 @@ Statement :: { Lexeme Statement }
     | varid "=" Expression      { (flip StAssign $3 . (<$ $1) . unTkVarId) `fmap` $1 }
 
     -- Definitions
-    | DataType VariableList         { (StDeclaration $ fmap (\lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
+    | DataType DeclareVariableList  { (StDeclaration $ fmap (\(lVar,lExp) -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
     | "return" Expression           { StReturn $2 <$ $1 }
 
     -- Functions
     | "def" varid "::" Signature    { let (dts,rt) = $4 in StFunctionDef ((Declaration (unTkVarId `fmap` $2) rt CatFunction) <$ $2) dts <$ $1 }
-    | "imp" varid "(" VariableList ")" "as" StatementList "end"        { StFunctionImp (unTkVarId `fmap` $2) $4 $7                      <$ $1 }
+    | "imp" varid "(" MaybeVariableList ")" "as" StatementList "end"        { StFunctionImp (unTkVarId `fmap` $2) $4 $7                      <$ $1 }
+    | varid "(" MaybeExpressionList ")"    { StFunctionCall (unTkVarId `fmap` $1) $3 <$ $1 }
 
     -- Conditional
     | "if" Expression "then" StatementList "end"                            { StIf $2 $4 empty <$ $1 }
@@ -213,6 +214,18 @@ VariableList :: { Seq (Lexeme Identifier) }
     : varid                         { singleton $ unTkVarId `fmap` $1  }
     | VariableList "," varid        { $1      |> (unTkVarId `fmap` $3) }
 
+MaybeVariableList :: { Seq (Lexeme Identifier) }
+    :                           { empty }
+    | VariableList              { $1    }
+
+DeclareVariableList :: { Seq (Lexeme Identifier, Maybe (Lexeme Expression)) }
+    : MaybeDeclareVariable                          { singleton $1 }
+    | DeclareVariableList "," MaybeDeclareVariable  { $1     |> $3 }
+
+MaybeDeclareVariable :: { (Lexeme Identifier, Maybe (Lexeme Expression)) }
+    : varid "=" Expression      { (unTkVarId `fmap` $1, Just $3) }
+    | varid                     { (unTkVarId `fmap` $1, Nothing) }
+
 DataTypeList :: { Seq (Lexeme DataType) }
     : DataType                   { singleton $1 }
     | DataTypeList "," DataType  { $1 |> $3     }
@@ -229,7 +242,9 @@ SignatureReturn :: { Lexeme DataType }
 
 Expression :: { Lexeme Expression }
     -- Variable
-    : varid                        { Variable (unTkVarId `fmap` $1) <$ $1 }
+    : varid                             { Variable (unTkVarId `fmap` $1) <$ $1 }
+    -- Function call
+    | varid "(" MaybeExpressionList ")"   { FunctionCall (unTkVarId `fmap` $1) $3 <$ $1 }
     -- Literals
     | int                          { LitInt    (unTkInt    `fmap` $1) <$ $1 }
     | float                        { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
@@ -261,6 +276,10 @@ Expression :: { Lexeme Expression }
 ExpressionList :: { Seq (Lexeme Expression) }
     : Expression                          { singleton $1 }
     | ExpressionList "," Expression       { $1 |> $3     }
+
+MaybeExpressionList :: { Seq (Lexeme Expression) }
+    :                       { empty }
+    | ExpressionList        { $1    }
 
 {
 

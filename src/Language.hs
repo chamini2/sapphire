@@ -51,8 +51,10 @@ data Statement
     -- Definitions
     | StDeclaration (Seq (Lexeme Declaration))
     | StReturn      (Lexeme Expression)
-    | StFunctionDef (Lexeme Declaration) (Seq (Lexeme DataType))
-    | StFunctionImp (Lexeme Identifier)  (Seq (Lexeme Identifier)) (Seq (Lexeme Statement))
+    -- Functions
+    | StFunctionDef  (Lexeme Declaration) (Seq (Lexeme DataType))
+    | StFunctionImp  (Lexeme Identifier)  (Seq (Lexeme Identifier)) (Seq (Lexeme Statement))
+    | StFunctionCall (Lexeme Identifier)  (Seq (Lexeme Expression))
     -- I/O
     | StRead  (Seq (Lexeme Identifier))
     | StPrint (Seq (Lexeme Expression))
@@ -92,6 +94,8 @@ data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
 data Expression
     -- Variable
     = Variable (Lexeme Identifier)
+    -- Function call
+    | FunctionCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- Literals
     | LitInt    (Lexeme Int)
     | LitFloat  (Lexeme Float)
@@ -187,19 +191,37 @@ type Printer a = StateT PrintState (WriterT (Seq String) Identity) a
 ----
 printStatement :: Statement -> Printer ()
 printStatement st = case st of
+
     StNoop         -> return ()
+
     StAssign (Lex var _) (Lex expr _) -> do
         printNonTerminal "ASSIGNMENT"
         raiseTabs
         printNonTerminal $ "- variable: " ++ var
         printExpressionWithTag "- value: " expr
         lowerTabs
+
     StDeclaration ds -> do
         printNonTerminal "DECLARATION"
         raiseTabs
         DF.mapM_ ((\(Declaration ld _ _) -> printNonTerminal (show $ lexInfo ld)) . lexInfo) ds
         lowerTabs
+
     StReturn (Lex expr _)     -> printExpressionWithTag "RETURN" expr
+
+    StFunctionCall iden args -> do
+        printNonTerminal "FUNCTION CALL"
+        raiseTabs
+        printNonTerminal "- id: "
+        raiseTabs
+        printNonTerminal . show $ lexInfo iden
+        lowerTabs
+        printNonTerminal "- arguments: "
+        raiseTabs
+        DF.mapM_ (printExpression . lexInfo) args
+        lowerTabs
+        lowerTabs
+
     StFunctionDef dc dts      -> do
         printNonTerminal "FUNCTION DEFINITION"
         raiseTabs
@@ -220,6 +242,7 @@ printStatement st = case st of
             printNonTerminal . show $ lexInfo rt
             lowerTabs
         lowerTabs
+
     StFunctionImp iden _ body -> do
         printNonTerminal "FUNCTION IMPLEMENTATION"
         raiseTabs
@@ -229,18 +252,19 @@ printStatement st = case st of
         lowerTabs
         printStatements "- body" body
         lowerTabs
-    -- I/O
+
     StRead vars -> do
         printNonTerminal "READ"
         raiseTabs
         DF.mapM_ (printExpression . Variable) vars
         lowerTabs
+
     StPrint exprs -> do
         printNonTerminal "PRINT"
         raiseTabs
         DF.mapM_ (printExpression . lexInfo) exprs
         lowerTabs
-    -- Conditional
+
     StIf cond success failure -> do
         printNonTerminal "IF"
         raiseTabs
@@ -248,14 +272,16 @@ printStatement st = case st of
         printStatements "- success: " success
         printStatements "- failure: " failure
         lowerTabs
+
     StCase expr cases othrw -> printNonTerminal "CASE"
-    -- Loops
+
     StWhile cond body -> do
         printNonTerminal "WHILE"
         raiseTabs
         printExpressionWithTag "- guard: " (lexInfo cond)
         printStatements "- body: " body
         lowerTabs
+
     StFor var range body -> do
         printNonTerminal "FOR"
         raiseTabs
@@ -264,7 +290,9 @@ printStatement st = case st of
         printNonTerminal "- body: "
         raiseTabs >> DF.mapM_ (printStatement . lexInfo) body >> lowerTabs
         lowerTabs
+
     StBreak    -> printNonTerminal "BREAK"
+
     StContinue -> printNonTerminal "CONTINUE"
 
 ----

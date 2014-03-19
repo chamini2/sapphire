@@ -279,7 +279,9 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionDef dcl dts -> return ()
 
-    StFunctionImp iden args body -> return ()
+    StFunctionImp iden parms body -> return ()
+
+    StFunctionCall iden args -> return ()
 
     StRead vars -> return ()
 

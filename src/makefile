@@ -7,7 +7,8 @@ ifeq (run,$(firstword $(MAKECMDGOALS)))
 endif
 
 main: clean happy
-	ghc -O2 Sapphire.hs
+	@# ghc -O2 Sapphire.hs
+	ghc Sapphire.hs
 
 alex:
 	alex -g Lexer.x
