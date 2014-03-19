@@ -445,16 +445,19 @@ El campo para `<rango>` debe ser del estilo `Int..Int`, puede ser con identifica
 Ejemplos:
 
 ~~~ruby
-    while money > 0 do
-        spend(money)
+    repeat
         print money
+    end while money > 0 do
+        spend(money)
     end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    while <expr Bool> do
+    repeat
+        <stats..>
+    end while <expr Bool> do
         <stats..>
     end
 ~~~
@@ -474,7 +477,9 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    until <expr Bool> do
+    repeat
+        <stats..>
+    end until <expr Bool> do
         <stats..>
     end
 ~~~
