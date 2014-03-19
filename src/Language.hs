@@ -10,7 +10,7 @@ import           Data.Sequence as DS (Seq, singleton)
 type Position = (Int, Int) -- (Fila, Columna)
 
 showPosn :: Position -> String
-showPosn (line, col) = "line " ++ show line ++ ", column " ++ show col ++ ": "
+showPosn (line, col) = show line ++ "," ++ show col ++ ": "
 
 ----------------------------------------
 
@@ -48,7 +48,8 @@ data Statement
     -- Definitions
     | StDeclaration (Seq (Lexeme Declaration))
     | StReturn      (Lexeme Expression)
-    | StFunction    (Maybe (Lexeme Signature)) (Seq (Lexeme Statement))   
+    | StFunctionDef (Lexeme Declaration) (Seq (Lexeme DataType))
+    | StFunctionImp (Lexeme Identifier)  (Seq (Lexeme Identifier)) (Seq (Lexeme Statement))
     -- I/O
     | StRead  (Seq (Lexeme Identifier))
     | StPrint (Seq (Lexeme Expression))
@@ -78,7 +79,7 @@ data Category
     | CatDataType
     deriving (Eq, Show)
 
-data Signature = Signature (Seq (Lexeme DataType)) (Lexeme DataType) | Empty
+--data Signature = Signature (Seq (Lexeme DataType)) (Lexeme DataType)
 
 data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
     deriving (Show)
@@ -101,7 +102,7 @@ data Expression
 --    | ExpArray  ExpressionArray
 
 instance Show Expression where
-    show = runPrinter . printExpression 
+    show = runPrinter . printExpression
 
 data Range = FromTo (Lexeme Expression) (Lexeme Expression)
     deriving (Show)
@@ -195,24 +196,37 @@ printStatement st = case st of
         raiseTabs
         DF.mapM_ ((\(Declaration ld _ _) -> printNonTerminal (show $ lexInfo ld)) . lexInfo) ds
         lowerTabs
-    StReturn (Lex expr _) -> printExpressionWithTag "RETURN" expr
-    StFunction ls body    -> do
-        printNonTerminal "FUNCTION"
+    StReturn (Lex expr _)     -> printExpressionWithTag "RETURN" expr
+    StFunctionDef dc dts      -> do
+        printNonTerminal "FUNCTION DEFINITION"
         raiseTabs
-        case ls of
-            Just (Lex (Signature ds rt) _) -> do
-                printNonTerminal "SIGNATURE"
-                raiseTabs
-                DF.mapM_ (printNonTerminal . show) ds
-                lowerTabs
-                printNonTerminal "RETURN TYPE:"
-                raiseTabs
-                printNonTerminal $ show rt
-                lowerTabs
-            Nothing           -> printNonTerminal "NO SIGNATURE"
-        printStatements "BODY:" body
+        let Declaration iden rt cat = lexInfo dc
+            in do
+            printNonTerminal "- id: "
+            raiseTabs
+            printNonTerminal . show $ lexInfo iden
+            lowerTabs
+
+            printNonTerminal "- signature: "
+            raiseTabs
+            DF.mapM_ (printNonTerminal . show) dts
+            lowerTabs
+
+            printNonTerminal "- return type: "
+            raiseTabs
+            printNonTerminal . show $ lexInfo rt
+            lowerTabs
         lowerTabs
---    -- I/O
+    StFunctionImp iden _ body -> do
+        printNonTerminal "FUNCTION IMPLEMENTATION"
+        raiseTabs
+        printNonTerminal "- id: "
+        raiseTabs
+        printNonTerminal . show $ lexInfo iden
+        lowerTabs
+        printStatements "- body" body
+        lowerTabs
+    -- I/O
     StRead vars -> do
         printNonTerminal "READ"
         raiseTabs
@@ -223,7 +237,7 @@ printStatement st = case st of
         raiseTabs
         DF.mapM_ (printExpression . lexInfo) exprs
         lowerTabs
---    -- Conditional
+    -- Conditional
     StIf cond success failure -> do
         printNonTerminal "IF"
         raiseTabs
@@ -232,7 +246,7 @@ printStatement st = case st of
         printStatements "- failure: " failure
         lowerTabs
     StCase expr cases othrw -> printNonTerminal "CASE"
---    -- Loops
+    -- Loops
     StWhile cond body -> do
         printNonTerminal "WHILE"
         raiseTabs

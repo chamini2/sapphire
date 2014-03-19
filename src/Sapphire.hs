@@ -26,10 +26,9 @@ printProgram pr = do
         Program prog = stAst
     -- TEMPORAL
     print state
-    DF.mapM_ print prog
     mapM_ print writer
     putStrLn "-----------------------------------------------------------------"
-    -- /TEMPORAL
+    -- \TEMPORAL
 
     if null writer
         then DF.mapM_ print prog

@@ -273,7 +273,8 @@ checkStatement (Lex st posn) = case st of
             Nothing -> return ()
     StDeclaration ds             -> DF.mapM_ processDeclaration ds
     StReturn ex                  -> undefined ex
-    StFunction ms body           -> DF.mapM_ checkStatement body
+    StFunctionDef dcl dts        -> return ()
+    StFunctionImp iden args body -> DF.mapM_ checkStatement body
     StRead vars                  -> undefined vars
     StPrint exs                  -> DF.mapM_ checkExpression exs
     StIf cnd success failure     -> do
