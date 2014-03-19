@@ -6,6 +6,7 @@ imp hola(a,b) as                            # scope 1
 end
 
 # def otra :: () esto es necesario???
+# imp otra as   # Void -> Void              # scope 2
 imp otra() as   # Void -> Void              # scope 2
     for i in 0..20 do                       # scope 3
         Int k;
