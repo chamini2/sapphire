@@ -23,16 +23,16 @@ module SymbolTable
     , push
     ) where
 
-import           Language      (Category (CatVariable), DataType (Void),
-                                Identifier, Position)
+import           Language      
 
 import qualified Data.Foldable as DF
 import qualified Data.Map      as DM
-import           Data.Sequence as DS hiding (empty, update, drop)
+import           Data.Sequence as DS hiding (update, drop)
 import           Prelude       as P  hiding (lookup)
 
 data SymInfo = SymInfo
-    { dataType    :: DataType
+    { name        :: Identifier
+    , dataType    :: DataType
     , category    :: Category
     , value       :: Maybe Value
     , scopeNum    :: ScopeNum
@@ -41,8 +41,9 @@ data SymInfo = SymInfo
     }
 
 instance Show SymInfo where
-    show (SymInfo dt ct v sn dp i) = showSN ++ showCT ++ showDT ++ showV ++ showDP
+    show (SymInfo n dt ct v sn dp i) = showN ++ showSN ++ showCT ++ showDT ++ showV ++ showDP
         where
+            showN  = n ++ "\t"
             showDT = show dt
             showCT = show ct ++ " | "
             showV  = case v of
@@ -53,11 +54,12 @@ instance Show SymInfo where
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo {
+                 name        = [],
                  dataType    = Void,
                  category    = CatVariable,
                  value       = Nothing,
                  scopeNum    = -1,
-                 declPosn    = (0, 0), -- TODO Esto se debe conseguir del AlexPosn
+                 declPosn    = (0, 0),
                  initialized = False
                }
 
@@ -73,17 +75,18 @@ type ScopeNum = Int
 --------------------------------------------------------------------------------
 
 data Value
-    = ValInt  Int
-    | ValBool Bool
-    | ValChar Char
-    | ValFloat Float
-    deriving (Eq)
+    = ValInt      Int
+    | ValBool     Bool
+    | ValChar     Char
+    | ValFloat    Float
+    | ValFunction { parameters :: Seq (Lexeme DataType), body :: Seq (Lexeme Statement) } 
 
 instance Show Value where
     show (ValInt v)        = show v
     show (ValBool v)       = show v
     show (ValChar v)       = show v
     show (ValFloat v)      = show v
+    show (ValFunction p b) = DF.concatMap show p ++ DF.concatMap show b
 
 ----------------------------------------
 

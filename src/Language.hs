@@ -4,6 +4,7 @@ import           Prelude
 import           Control.Monad.State
 import           Control.Monad.Writer
 import           Control.Monad.Identity
+import           Data.Char           (toLower)
 import qualified Data.Foldable as DF (mapM_, foldr, toList)
 import           Data.Sequence as DS (Seq, singleton)
 
@@ -212,7 +213,7 @@ printStatement st = case st of
     StFunctionCall iden args -> do
         printNonTerminal "FUNCTION CALL"
         raiseTabs
-        printNonTerminal "- id: "
+        printNonTerminal "- function name: "
         raiseTabs
         printNonTerminal . show $ lexInfo iden
         lowerTabs
@@ -302,10 +303,17 @@ printStatement st = case st of
 printExpression :: Expression -> Printer ()
 printExpression e = case e of
     Variable  v      -> printNonTerminal $ "VARIABLE: "        ++ show (lexInfo v)
-    LitInt    c      -> printNonTerminal $ "INTEGER LITERAL: " ++ show (lexInfo c)
-    LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: " ++ show (lexInfo b)
-    LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "   ++ show (lexInfo f)
-    LitString s      -> printNonTerminal $ "STRING LITERAL: "  ++ show (lexInfo s)
+    FunctionCall iden args -> do
+        printNonTerminal "FUNCTION CALL"
+        raiseTabs
+        printNonTerminal "- function name:"
+        DF.mapM_ (printExpression . lexInfo) args
+        lowerTabs
+    LitInt    i      -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
+    LitChar   c      -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)
+    LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: "   ++ map toLower (show (lexInfo b))
+    LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "     ++ show (lexInfo f)
+    LitString s      -> printNonTerminal $ "STRING LITERAL: "    ++ show (lexInfo s)
     ExpBinary op l r -> do
         printNonTerminal "BINARY OPERATION"
         raiseTabs

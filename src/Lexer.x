@@ -98,7 +98,7 @@ tokens :-
         -- -- Conditionals
         "if"            { lex' TkIf             }
         "then"          { lex' TkThen           }
-        "elif"         { lex' TlElif          }
+        "elif"          { lex' TlElif           }
         "else"          { lex' TkElse           }
 
         "unless"        { lex' TkUnless         }

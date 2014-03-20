@@ -61,7 +61,9 @@ data StaticError
     = VariableNotDeclared    Identifier
     | VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
-    | AlreadyDeclared        Identifier Position
+    -- Functions
+    | FunctionNotDefined     Identifier
+    | FunctionNotDeclared    Identifier
     -- Statements
     | ConditionDataType DataType
     -- Operators
@@ -69,13 +71,16 @@ data StaticError
     | UnaryTypes  Unary  DataType
     -- General
     | StaticError String
+    | AlreadyDeclared        Identifier Position
 
 instance Show StaticError where
     -- Variables
     show (VariableNotDeclared var)     = "variable '" ++ var ++ "' has not been declared"
     show (VariableNotInitialized var)  = "variable '" ++ var ++ "' has not been initialized"
     show (InvalidAssignType var vt et) = "cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
-    show (AlreadyDeclared var p)       = "variable '" ++ var ++ "' has already been declared at " ++ show p
+    -- Functions
+    show (FunctionNotDeclared fname)   = "function '" ++ fname ++ "' has not been declared"
+    show (FunctionNotDefined fname)    = "must define function '" ++ fname ++ "' before implementing it"
     -- Statements
     show (ConditionDataType dt)        = "condition must be of type 'Bool', but is of type '" ++ show dt ++ "'"
     -- Operators
@@ -83,6 +88,7 @@ instance Show StaticError where
     show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'"
     -- General
     show (StaticError msg)             = msg
+    show (AlreadyDeclared var p)       = "identifier '" ++ var ++ "' has already been declared at " ++ show p
 
 --------------------------------------------------------------------------------
 
@@ -228,7 +234,7 @@ getScopeVariables = do
         funcFind stc (v, infos) = (v, find (\i -> scopeNum i `elem` stc) infos)
 
 {- |
-    Replaces the variables in the curren scope
+    Replaces the variables in the current scope
 -}
 putScopeVariables :: [(Identifier, SymInfo)] -> Checker ()
 putScopeVariables vars = return ()
@@ -251,8 +257,8 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
                }
     case lookup var tab of
         Nothing -> addSymbol varL info
-        Just (SymInfo _ _ _ sn op _)
-            | sn == cs  -> tell [SError posn $ AlreadyDeclared var op ]
+        Just (SymInfo _ _ _ _ sn op _)
+            | sn == cs  -> tell [SError posn $ AlreadyDeclared var op]
             | otherwise -> addSymbol varL info
 
 ----------------------------------------
@@ -287,13 +293,21 @@ checkStatement (Lex st posn) = case st of
 
     StDeclaration ds      -> DF.mapM_ processDeclaration ds
 
-    StReturn ex           -> checkExpression ex >> return ()
+    StReturn ex           -> void $ checkExpression ex 
 
-    StFunctionDef dcl dts -> return ()
+    StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
+        processDeclaration decl
+        putValue iden $ ValFunction dts empty
 
-    StFunctionImp iden parms body -> return ()
+    StFunctionImp fname@(Lex iden posn) params body -> do
+        val <- getsSymInfo fname value 
+        maybe failure success val
+        where failure    = tell [SError posn $ FunctionNotDefined iden]
+              success    = maybe failure success2 
+              success2 v = putValue fname $ ValFunction (parameters v) body
 
-    StFunctionCall iden args -> return ()
+
+    StFunctionCall fname args -> return ()
 
     StRead vars -> return ()
 
