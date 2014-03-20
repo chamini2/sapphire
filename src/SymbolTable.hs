@@ -135,7 +135,7 @@ update var f (SymTable m) = SymTable $ DM.alter func var m
             Nothing   -> error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
 
 {- |
-    Returns all the variables -----  MAYBE ONLY VISIBLE???
+    Returns all the variables
  -}
 accessible :: SymTable -> Seq (Identifier, Seq SymInfo)
 accessible (SymTable m) = DS.fromList $ DM.toList m

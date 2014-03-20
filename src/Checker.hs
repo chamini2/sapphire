@@ -3,14 +3,15 @@ module Checker where
 import           Language
 import           SymbolTable
 
-import           Control.Arrow          ((&&&), second)
-import           Control.Monad.Identity (Identity (..), runIdentity)
+import           Control.Arrow             ((&&&), second)
+import           Control.Monad.Identity    (Identity (..), runIdentity)
 import           Control.Monad.RWS
-import           Data.Foldable as DF    (mapM_, elem, toList)
-import           Data.Function          (on)
-import           Data.List              (sortBy, find)
-import           Data.Sequence as DS    (empty, singleton, Seq, (><))
-import           Prelude       as P     hiding (lookup, zipWith, elem)
+import           Data.Foldable    as DF    (mapM_, elem, toList)
+import           Data.Function             (on)
+import           Data.List                 (sortBy, find)
+import           Data.Sequence    as DS    (empty, singleton, Seq, (><))
+import           Data.Traversable as DT
+import           Prelude          as P     hiding (lookup, zipWith, elem)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -62,7 +63,7 @@ data StaticError
     | InvalidAssignType      Identifier DataType DataType
     | AlreadyDeclared        Identifier Position
     -- Statements
-    | IfConditionDataType    DataType
+    | ConditionDataType DataType
     -- Operators
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
@@ -76,10 +77,10 @@ instance Show StaticError where
     show (InvalidAssignType var vt et) = "cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
     show (AlreadyDeclared var p)       = "variable '" ++ var ++ "' has already been declared at " ++ show p
     -- Statements
-    show (IfConditionDataType dt)      = "condition of if statement must be of type 'Bool', but is of type '" ++ show dt ++ "'"
+    show (ConditionDataType dt)        = "condition must be of type 'Bool', but is of type '" ++ show dt ++ "'"
     -- Operators
     show (UnaryTypes op dt)            = "operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
-    show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'" -- ++ take 2 (concatMap (\dt -> ", '" ++ show dt) dts) ++ "'"
+    show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'"
     -- General
     show (StaticError msg)             = msg
 
@@ -157,7 +158,7 @@ getErrors errors = (only lexical, only parsing, only static)
 enterScope :: Checker ()
 enterScope = do
     cs <- gets currtSc
-    let sc    = Scope { serial = cs + 1 }
+    let sc = Scope { serial = cs + 1 }
     modify (\s -> s { stack = push sc (stack s), currtSc = cs + 1 })
 
 {- |
@@ -173,38 +174,42 @@ addSymbol :: Lexeme Identifier -> SymInfo -> Checker ()
 addSymbol (Lex var _) info = modify func
     where
         func s = s { table = insert var info (table s)}
+
 {- |
-    Gets a symbol's value said value exists in the table, otherwise Nothing
+    Gets a symbol's attribute if said symbol exists in the table, otherwise Nothing
 -}
-getSymInfoArg :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
-getSymInfoArg (Lex var posn) f = do
+getsSymInfo :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
+getsSymInfo (Lex var posn) f = do
     tab <- gets table
     maybe failure success $ lookup var tab
     where
         success = return . Just . f
-        failure = do
-            tell [SError posn $ VariableNotDeclared var]
-            return Nothing
+        failure = tell [SError posn $ VariableNotDeclared var] >> return Nothing
 
 {- |
-    Changes the value of the variable var to the value val in the symbol table
+    Modifies a symbol if said symbol exists in the table
 -}
-modifyValue :: Lexeme Identifier -> Value -> Checker ()
-modifyValue (Lex var posn) val = do
+modifySymInfo :: Lexeme Identifier -> (SymInfo -> SymInfo) -> Checker ()
+modifySymInfo (Lex var posn) f = do
     tab <- gets table
-    let mSym = lookup var tab
-    case mSym of
-        Just _  -> modify $ func tab
-        Nothing -> tell [SError posn $ VariableNotDeclared var]
+    maybe failure (success tab) $ lookup var tab
     where
-        func tab s = s { table = update var modValue tab }
-        modValue sy = sy { value = Just val }
+        success tab _ = modify (\s -> s { table = update var f tab })
+        failure       = tell [SError posn $ VariableNotDeclared var]
 
 {- |
-    Marks the variable var as initialized.
+    Changes the value of the variable to the value specified in the symbol table
+-}
+putValue :: Lexeme Identifier -> Value -> Checker ()
+putValue var val = modifySymInfo var (\sym -> sym { value = Just val })
+
+{- |
+    Marks the specifued variable as initialized
 -}
 markInitialized :: Identifier -> Checker ()
-markInitialized var = modify $ \s -> s { table = update var (\sym -> sym { initialized = True }) (table s) }
+markInitialized var = modify (\s -> s { table = update var func (table s) })
+    where
+        func sym = sym { initialized = True }
 
 {- |
     Returns the variables in the current scope
@@ -221,6 +226,13 @@ getScopeVariables = do
             (v, Just x)  -> (v,x) : b
             (_, Nothing) -> b
         funcFind stc (v, infos) = (v, find (\i -> scopeNum i `elem` stc) infos)
+
+{- |
+    Replaces the variables in the curren scope
+-}
+putScopeVariables :: [(Identifier, SymInfo)] -> Checker ()
+putScopeVariables vars = return ()
+
 
 ----------------------------------------
 
@@ -264,7 +276,7 @@ checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
     StAssign varL@(Lex var _) ex -> do
-        mayVarDt <- getSymInfoArg varL dataType
+        mayVarDt <- getsSymInfo varL dataType
         expDt    <- checkExpression ex
         case mayVarDt of
             Just varDt -> do
@@ -275,7 +287,7 @@ checkStatement (Lex st posn) = case st of
 
     StDeclaration ds      -> DF.mapM_ processDeclaration ds
 
-    StReturn ex           -> return ()
+    StReturn ex           -> checkExpression ex >> return ()
 
     StFunctionDef dcl dts -> return ()
 
@@ -294,32 +306,35 @@ checkStatement (Lex st posn) = case st of
                 before      <- getScopeVariables
                 stateBefore <- get
 
+                enterScope
                 checkStatements success
                 varSucc <- getScopeVariables
+                exitScope
 
-                -- Reiniciando el estado
                 stateSucc <- get
-                put stateBefore
+                putScopeVariables before
 
+                enterScope
                 checkStatements failure
                 varFail <- getScopeVariables
+                exitScope
 
                 stateFail <- get
-                put stateBefore
+                -- putScopeVariables before
 
                 --let after = zipWith3 zipFunc varSucc varFail before
-                --let after = foldr func [] $ sortBy (\(a,_) (b,_) -> compare a b) $ varSucc ++ varFail
+                let after = foldr func [] $ sortBy (\(a,_) (b,_) -> compare a b) $ varSucc ++ varFail
                     --final = foldr (func (||)) [] $ sortBy (\(a,_) (b,_) -> compare a b) $ before  ++ after
 
                 --forM_ after $
                 --    \(var,info) -> when (initialized info) $ markInitialized var
 
-                --tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
-                --tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
-                --tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
-                --tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
-                --tell [SError posn $ StaticError "---------------------------"]
-            _    -> tell [SError posn $ IfConditionDataType dt]
+                tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
+                tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
+                tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
+                tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
+                tell [SError posn $ StaticError "---------------------------"]
+            _    -> tell [SError posn $ ConditionDataType dt]
         where
             -- before || (varSucc && varFail) == initialized
             --zipFunc (_,sI) (_,fI) (var,bI) = (var, bI { initialized =
@@ -332,11 +347,21 @@ checkStatement (Lex st posn) = case st of
                         (False,_,_)      -> a : bs
                         _                -> (aVar, aInfo { initialized = False }) : tbs
 
-    StCase ex cs def -> return ()
+    StCase ex cs els -> do
+        dt  <- checkExpression ex
+        dts <- DT.mapM (\(Lex (Case cex _) _) -> checkExpression cex) cs
+        DF.mapM_ (\(Lex (Case _ sts) _) -> checkStatements sts) cs
+        checkStatements els
 
-    StLoop rep cnd sts -> return ()
+    StLoop rep cnd body -> do
+        dt <- checkExpression cnd
+        case dt of
+            Bool -> do
+                checkStatements rep
+                checkStatements body
+            _    -> tell [SError posn $ ConditionDataType dt]
 
-    StFor var rng sts -> return ()
+    StFor var rng body -> return ()
 
     StBreak -> return ()
 
@@ -348,12 +373,14 @@ checkStatement (Lex st posn) = case st of
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable varL@(Lex var _) -> do
-        mayInf <- getSymInfoArg varL (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
+        mayInf <- getsSymInfo varL (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
         case mayInf of
             Just (ini, dt) -> do
                 unless ini $ tell [SError posn $ VariableNotInitialized var]
                 return dt
             Nothing -> return Void
+
+    FunctionCall iden exs -> undefined
 
     LitInt _    -> return Int
 
