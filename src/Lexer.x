@@ -98,6 +98,7 @@ tokens :-
         -- -- Conditionals
         "if"            { lex' TkIf             }
         "then"          { lex' TkThen           }
+        "elsif"         { lex' TlElsif          }
         "else"          { lex' TkElse           }
 
         "unless"        { lex' TkUnless         }
@@ -183,7 +184,7 @@ data Token
     | TkRead | TkPrint
 
     -- -- Conditionals
-    | TkIf | TkThen | TkElse
+    | TkIf | TkThen | TlElsif | TkElse
     | TkUnless
     | TkCase | TkWhen
 

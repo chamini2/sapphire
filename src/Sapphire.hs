@@ -27,7 +27,7 @@ printProgram pr = do
     -- TEMPORAL
     print state
     mapM_ print writer
-    putStrLn "-----------------------------------------------------------------"
+    putStrLn "#################################################################\n"
     -- \TEMPORAL
 
     if null writer
