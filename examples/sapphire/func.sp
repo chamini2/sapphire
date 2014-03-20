@@ -1,4 +1,4 @@
-def func :: Int, Bool, String -> Bool
+def func :: Int, Bool, Char -> Bool
 
 imp func (i, valid, str) as
   if i % 3 == 0 and valid then

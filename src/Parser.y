@@ -63,7 +63,7 @@ import           Data.Sequence
         -- -- Conditionals
         "if"            { Lex TkIf          _ }
         "then"          { Lex TkThen        _ }
-        "elif"         { Lex TlElif       _ }
+        "elif"          { Lex TlElif        _ }
         "else"          { Lex TkElse        _ }
         "unless"        { Lex TkUnless      _ }
         "case"          { Lex TkCase        _ }
@@ -116,7 +116,7 @@ import           Data.Sequence
 --------------------------------------------------------------------------------
 -- Precedence
 -- -- Language
-%left ","
+%right ","
 
 -- -- Bool
 %left "or"
@@ -164,8 +164,8 @@ Statement :: { Lexeme Statement }
     | "if"     Expression "then" StatementList ElIfs "end"                      { StIf $2 $4 $5 <$ $1 }
     | "unless" Expression "then" StatementList "end"                            { StIf (negateExp $2) $4 empty <$ $1 }
     | "unless" Expression "then" StatementList "else" StatementList "end"       { StIf (negateExp $2) $4 $6    <$ $1 }
-    | "case" Expression CaseList "end"                                          { StCase $2 $3 empty <$ $1 }
-    | "case" Expression CaseList "else" StatementList "end"                     { StCase $2 $3 $5    <$ $1 }
+    | "case" Expression MaybeNewLine CaseList "end"                             { StCase $2 $4 empty <$ $1 }
+    | "case" Expression MaybeNewLine CaseList "else" StatementList "end"        { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
     | "read" VariableList       { StRead  $2 <$ $1 }
@@ -174,13 +174,17 @@ Statement :: { Lexeme Statement }
     -- Loops
     | "while" Expression "do" StatementList "end"       { StLoop empty $2             $4    <$ $1 }
     | "until" Expression "do" StatementList "end"       { StLoop empty (negateExp $2) $4    <$ $1 }
-    | "repeat" StatementList "end" "while" Expression       { StLoop $2 $5             empty <$ $1 }
-    | "repeat" StatementList "end" "until" Expression       { StLoop $2 (negateExp $5) empty <$ $1 }
-    | "repeat" StatementList "end" "while" Expression "do" StatementList "end"    { StLoop $2 $5             $7 <$ $1 }
-    | "repeat" StatementList "end" "until" Expression "do" StatementList "end"    { StLoop $2 (negateExp $5) $7 <$ $1 }
+    | "repeat" StatementList "end" MaybeNewLine "while" Expression       { StLoop $2 $6             empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNewLine "until" Expression       { StLoop $2 (negateExp $6) empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNewLine "while" Expression "do" StatementList "end"    { StLoop $2 $6             $8 <$ $1 }
+    | "repeat" StatementList "end" MaybeNewLine "until" Expression "do" StatementList "end"    { StLoop $2 (negateExp $6) $8 <$ $1 }
     | "for" varid "in" Expression "do" StatementList "end"      { StFor (unTkVarId `fmap` $2) $4 $6 <$ $1 }
     | "break"           { StBreak <$ $1    }
     | "continue"        { StContinue <$ $1 }
+
+MaybeNewLine :: { () }
+    :                       { }
+    | MaybeNewLine newline  { }
 
 Separator :: { () }
     : ";"           { }

@@ -339,7 +339,7 @@ Ejemplos:
 ~~~ruby
     if x%2==0 then
         print "even\n"
-    else if x%3 == 0 then
+    elif x%3 == 0 then
         print "threeven"    # esto no existe.
     else
         print "I dunno\n"
