@@ -11,11 +11,14 @@ if (y^2) > z then
   v = 2
 else
   Int a,b
+  a = 5
   if true then
     Int c
     w = 1
     x = 10
+    c = 3 * a
   else
+    b = 10
     w = 2
   end
 end

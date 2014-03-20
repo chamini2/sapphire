@@ -86,8 +86,6 @@ data Category
     | CatDataType
     deriving (Eq, Show)
 
---data Signature = Signature (Seq (Lexeme DataType)) (Lexeme DataType)
-
 data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
     deriving (Show)
 
@@ -123,22 +121,22 @@ data Binary
 
 instance Show Binary where
     show op = case op of
-        OpPlus    -> "'Arithmetic addition'"
-        OpMinus   -> "'Arithmetic substraction'"
-        OpTimes   -> "'Arithmetic multiplication'"
-        OpDivide  -> "'Arithmetic division'"
-        OpModulo  -> "'Arithmetic Modulo'"
-        OpPower   -> "'Arithmetic power'"
-        OpFromTo  -> "'Range construction operator'"
-        OpOr      -> "'Logical disjunction'"
-        OpAnd     -> "'Logical conjunction'"
-        OpEqual   -> "'Equal to'"
-        OpUnequal -> "'Not equal to'"
-        OpLess    -> "'Less than'"
-        OpLessEq  -> "'Less than or equal to'"
-        OpGreat   -> "'Greater than'"
-        OpGreatEq -> "'Greater than or equal to'"
-        OpBelongs -> "'Belongs to Range'"
+        OpPlus    -> "Arithmetic addition"
+        OpMinus   -> "Arithmetic substraction"
+        OpTimes   -> "Arithmetic multiplication"
+        OpDivide  -> "Arithmetic division"
+        OpModulo  -> "Arithmetic Modulo"
+        OpPower   -> "Arithmetic power"
+        OpFromTo  -> "Range construction operator"
+        OpOr      -> "Logical disjunction"
+        OpAnd     -> "Logical conjunction"
+        OpEqual   -> "Equal to"
+        OpUnequal -> "Not equal to"
+        OpLess    -> "Less than"
+        OpLessEq  -> "Less than or equal to"
+        OpGreat   -> "Greater than"
+        OpGreatEq -> "Greater than or equal to"
+        OpBelongs -> "Belongs to Range"
 
 binaryOperation :: Binary -> [((DataType, DataType), DataType)]
 binaryOperation op = case op of
