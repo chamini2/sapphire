@@ -63,7 +63,7 @@ import           Data.Sequence
         -- -- Conditionals
         "if"            { Lex TkIf          _ }
         "then"          { Lex TkThen        _ }
-        "elsif"         { Lex TlElsif       _ }
+        "elif"         { Lex TlElif       _ }
         "else"          { Lex TkElse        _ }
         "unless"        { Lex TkUnless      _ }
         "case"          { Lex TkCase        _ }
@@ -161,7 +161,7 @@ Statement :: { Lexeme Statement }
     | varid "(" MaybeExpressionList ")"                                     { StFunctionCall (unTkVarId `fmap` $1) $3 <$ $1 }
 
     -- Conditional
-    | "if" Expression "then" StatementList ElsIfs "end"                         { StIf $2 $4 $5 <$ $1 }
+    | "if"     Expression "then" StatementList ElIfs "end"                      { StIf $2 $4 $5 <$ $1 }
     | "unless" Expression "then" StatementList "end"                            { StIf (negateExp $2) $4 empty <$ $1 }
     | "unless" Expression "then" StatementList "else" StatementList "end"       { StIf (negateExp $2) $4 $6    <$ $1 }
     | "case" Expression CaseList "end"                                          { StCase $2 $3 empty <$ $1 }
@@ -186,10 +186,10 @@ Separator :: { () }
     : ";"           { }
     | newline       { }
 
-ElsIfs :: { Seq (Lexeme Statement) }
+ElIfs :: { Seq (Lexeme Statement) }
     :                           { empty }
     | "else" StatementList      { $2    }
-    | "elsif" Expression "then" StatementList ElsIfs { singleton $ StIf $2 $4 $5 <$ $1 }
+    | "elif" Expression "then" StatementList ElIfs { singleton $ StIf $2 $4 $5 <$ $1 }
 
 Case :: { Lexeme Case }
     : "when" Expression "do" StatementList      { Case $2 $4 <$ $1 }
