@@ -156,7 +156,7 @@ binaryOperation op = case op of
     OpLessEq  -> zip numbers [Bool, Bool]
     OpGreat   -> zip numbers [Bool, Bool]
     OpGreatEq -> zip numbers [Bool, Bool]
-    OpBelongs -> zip numbers [Bool, Bool]
+    OpBelongs -> zip [(Int,Range), (Float,Range)] [Bool, Bool]
     where
         numbers = [(Int,Int), (Float,Float)]
 
