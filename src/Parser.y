@@ -205,7 +205,8 @@ CaseList :: { Seq (Lexeme Case) }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"             { Int    <$ $1 }
+    : "Void"            { Void   <$ $1 }
+    | "Int"             { Int    <$ $1 }
     | "Float"           { Float  <$ $1 }
     | "Bool"            { Bool   <$ $1 }
     | "Char"            { Char   <$ $1 }

@@ -9,6 +9,7 @@ import           Control.Monad.RWS
 import           Data.Foldable    as DF    (mapM_, elem, toList)
 import           Data.Function             (on)
 import           Data.List                 (sortBy, find)
+import           Data.Maybe       as DM    (isJust)
 import           Data.Sequence    as DS    (empty, singleton, Seq, (><))
 import           Data.Traversable as DT
 import           Prelude          as P     hiding (lookup, elem)
@@ -177,31 +178,29 @@ exitScope = modify (\s -> s { stack = snd . pop $ stack s })
     Adds a symbol to the Checker's symbol table
 -}
 addSymbol :: Lexeme Identifier -> SymInfo -> Checker ()
-addSymbol (Lex var _) info = modify func
-    where
-        func s = s { table = insert var info (table s)}
+addSymbol (Lex var _) info = modify $ \s -> s { table = insert var info (table s)}
 
 {- |
     Gets a symbol's attribute if said symbol exists in the table, otherwise Nothing
 -}
 getsSymInfo :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
-getsSymInfo (Lex var posn) f = do
+getsSymInfo (Lex iden posn) f = do
     (tab, stck) <- gets (table &&& stack)
-    maybe failure success $ lookupWithScope var stck tab
+    maybe failure success $ lookupWithScope iden stck tab
     where
         success = return . Just . f
-        failure = tell [SError posn $ VariableNotDeclared var] >> return Nothing
+        failure = tell [SError posn $ VariableNotDeclared iden] >> return Nothing
 
 {- |
     Modifies a symbol if said symbol exists in the table
 -}
 modifySymInfo :: Lexeme Identifier -> (SymInfo -> SymInfo) -> Checker ()
-modifySymInfo (Lex var posn) f = do
-    (tab, stck) <- gets (table &&& stack)
-    maybe failure (success tab) $ lookupWithScope var stck tab
-    where
-        success tab _ = modify (\s -> s { table = update var f tab })
-        failure       = tell [SError posn $ VariableNotDeclared var]
+modifySymInfo var@(Lex iden posn) f = do
+    tab <- gets table
+    maySi <- getsSymInfo var id
+    case maySi of
+        Just var -> modify (\s -> s { table = updateWithScope iden (scopeNum var) f tab })
+        Nothing  -> return ()
 
 {- |
     Changes the value of the variable to the value specified in the symbol table
@@ -212,10 +211,8 @@ putValue var val = modifySymInfo var (\sym -> sym { value = Just val })
 {- |
     Marks the specifued variable as initialized
 -}
-markInitialized :: Identifier -> Checker ()
-markInitialized var = modify (\s -> s { table = update var func (table s) })
-    where
-        func sym = sym { initialized = True }
+markInitialized :: Lexeme Identifier -> Checker ()
+markInitialized var = modifySymInfo var (\sym -> sym { initialized = True })
 
 {- |
     Returns the variables in the current scope
@@ -289,7 +286,7 @@ checkStatement (Lex st posn) = case st of
         expDt    <- checkExpression ex
         case mayVarDt of
             Just varDt -> do
-                markInitialized var
+                markInitialized varL
                 unless (varDt == expDt) $
                     tell [SError posn $ InvalidAssignType var varDt expDt]
             Nothing -> return ()
@@ -339,7 +336,7 @@ checkStatement (Lex st posn) = case st of
                 let after = zipWith func varSucc varFail
 
                 forM_ after $
-                    \(var,info) -> when (initialized info) $ markInitialized var
+                    \(var,info) -> when (initialized info) $ markInitialized (Lex var (declPosn info))
 
                 tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
                 tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
