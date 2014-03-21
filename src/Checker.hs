@@ -11,7 +11,7 @@ import           Data.Function             (on)
 import           Data.List                 (sortBy, find)
 import           Data.Sequence    as DS    (empty, singleton, Seq, (><))
 import           Data.Traversable as DT
-import           Prelude          as P     hiding (lookup, zipWith, elem)
+import           Prelude          as P     hiding (lookup, elem)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -186,8 +186,8 @@ addSymbol (Lex var _) info = modify func
 -}
 getsSymInfo :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
 getsSymInfo (Lex var posn) f = do
-    tab <- gets table
-    maybe failure success $ lookup var tab
+    (tab, stck) <- gets (table &&& stack)
+    maybe failure success $ lookupWithScope var stck tab
     where
         success = return . Just . f
         failure = tell [SError posn $ VariableNotDeclared var] >> return Nothing
@@ -197,8 +197,8 @@ getsSymInfo (Lex var posn) f = do
 -}
 modifySymInfo :: Lexeme Identifier -> (SymInfo -> SymInfo) -> Checker ()
 modifySymInfo (Lex var posn) f = do
-    tab <- gets table
-    maybe failure (success tab) $ lookup var tab
+    (tab, stck) <- gets (table &&& stack)
+    maybe failure (success tab) $ lookupWithScope var stck tab
     where
         success tab _ = modify (\s -> s { table = update var f tab })
         failure       = tell [SError posn $ VariableNotDeclared var]
@@ -223,21 +223,24 @@ markInitialized var = modify (\s -> s { table = update var func (table s) })
 getScopeVariables :: Checker [(Identifier, SymInfo)]
 getScopeVariables = do
     vars <- gets $ accessible . table
-    stc <- gets stack
-    let stcS = fmap serial stc
-    return $ foldr (func stcS) [] . fmap (second DF.toList) $ DF.toList vars
+    stck <- gets stack
+    let stckS = fmap serial stck
+    tell [PError (0,0) $ ParseError (show stckS)]
+    return $ foldr (func stckS) [] . fmap (second DF.toList) $ DF.toList vars
     where
-        --func stc (_, info) = scopeNum info `elem` stc
         func stc a b = case funcFind stc a of
-            (v, Just x)  -> (v,x) : b
-            (_, Nothing) -> b
+            (v,Just x)  -> (v,x) : b
+            (_,Nothing) -> b
         funcFind stc (v, infos) = (v, find (\i -> scopeNum i `elem` stc) infos)
 
 {- |
     Replaces the variables in the current scope
 -}
 putScopeVariables :: [(Identifier, SymInfo)] -> Checker ()
-putScopeVariables vars = return ()
+putScopeVariables vars = forM_ vars $ \(var, si) -> do
+    tab <- gets table
+    let newTab = updateWithScope var (scopeNum si) (const si) tab
+    modify (\s -> s { table = newTab })
 
 
 ----------------------------------------
@@ -257,9 +260,9 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
                }
     case lookup var tab of
         Nothing -> addSymbol varL info
-        Just (SymInfo _ _ _ _ sn op _)
-            | sn == cs  -> tell [SError posn $ AlreadyDeclared var op]
-            | otherwise -> addSymbol varL info
+        Just si
+            | (scopeNum si) == cs  -> tell [SError posn $ AlreadyDeclared var (declPosn si)]
+            | otherwise            -> addSymbol varL info
 
 ----------------------------------------
 
@@ -293,17 +296,17 @@ checkStatement (Lex st posn) = case st of
 
     StDeclaration ds      -> DF.mapM_ processDeclaration ds
 
-    StReturn ex           -> void $ checkExpression ex 
+    StReturn ex           -> void $ checkExpression ex
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
         processDeclaration decl
         putValue iden $ ValFunction dts empty
 
     StFunctionImp fname@(Lex iden posn) params body -> do
-        val <- getsSymInfo fname value 
+        val <- getsSymInfo fname value
         maybe failure success val
         where failure    = tell [SError posn $ FunctionNotDefined iden]
-              success    = maybe failure success2 
+              success    = maybe failure success2
               success2 v = putValue fname $ ValFunction (parameters v) body
 
 
@@ -318,48 +321,34 @@ checkStatement (Lex st posn) = case st of
         case dt of
             Bool -> do
                 before      <- getScopeVariables
-                stateBefore <- get
 
                 enterScope
                 checkStatements success
-                varSucc <- getScopeVariables
                 exitScope
+                varSucc <- getScopeVariables
 
-                stateSucc <- get
                 putScopeVariables before
 
                 enterScope
                 checkStatements failure
-                varFail <- getScopeVariables
                 exitScope
+                varFail <- getScopeVariables
 
-                stateFail <- get
-                -- putScopeVariables before
+                putScopeVariables before
 
-                --let after = zipWith3 zipFunc varSucc varFail before
-                let after = foldr func [] $ sortBy (\(a,_) (b,_) -> compare a b) $ varSucc ++ varFail
-                    --final = foldr (func (||)) [] $ sortBy (\(a,_) (b,_) -> compare a b) $ before  ++ after
+                let after = zipWith func varSucc varFail
 
-                --forM_ after $
-                --    \(var,info) -> when (initialized info) $ markInitialized var
+                forM_ after $
+                    \(var,info) -> when (initialized info) $ markInitialized var
 
                 tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
                 tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
                 tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
                 tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
-                tell [SError posn $ StaticError "---------------------------"]
+
             _    -> tell [SError posn $ ConditionDataType dt]
         where
-            -- before || (varSucc && varFail) == initialized
-            --zipFunc (_,sI) (_,fI) (var,bI) = (var, bI { initialized =
-            --        initialized bI || initialized sI && initialized fI })
-            func a@(aVar,aInfo) bs = case bs of
-                [] -> [a]
-                ((bVar, bInfo) : tbs) ->
-                    case (aVar == bVar, initialized aInfo, initialized bInfo) of
-                        (True,True,True) -> (aVar, aInfo { initialized = True  }) : tbs
-                        (False,_,_)      -> a : bs
-                        _                -> (aVar, aInfo { initialized = False }) : tbs
+            func (a,sa) (b,sb) = (a, sa { initialized = (initialized sa && initialized sb) })
 
     StCase ex cs els -> do
         dt  <- checkExpression ex
@@ -387,7 +376,9 @@ checkStatement (Lex st posn) = case st of
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable varL@(Lex var _) -> do
-        mayInf <- getsSymInfo varL (initialized &&& dataType) -- (\si -> (initialized si, dataType si))
+        mayInf <- getsSymInfo varL (initialized &&& dataType)       -- (\si -> (initialized si, dataType si))
+        showth <- getsSymInfo varL id
+        tell [PError posn $ ParseError $ var ++ show showth]
         case mayInf of
             Just (ini, dt) -> do
                 unless ini $ tell [SError posn $ VariableNotInitialized var]
