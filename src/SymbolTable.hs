@@ -6,7 +6,9 @@ module SymbolTable
     , emptyTable
     , insert
     , lookup
+    , lookupWithScope
     , update
+    , updateWithScope
     , accessible
 
     , SymInfo(..)
@@ -23,16 +25,16 @@ module SymbolTable
     , push
     ) where
 
-import           Language      
+import           Language
 
+import           Control.Monad (forM)
 import qualified Data.Foldable as DF
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (update, drop)
 import           Prelude       as P  hiding (lookup)
 
 data SymInfo = SymInfo
-    { name        :: Identifier
-    , dataType    :: DataType
+    { dataType    :: DataType
     , category    :: Category
     , value       :: Maybe Value
     , scopeNum    :: ScopeNum
@@ -41,20 +43,18 @@ data SymInfo = SymInfo
     }
 
 instance Show SymInfo where
-    show (SymInfo n dt ct v sn dp i) = showN ++ showSN ++ showCT ++ showDT ++ showV ++ showDP
+    show (SymInfo dt ct v sn dp i) = showSN ++ showCT ++ showDT ++ showV ++ showDP
         where
-            showN  = n ++ "\t"
-            showDT = show dt
+            showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
+            showDT = show dt
             showV  = case v of
                 Just val -> " (" ++ show val ++ ") "
                 Nothing  -> " (" ++ show i ++ ") "
-            showSN = "Scope: " ++ show sn ++ ", "
             showDP = show dp
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo {
-                 name        = [],
                  dataType    = Void,
                  category    = CatVariable,
                  value       = Nothing,
@@ -79,7 +79,7 @@ data Value
     | ValBool     Bool
     | ValChar     Char
     | ValFloat    Float
-    | ValFunction { parameters :: Seq (Lexeme DataType), body :: Seq (Lexeme Statement) } 
+    | ValFunction { parameters :: Seq (Lexeme DataType), body :: Seq (Lexeme Statement) }
 
 instance Show Value where
     show (ValInt v)        = show v
@@ -125,17 +125,36 @@ lookup var (SymTable m) = do
         info :< _ -> Just info
 
 {- |
-    Update Actualiza el value de una variable, solo si la variable esta
-    en la tabla de símbolos
+    Looks up the symbol identifier in the specified scope in the symbol table
+ -}
+lookupWithScope :: Identifier -> (Stack Scope) -> SymTable -> Maybe SymInfo
+lookupWithScope var (Stack scopes) (SymTable m) = do
+    is <- DM.lookup var m
+    DF.msum $ map (\sc -> DF.find ((sc==) . scopeNum) is) $ map serial scopes
+
+{- |
+    Updates the SymInfo of a given identifier.
  -}
 update :: Identifier -> (SymInfo -> SymInfo) -> SymTable -> SymTable
 update var f (SymTable m) = SymTable $ DM.alter func var m
     where
         func mayIs = case mayIs of
-            (Just is) -> case viewl is of
-                i :< iss  -> Just $ f i <| iss
-                _         -> error $ "SymbolTable.update: No value to update for '" ++ var ++ "'"
-            Nothing   -> error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
+            Just is -> case viewl is of
+                i :< iss -> Just $ f i <| iss
+                _        -> error $ "SymbolTable.update: No value to update for '" ++ var ++ "'"
+            Nothing -> error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
+
+{- |
+    Updates the SymInfo of a given identifier, in a given scope.
+-}
+updateWithScope :: Identifier -> ScopeNum -> (SymInfo -> SymInfo) -> SymTable -> SymTable
+updateWithScope var sc f (SymTable m) = SymTable $ DM.alter func var m
+    where
+        func = maybe failure (Just . DF.foldr foldFunc empty)
+        failure = error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
+        foldFunc i is = if scopeNum i == sc
+            then f i <| is
+            else   i <| is
 
 {- |
     Returns all the variables
@@ -156,12 +175,28 @@ instance Functor Stack where
 instance DF.Foldable Stack where
     foldr f b (Stack s) = P.foldr f b s
 
+{- |
+    Shows the first element in the stack, if there are any, without popping it.
+-}
+peek :: Stack a -> (Maybe a, Stack a)
+peek s@(Stack [])      = (Nothing, s)
+peek s@(Stack (x : _)) = (Just x , s)
+
+{- |
+    Pushes an element to the stack.
+-}
 push :: a -> Stack a -> Stack a
 push element (Stack s) = Stack $ element : s
 
+{- |
+    Pops an element from the stack.
+-}
 pop :: Stack a -> (a, Stack a)
 pop (Stack [])      = error "SymbolTable.pop: Empty stack"
 pop (Stack (x : s)) = (x, Stack s)
 
+{- |
+    The scope stack has the inital scope by default.
+-}
 initialStack :: Stack Scope
 initialStack = Stack [initialScope]
