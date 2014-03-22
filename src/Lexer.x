@@ -105,6 +105,7 @@ tokens :-
 
         "case"          { lex' TkCase           }
         "when"          { lex' TkWhen           }
+        "otherwise"     { lex' TkOtherwise      }
 
         -- -- Loops
         "for"           { lex' TkFor            }
@@ -186,7 +187,7 @@ data Token
     -- -- Conditionals
     | TkIf | TkThen | TlElif | TkElse
     | TkUnless
-    | TkCase | TkWhen
+    | TkCase | TkWhen | TkOtherwise
 
     -- -- Loops
     | TkFor | TkIn | TkFromTo | TkDo
