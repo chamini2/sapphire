@@ -21,13 +21,13 @@ module SymbolTable
 
     , Stack
     , initialStack
+    , peek
     , pop
     , push
     ) where
 
 import           Language
 
-import           Control.Monad (forM)
 import qualified Data.Foldable as DF
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (update, drop)
@@ -127,10 +127,10 @@ lookup var (SymTable m) = do
 {- |
     Looks up the symbol identifier in the specified scope in the symbol table
  -}
-lookupWithScope :: Identifier -> (Stack Scope) -> SymTable -> Maybe SymInfo
+lookupWithScope :: Identifier -> Stack Scope -> SymTable -> Maybe SymInfo
 lookupWithScope var (Stack scopes) (SymTable m) = do
     is <- DM.lookup var m
-    DF.msum $ map (\sc -> DF.find ((sc==) . scopeNum) is) $ map serial scopes
+    DF.msum $ map ((\sc -> DF.find ((sc==) . scopeNum) is) . serial) scopes
 
 {- |
     Updates the SymInfo of a given identifier.
