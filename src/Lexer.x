@@ -14,11 +14,12 @@ module Lexer
     , alexGetPosn
     ) where
 
-import           Checker  (LexerError (..))
-import           Language (Position, Lexeme (..))
+import           Checker       (CheckError (LError), LexerError (..))
+import           Language      (Position, Lexeme (..))
 
-import           Prelude  hiding (lex)
-import           Data.List (foldl')
+import           Prelude       hiding (lex, null)
+import           Control.Monad (liftM)
+import           Data.Sequence (Seq, (|>), empty, null)
 
 }
 
@@ -40,11 +41,11 @@ $idchar = [$alpha $digit]
 @varid  = $small $idchar*
 @typeid = $large $idchar*
 
-@int    = $digit+
-@float  = $digit+(\.$digit+)?
-@string = \"($printable # [\"\\]|\\[abfnrtv]|\\$newline)*\"
-@stringerror = \"($printable # [\"\\]|\\[abfnrtv]|\\$newline)*
-@char   = \'$printable\'
+@int         = $digit+
+@float       = $digit+(\.$digit+)?
+@string      = \"(($printable # [\"\\])|\\[abfnrtv]|\\$newline)*\"
+@stringerror = \"(($printable # [\"\\])|\\[abfnrtv]|\\$newline)*
+@char        = \'$printable\'
 
 --------------------------------------------------------------------------------
 
@@ -127,7 +128,7 @@ tokens :-
         @float          { lex  (TkFloat . read) }
         @char           { lex  (TkChar . read)  }
         -- -- -- Filtering newlines
-        @string         { lex  (TkString . filterNewline) }
+        @string         { lex  (TkString . init . tail . filterNewline) }
 
         -- -- Num
         "+"             { lex' TkPlus           }
@@ -158,7 +159,7 @@ tokens :-
 
         -- Errors
         .               { lex (TkError . head) }
-        @stringerror    { lex TkStringError    }
+        @stringerror    { lex (TkStringError . tail . filterNewline) }
 
 {
 
@@ -222,10 +223,10 @@ data Token
 
 --------------------------------------------------------------------------------
 
-data AlexUserState = AlexUSt { lexerErrors :: [(LexerError, Lexeme Token)] }
+data AlexUserState = AlexUSt { lexerErrors :: Seq CheckError }
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUSt []
+alexInitUserState = AlexUSt empty
 
 -- some useful interaces to the Alex monad (which is naturally an instance of state monad)
 modifyUserState :: (AlexUserState -> AlexUserState) -> Alex ()
@@ -234,26 +235,17 @@ modifyUserState f = Alex $ \s -> let st = alex_ust s in Right (s {alex_ust = f s
 getUserState :: Alex AlexUserState
 getUserState = Alex (\s -> Right (s,alex_ust s))
 
---pushLexerError :: Token -> Alex ()
---pushLexerError t = alexGetPosn >>= \p -> modifyUserState (push $ Lex t p)
---    where
---       push :: Lexeme -> AlexUserState -> AlexUserState
---       push l (AlexUSt ls) = AlexUSt $ l : ls
-
-
---addLexerError :: Token -> Alex ()
---addLexerError t = do
 addLexerError :: Lexeme Token -> Alex ()
 addLexerError (Lex t p) = do
-    let error = case t of
-            TkError c       -> (UnexpectedChar c, Lex t p)
-            TkStringError s -> (StringError s   , Lex t p)
-    Alex $ \s -> let st = alex_ust s in Right (s { alex_ust = st { lexerErrors = error : (lexerErrors st) } } , () )
+    let err = case t of
+            TkError c       -> LError p $ UnexpectedChar c
+            TkStringError s -> LError p $ StringError s
+    modifyUserState $ \st -> st { lexerErrors = lexerErrors st |> err }
 
 ----------------------------------------
 
 filterNewline :: String -> String
-filterNewline = init . tail . foldr func []
+filterNewline = foldr func []
     where
         func c str = case (c,str) of
             ('\\','\n':'\r':strs) -> strs
@@ -272,12 +264,12 @@ toPosition :: AlexPosn -> Position
 toPosition (AlexPn _ line col) = (line,col)
 
 alexEOF :: Alex (Lexeme Token)
-alexEOF = alexGetPosn >>= return . Lex TkEOF
+alexEOF = liftM (Lex TkEOF) alexGetPosn
 
 -- Unfortunately, we have to extract the matching bit of string
 -- ourselves...
 lex :: (String -> Token) -> AlexAction (Lexeme Token)
-lex f = \(p,_,_,s) i -> return $ Lex (f $ take i s) (toPosition p)
+lex f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
 
 -- For constructing tokens that do not depend on
 -- the input
@@ -287,19 +279,19 @@ lex' = lex . const
 alexGetPosn :: Alex Position
 alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
 
-runAlex' :: String -> Alex a -> Either [(LexerError,Lexeme Token)] a
-runAlex' input (Alex f)
-   = case f (AlexState
+runAlex' :: String -> Alex a -> (Seq CheckError, a)
+runAlex' input (Alex f) =
+    let Right (st,a) = f state
+        ust = lexerErrors (alex_ust st)
+    in (ust,a)
+    where
+        state = AlexState
             { alex_pos = alexStartPos
             , alex_inp = input
             , alex_chr = '\n'
             , alex_bytes = []
             , alex_ust = alexInitUserState
-            , alex_scd = 0 }) of
-                Right (st,a) ->
-                    let ust = lexerErrors (alex_ust st)
-                    in if null ust
-                        then Right a
-                        else Left ust
+            , alex_scd = 0
+            }
 
 }
