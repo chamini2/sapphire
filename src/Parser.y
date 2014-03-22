@@ -6,10 +6,10 @@ import           Lexer
 import           Language
 import           Checker
 
-import           Prelude
-import qualified Data.Foldable as DF
+import qualified Data.Foldable     as DF
 import           Data.Functor
-import           Data.Sequence
+import           Data.Sequence     hiding (reverse)
+import           Prelude
 }
 
 %name parse
@@ -182,9 +182,12 @@ Statement :: { Lexeme Statement }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
 
+    -- Error
+    | error Separator   { Lex StNoop (0,0) }
+
 MaybeNewLine :: { () }
-    :                       { }
-    | MaybeNewLine newline  { }
+    :                           { }
+    | MaybeNewLine newline      { }
 
 Separator :: { () }
     : ";"           { }
@@ -250,9 +253,9 @@ SignatureReturn :: { Lexeme DataType }
 
 Expression :: { Lexeme Expression }
     -- Variable
-    : varid                             { Variable (unTkVarId `fmap` $1) <$ $1 }
+    : varid                                 { Variable (unTkVarId `fmap` $1) <$ $1 }
     -- Function call
-    | varid "(" MaybeExpressionList ")"   { FunctionCall (unTkVarId `fmap` $1) $3 <$ $1 }
+    | varid "(" MaybeExpressionList ")"     { FunctionCall (unTkVarId `fmap` $1) $3 <$ $1 }
     -- Literals
     | int                          { LitInt    (unTkInt    `fmap` $1) <$ $1 }
     | float                        { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
@@ -297,15 +300,9 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 negateExp :: Lexeme Expression -> Lexeme Expression
 negateExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
---expError :: DataType -> String -> Checker Expression
---expError dt str = do
---    tell [SError $ StaticError str]
---    return $ ExpError dt
-
---parseError :: a -> String -> Checker a
---parseError identity str = do
---    tell [PError $ UnexpectedToken str]
---    return identity
+--parseError :: Lexeme Token -> Checker ()
+--parseError (Lex tk posn) = do
+--    tell [PError posn $ UnexpectedToken (show tk)]
 
 --------------------------------------------------------------------------------
 
@@ -320,13 +317,14 @@ lexWrap cont = do
         Lex (TkStringError str) p -> do
             p <- alexGetPosn
             addLexerError t
-            lexWrap cont
+            -- Simulates that the String was correctly constructed
+            cont $ TkString str <$ t
         _         -> cont t
 
 happyError :: Lexeme Token -> Alex a
 happyError (Lex t p) = fail $ showPosn p ++ "Parse error on Token: " ++ show t ++ "\n"
 
-parseProgram :: String -> Either [(LexerError, Lexeme Token)] Program
+parseProgram :: String -> (Seq CheckError, Program)
 parseProgram input = runAlex' input parse
 
 }
