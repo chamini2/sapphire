@@ -6,6 +6,7 @@ import           Lexer
 import           Language
 import           Checker
 
+import           Control.Arrow     (first)
 import qualified Data.Foldable     as DF
 import           Data.Functor
 import           Data.Sequence     hiding (reverse)
@@ -144,15 +145,15 @@ Program :: { Program }
     : StatementList         { Program $1 }
 
 StatementList :: { Seq (Lexeme Statement) }
-    : Statement                             { singleton $1 }
-    | StatementList Separator Statement     { $1 |> $3     }
+    : Statement                             { fromDeclarationList $1       }
+    | StatementList Separator Statement     { $1 >< fromDeclarationList $3 }
 
 Statement :: { Lexeme Statement }
     :                           { Lex StNoop (0,0) }      -- λ, no-operation
     | varid "=" Expression      { (flip StAssign $3 . (<$ $1) . unTkVarId) `fmap` $1 }
 
     -- Definitions
-    | DataType DeclareVariableList  { (StDeclaration $ fmap (\(lVar,lExp) -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
+    | DataType DeclareVariableList  { (StDeclarationList $ fmap (first $ \lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
     | "return" Expression           { StReturn $2 <$ $1 }
 
     -- Functions
@@ -299,6 +300,17 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 
 negateExp :: Lexeme Expression -> Lexeme Expression
 negateExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
+
+fromDeclarationList :: Lexeme Statement -> Seq (Lexeme Statement)
+fromDeclarationList st = case lexInfo st of
+    StDeclarationList dcls -> DF.foldr func empty dcls
+        where
+            func (dcl@(Lex (Declaration var _ _) _), mayExpr) sts = flip (><) sts $ case mayExpr of
+                Just expr -> fromList [StDeclaration dcl <$ dcl, StAssign var expr <$ expr]
+                Nothing   -> singleton $ StDeclaration dcl <$ dcl
+    -- Any other statement
+    _ -> singleton st
+
 
 --parseError :: Lexeme Token -> Checker ()
 --parseError (Lex tk posn) = do

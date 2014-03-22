@@ -27,10 +27,10 @@ imp otra() as   # Void -> Void              # scope 2
   end
 
   Bool b = false;
+  Int i = 10
 
   until b do                              # scope 8
-    Int i
-    read i
+    i = i * 3 / 2
     b = i % 2 == 1;
   end
 end

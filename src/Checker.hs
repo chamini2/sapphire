@@ -8,6 +8,7 @@ import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
 import           Data.Foldable          as DF (elem, mapM_, toList)
 import           Data.Function          (on)
+import           Data.Functor           ((<$))
 import           Data.List              (find, sortBy)
 import           Data.Sequence          as DS (Seq, empty)
 import           Data.Traversable       as DT
@@ -291,7 +292,7 @@ checkStatement (Lex st posn) = case st of
                     tell [SError posn $ InvalidAssignType var varDt expDt]
             Nothing -> return ()
 
-    StDeclaration ds      -> DF.mapM_ processDeclaration ds
+    StDeclaration dcl     -> processDeclaration dcl
 
     StReturn ex           -> void $ checkExpression ex
 

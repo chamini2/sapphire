@@ -50,9 +50,10 @@ data Statement
     = StNoop
     | StAssign (Lexeme Identifier) (Lexeme Expression)
     -- Definitions
-    | StDeclaration (Seq (Lexeme Declaration))
-    | StReturn      (Lexeme Expression)
+    | StDeclaration     (Lexeme Declaration)
+    | StDeclarationList (Seq (Lexeme Declaration, Maybe (Lexeme Expression)))
     -- Functions
+    | StReturn      (Lexeme Expression)
     | StFunctionDef  (Lexeme Declaration) (Seq (Lexeme DataType))
     | StFunctionImp  (Lexeme Identifier)  (Seq (Lexeme Identifier)) (Seq (Lexeme Statement))
     | StFunctionCall (Lexeme Identifier)  (Seq (Lexeme Expression))
@@ -202,10 +203,10 @@ printStatement st = case st of
         printExpressionWithTag "- value: " expr
         lowerTabs
 
-    StDeclaration ds -> do
+    StDeclaration (Lex (Declaration ld dt _) _) -> do
         printNonTerminal "DECLARATION"
         raiseTabs
-        DF.mapM_ ((\(Declaration ld _ _) -> printNonTerminal (show $ lexInfo ld)) . lexInfo) ds
+        printNonTerminal $ show (lexInfo dt) ++ " " ++ lexInfo ld
         lowerTabs
 
     StReturn (Lex expr _)     -> printExpressionWithTag "RETURN" expr

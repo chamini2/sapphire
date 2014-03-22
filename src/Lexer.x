@@ -56,7 +56,6 @@ tokens :-
         "#".*           ;
 
         -- Language
-        --$newline      { lex' TkNewLine        }
         @skip           { lex' TkNewLine        }
         "end"           { lex' TkEnd            }
         "return"        { lex' TkReturn         }
