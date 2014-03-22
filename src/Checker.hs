@@ -5,14 +5,17 @@ import           SymbolTable
 
 import           Control.Arrow          (second, (&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
-import           Control.Monad.RWS
-import           Data.Foldable          as DF (elem, mapM_, toList)
+import           Control.Monad.RWS      hiding (forM, forM_, mapM_)
+import           Data.Foldable          as DF (elem, foldr, forM_, mapM_,
+                                               toList)
 import           Data.Function          (on)
 import           Data.Functor           ((<$))
 import           Data.List              (find, sortBy)
-import           Data.Sequence          as DS (Seq, empty)
-import           Data.Traversable       as DT
-import           Prelude                as P hiding (elem, lookup)
+import           Data.Sequence          as DS (Seq, empty, fromList, index,
+                                               singleton, zipWith, (<|), (|>))
+import           Data.Traversable       as DT (forM)
+import           Prelude                as P hiding (elem, foldr, lookup, mapM_,
+                                              zipWith)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -21,7 +24,7 @@ data Flag = OutputFile String | SupressWarnings
 
 --------------------------------------------------------------------------------
 
-type CheckWriter = [CheckError]
+type CheckWriter = Seq CheckError
 
 data CheckError
     = LError Position LexerError
@@ -67,6 +70,10 @@ data StaticError
     | FunctionNotDeclared    Identifier
     -- Statements
     | ConditionDataType DataType
+    | CaseWhenDataType  DataType DataType
+    | ForInDataType     DataType
+    | BreakOutsideLoop
+    | ContinueOutsideLoop
     -- Operators
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
@@ -83,7 +90,11 @@ instance Show StaticError where
     show (FunctionNotDeclared fname)   = "function '" ++ fname ++ "' has not been declared"
     show (FunctionNotDefined fname)    = "must define function '" ++ fname ++ "' before implementing it"
     -- Statements
-    show (ConditionDataType dt)        = "condition must be of type 'Bool', but is of type '" ++ show dt ++ "'"
+    show (ConditionDataType dt)        = "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
+    show (CaseWhenDataType dt wd)      = "case has expression of type '" ++ show dt ++ "' but when has expression of type '" ++ show wd ++ "'"
+    show (ForInDataType dt)            = "for statement must iterate over expression of type 'Range', but it is of type '" ++ show dt ++ "'"
+    show BreakOutsideLoop              = "break statement not within loop"
+    show ContinueOutsideLoop           = "continue statement not within loop"
     -- Operators
     show (UnaryTypes op dt)            = "operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
     show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'"
@@ -98,15 +109,18 @@ data CheckState = CheckState
     , stack   :: Stack Scope
     , currtSc :: ScopeNum
     , ast     :: Program
+    , loop    :: LoopLevel
     }
 
 instance Show CheckState where
-    show (CheckState t s c a) = showT ++ showS ++ showC ++ showA
+    show (CheckState t s c a _) = showT ++ showS ++ showC ++ showA
         where
             showT = "Symbol Table:\n" ++ show t ++ "\n"
             showS = "Scope Stack:\n"  ++ show s ++ "\n"
             showC = "Scope Number:\t" ++ show c ++ "\n"
             showA = "Program:\n"      ++ show a ++ "\n"
+
+type LoopLevel = Int
 
 --------------------------------------------------------------------------------
 
@@ -124,6 +138,7 @@ initialState = CheckState
     , stack    = initialStack
     , currtSc  = 0
     , ast      = Program DS.empty
+    , loop     = 0
     }
 
 ----------------------------------------
@@ -146,7 +161,7 @@ getState = (\(_,s,_) -> s) . runChecker
 getErrors :: CheckWriter -> ([CheckError], [CheckError], [CheckError])
 getErrors errors = (only lexical, only parsing, only static)
     where
-        only f = sortBy compare $ filter f errors
+        only f = sortBy compare . filter f $ toList errors
         lexical e = case e of
             (LError _ _) -> True
             _            -> False
@@ -175,6 +190,19 @@ exitScope :: Checker ()
 exitScope = modify (\s -> s { stack = snd . pop $ stack s })
 
 {- |
+    Entering a loop
+-}
+enterLoop :: Checker ()
+enterLoop = modify (\s -> s { loop = loop s + 1 })
+
+{- |
+    Exiting a loop
+-}
+exitLoop :: Checker ()
+exitLoop = modify (\s -> s { loop = loop s - 1 })
+
+
+{- |
     Adds a symbol to the Checker's symbol table
 -}
 addSymbol :: Lexeme Identifier -> SymInfo -> Checker ()
@@ -189,7 +217,7 @@ getsSymInfo (Lex iden posn) f = do
     maybe failure success $ lookupWithScope iden stck tab
     where
         success = return . Just . f
-        failure = tell [SError posn $ VariableNotDeclared iden] >> return Nothing
+        failure = tell (singleton $ SError posn $ VariableNotDeclared iden) >> return Nothing
 
 {- |
     Modifies a symbol if said symbol exists in the table
@@ -217,28 +245,35 @@ markInitialized var = modifySymInfo var (\sym -> sym { initialized = True })
 {- |
     Returns the variables in the current scope
 -}
-getScopeVariables :: Checker [(Identifier, SymInfo)]
+getScopeVariables :: Checker (Seq (Identifier, SymInfo))
 getScopeVariables = do
     vars <- gets $ accessible . table
     stck <- gets stack
     let stckS = fmap serial stck
-    tell [PError (0,0) $ ParseError (show stckS)]
-    return $ foldr (func stckS) [] . fmap (second DF.toList) $ DF.toList vars
+    return $ foldr (func stckS) empty . fmap (second toList) $ toList vars
     where
         func stc a b = case funcFind stc a of
-            (v,Just x)  -> (v,x) : b
+            (v,Just x)  -> (v,x) <| b
             (_,Nothing) -> b
         funcFind stc (v, infos) = (v, find (\i -> scopeNum i `elem` stc) infos)
 
 {- |
     Replaces the variables in the current scope
 -}
-putScopeVariables :: [(Identifier, SymInfo)] -> Checker ()
+putScopeVariables :: Seq (Identifier, SymInfo) -> Checker ()
 putScopeVariables vars = forM_ vars $ \(var, si) -> do
     tab <- gets table
     let newTab = updateWithScope var (scopeNum si) (const si) tab
     modify (\s -> s { table = newTab })
 
+
+checkInitialization :: Seq (Seq (Identifier, SymInfo)) -> Seq (Identifier, SymInfo)
+checkInitialization scopes = foldr (zipWith func) (index scopes 0) scopes
+    where
+        func :: (Identifier, SymInfo) -> (Identifier, SymInfo) -> (Identifier, SymInfo)
+        func (a,sa) (b,sb) = if a /= b
+            then error "Checker.checkInitialization: zipping different variabls"
+            else (a, sa { initialized = initialized sa && initialized sb })
 
 ----------------------------------------
 
@@ -258,7 +293,7 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
     case lookup var tab of
         Nothing -> addSymbol varL info
         Just si
-            | scopeNum si == cs  -> tell [SError posn $ AlreadyDeclared var (declPosn si)]
+            | scopeNum si == cs  -> tell (singleton $ SError posn $ AlreadyDeclared var (declPosn si))
             | otherwise          -> addSymbol varL info
 
 ----------------------------------------
@@ -267,13 +302,13 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
     Checks the validity of each statement of the program, modifying the state.
 -}
 checkProgram :: Seq CheckError -> Program -> Checker ()
-checkProgram lerrors pr@(Program sts) = do
+checkProgram lexErrors pr@(Program sts) = do
     modify (\s -> s { ast = pr })
-    tell $ DF.toList lerrors
+    tell lexErrors
     checkStatements sts
 
 checkStatements :: Seq (Lexeme Statement) -> Checker ()
-checkStatements = DF.mapM_ checkStatement
+checkStatements = mapM_ checkStatement
 
 {- |
     Checks the validity of a statement, modifying the state.
@@ -289,84 +324,117 @@ checkStatement (Lex st posn) = case st of
             Just varDt -> do
                 markInitialized varL
                 unless (varDt == expDt) $
-                    tell [SError posn $ InvalidAssignType var varDt expDt]
+                    tell (singleton $ SError posn $ InvalidAssignType var varDt expDt)
             Nothing -> return ()
 
-    StDeclaration dcl     -> processDeclaration dcl
+    StDeclaration dcl -> processDeclaration dcl
 
-    StReturn ex           -> void $ checkExpression ex
+    StReturn ex       -> void $ checkExpression ex
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
         processDeclaration decl
         putValue iden $ ValFunction dts empty
 
-    StFunctionImp fname@(Lex iden _) params body -> do
+    --StFunctionImp fname@(Lex iden _) params body -> do
+    StFunctionImp fname@(Lex iden _) _ body -> do
         val <- getsSymInfo fname value
         maybe failure success val
-        where failure    = tell [SError posn $ FunctionNotDefined iden]
-              success    = maybe failure success2
-              success2 v = putValue fname $ ValFunction (parameters v) body
+        where failure = tell (singleton $ SError posn $ FunctionNotDefined iden)
+              success = maybe failure func
+              func v  = putValue fname $ ValFunction (parameters v) body
 
+    --StFunctionCall fname args -> return ()
+    StFunctionCall _ _ -> return ()
 
-    StFunctionCall fname args -> return ()
+    StRead vars -> forM_ vars $ \varL -> do
+        mayInf <- getsSymInfo varL dataType
+        case mayInf of
+            --Just dt -> markInitialized varL
+            Just _ -> markInitialized varL
+            Nothing -> return ()
 
-    StRead vars -> return ()
-
-    StPrint exs -> DF.mapM_ checkExpression exs
+    StPrint exs -> mapM_ checkExpression exs
 
     StIf cnd success failure -> do
-        dt <- checkExpression cnd
-        case dt of
-            Bool -> do
-                before      <- getScopeVariables
+        checkExpression cnd >>= \dt -> unless (dt == Bool) $ tell (singleton $ SError posn $ ConditionDataType dt)
 
-                enterScope
-                checkStatements success
-                exitScope
-                varSucc <- getScopeVariables
+        before <- getScopeVariables
 
-                putScopeVariables before
+        enterScope
+        checkStatements success
+        exitScope
+        varSucc <- getScopeVariables
 
-                enterScope
-                checkStatements failure
-                exitScope
-                varFail <- getScopeVariables
+        putScopeVariables before
 
-                putScopeVariables before
+        enterScope
+        checkStatements failure
+        exitScope
+        varFail <- getScopeVariables
 
-                let after = zipWith func varSucc varFail
+        putScopeVariables before
 
-                forM_ after $
-                    \(var,info) -> when (initialized info) $ markInitialized (Lex var (declPosn info))
-
-                tell [SError posn $ StaticError ("before:" ++ concatMap (("\n\t\t"++) . show) before)]
-                tell [SError posn $ StaticError ("varSucc:" ++ concatMap (("\n\t\t"++) . show) varSucc)]
-                tell [SError posn $ StaticError ("varFail:" ++ concatMap (("\n\t\t"++) . show) varFail)]
-                tell [SError posn $ StaticError ("after:" ++ concatMap (("\n\t\t"++) . show) after)]
-
-            _    -> tell [SError posn $ ConditionDataType dt]
-        where
-            func (a,sa) (_,sb) = (a, sa { initialized = initialized sa && initialized sb })
+        forM_ (checkInitialization $ fromList [varSucc,varFail]) $
+            \(var,info) -> when (initialized info) $ markInitialized (Lex var (declPosn info))
 
     StCase ex cs els -> do
-        dt  <- checkExpression ex
-        dts <- DT.mapM (\(Lex (Case cex _) _) -> checkExpression cex) cs
-        DF.mapM_ (\(Lex (Case _ sts) _) -> checkStatements sts) cs
+        dt <- checkExpression ex
+        before <- getScopeVariables
+
+        varScopes <- forM cs $ \(Lex (When wexps sts) wposn) -> do
+            --forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
+            forM_ wexps $ checkExpression >=> \wd ->
+                when (wd /= dt) $ tell (singleton $ SError wposn $ CaseWhenDataType dt wd)
+
+            enterScope
+            checkStatements sts
+            exitScope
+            getScopeVariables
+
+        enterScope
         checkStatements els
+        exitScope
+        varOtherwise <- getScopeVariables
+
+        putScopeVariables before
+        forM_ (checkInitialization $ varScopes |> varOtherwise) $
+            \(var,info) -> when (initialized info) $ markInitialized (Lex var (declPosn info))
 
     StLoop rep cnd body -> do
-        dt <- checkExpression cnd
-        case dt of
-            Bool -> do
-                checkStatements rep
-                checkStatements body
-            _    -> tell [SError posn $ ConditionDataType dt]
+        enterScope >> enterLoop
+        checkStatements rep
+        exitLoop >> exitScope
 
-    StFor var rng body -> return ()
+        checkExpression cnd >>= \dt -> unless (dt == Bool) $ tell (singleton $ SError posn $ ConditionDataType dt)
 
-    StBreak -> return ()
+        before <- getScopeVariables
 
-    StContinue -> return ()
+        enterScope >> enterLoop
+        checkStatements body
+        exitLoop >> exitScope
+
+        putScopeVariables before
+
+    StFor var rng body -> do
+        dt <- checkExpression rng
+        unless (dt == Range) $ tell (singleton $ SError posn $ ForInDataType dt)
+
+        before <- getScopeVariables
+
+        enterScope >> enterLoop
+        processDeclaration $ Declaration var (Int <$ var) CatVariable <$ var
+        checkStatements body
+        exitLoop >> exitScope
+
+        putScopeVariables before
+
+    StBreak -> do
+        loopL <- gets loop
+        unless (loopL > 0) $ tell (singleton $ SError posn BreakOutsideLoop)
+
+    StContinue -> do
+        loopL <- gets loop
+        unless (loopL > 0) $ tell (singleton $ SError posn ContinueOutsideLoop)
 
 {- |
     Checks the validity of an expression and returns it's value.
@@ -375,15 +443,14 @@ checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable varL@(Lex var _) -> do
         mayInf <- getsSymInfo varL (initialized &&& dataType)       -- (\si -> (initialized si, dataType si))
-        showth <- getsSymInfo varL id
-        tell [PError posn $ ParseError $ var ++ show showth]
         case mayInf of
             Just (ini, dt) -> do
-                unless ini $ tell [SError posn $ VariableNotInitialized var]
+                unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
                 return dt
             Nothing -> return Void
 
-    FunctionCall iden exs -> undefined
+    --FunctionCall iden exs -> undefined
+    FunctionCall _ _ -> undefined
 
     LitInt _    -> return Int
 
@@ -401,7 +468,7 @@ checkExpression (Lex e posn) = case e of
         let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
         if null dts
             then do
-                tell [SError posn $ BinaryTypes op (ldt,rdt)]
+                tell (singleton $ SError posn $ BinaryTypes op (ldt,rdt))
                 return . snd . head $ binaryOperation op
             else return . snd $ head dts
 
@@ -410,6 +477,6 @@ checkExpression (Lex e posn) = case e of
         let dts = filter ((dt==) . fst) $ unaryOperation op
         if null dts
             then do
-                tell [SError posn $ UnaryTypes op dt]
+                tell (singleton $ SError posn $ UnaryTypes op dt)
                 return . snd . head $ unaryOperation op
             else return . snd $ head dts
