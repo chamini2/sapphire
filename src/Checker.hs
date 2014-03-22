@@ -3,16 +3,15 @@ module Checker where
 import           Language
 import           SymbolTable
 
-import           Control.Arrow             ((&&&), second)
-import           Control.Monad.Identity    (Identity (..), runIdentity)
+import           Control.Arrow          (second, (&&&))
+import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS
-import           Data.Foldable    as DF    (mapM_, elem, toList)
-import           Data.Function             (on)
-import           Data.List                 (sortBy, find)
-import           Data.Maybe       as DM    (isJust)
-import           Data.Sequence    as DS    (empty, singleton, Seq, (><))
-import           Data.Traversable as DT
-import           Prelude          as P     hiding (lookup, elem)
+import           Data.Foldable          as DF (elem, mapM_, toList)
+import           Data.Function          (on)
+import           Data.List              (find, sortBy)
+import           Data.Sequence          as DS (Seq, empty)
+import           Data.Traversable       as DT
+import           Prelude                as P hiding (elem, lookup)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -45,12 +44,12 @@ data LexerError
     | LexerError     String
 
 instance Show LexerError where
-    show (UnexpectedChar c) = "unexpected character'" ++ [c] ++ "'"
-    show (StringError str)  = "missing matching '\"' for string '" ++ str ++ "'"
+    show (UnexpectedChar c) = "unexpected character '" ++ [c] ++ "'"
+    show (StringError str)  = "missing matching \" for string " ++ show str
     show (LexerError  msg)  = msg
 
 data ParseError
-    = UnexpectedToken String{-Token-}
+    = UnexpectedToken String -- show Token
     | ParseError      String
 
 instance Show ParseError where
@@ -94,10 +93,10 @@ instance Show StaticError where
 --------------------------------------------------------------------------------
 
 data CheckState = CheckState
-    { table    :: SymTable
-    , stack    :: Stack Scope
-    , currtSc  :: ScopeNum
-    , ast      :: Program
+    { table   :: SymTable
+    , stack   :: Stack Scope
+    , currtSc :: ScopeNum
+    , ast     :: Program
     }
 
 instance Show CheckState where
@@ -195,12 +194,12 @@ getsSymInfo (Lex iden posn) f = do
     Modifies a symbol if said symbol exists in the table
 -}
 modifySymInfo :: Lexeme Identifier -> (SymInfo -> SymInfo) -> Checker ()
-modifySymInfo var@(Lex iden posn) f = do
+modifySymInfo var@(Lex iden _) f = do
     tab <- gets table
     maySi <- getsSymInfo var id
     case maySi of
-        Just var -> modify (\s -> s { table = updateWithScope iden (scopeNum var) f tab })
-        Nothing  -> return ()
+        Just si -> modify (\s -> s { table = updateWithScope iden (scopeNum si) f tab })
+        Nothing -> return ()
 
 {- |
     Changes the value of the variable to the value specified in the symbol table
@@ -258,17 +257,18 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
     case lookup var tab of
         Nothing -> addSymbol varL info
         Just si
-            | (scopeNum si) == cs  -> tell [SError posn $ AlreadyDeclared var (declPosn si)]
-            | otherwise            -> addSymbol varL info
+            | scopeNum si == cs  -> tell [SError posn $ AlreadyDeclared var (declPosn si)]
+            | otherwise          -> addSymbol varL info
 
 ----------------------------------------
 
 {- |
     Checks the validity of each statement of the program, modifying the state.
 -}
-checkProgram :: Program -> Checker ()
-checkProgram pr@(Program sts) = do
-    modify (\s -> s {ast = pr})
+checkProgram :: Seq CheckError -> Program -> Checker ()
+checkProgram lerrors pr@(Program sts) = do
+    modify (\s -> s { ast = pr })
+    tell $ DF.toList lerrors
     checkStatements sts
 
 checkStatements :: Seq (Lexeme Statement) -> Checker ()
@@ -299,7 +299,7 @@ checkStatement (Lex st posn) = case st of
         processDeclaration decl
         putValue iden $ ValFunction dts empty
 
-    StFunctionImp fname@(Lex iden posn) params body -> do
+    StFunctionImp fname@(Lex iden _) params body -> do
         val <- getsSymInfo fname value
         maybe failure success val
         where failure    = tell [SError posn $ FunctionNotDefined iden]
@@ -345,7 +345,7 @@ checkStatement (Lex st posn) = case st of
 
             _    -> tell [SError posn $ ConditionDataType dt]
         where
-            func (a,sa) (b,sb) = (a, sa { initialized = (initialized sa && initialized sb) })
+            func (a,sa) (_,sb) = (a, sa { initialized = initialized sa && initialized sb })
 
     StCase ex cs els -> do
         dt  <- checkExpression ex
@@ -412,13 +412,3 @@ checkExpression (Lex e posn) = case e of
                 tell [SError posn $ UnaryTypes op dt]
                 return . snd . head $ unaryOperation op
             else return . snd $ head dts
-
---------------------------------------------------------------------------------
-
-getExpressionVariables :: Lexeme Expression -> Seq (Lexeme Identifier)
-getExpressionVariables (Lex e _) = case e of
-    Variable var     -> singleton var
-    ExpBinary _ l r  -> getExpressionVariables l >< getExpressionVariables r
-    ExpUnary _ expr  -> getExpressionVariables expr
-    -- (LitInt _) (LitFloat _) (LitBool _) (LitChar _) (LitString _)
-    _                -> empty
