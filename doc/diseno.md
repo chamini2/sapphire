@@ -88,42 +88,52 @@ Las palabras reservadas son las siguientes
 Se dispone de los siguientes tipos de datos:
 
 **`Void`**
+
 > el *no-valor*, también usado para funciones que no devuelven valores *(aka. procedimientos)*.
 
 **`Int`**
+
 > números enteros con signo de `N(32/64) bits`.
 
 **`Bool`**
+
 > representa un valor booleano o lógico, es decir `true` o `false`.
 
 **`Float`**
+
 > números flotantes de `N bits`, precisión y tal...
 
 **`Char`**
+
 > caracteres, `UTF-8`.
 
 **`String`**
+
 > cadenas de caracteres, esencialmente `[Char]`.
 
 **`[Array]`**
+
 > arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
 
 **`Union`**
+
 > unions arbitrarimente anidados, equivalentes a los unions de `C`.
 
 **`Record`**
+
 > records arbitrarimente anidados, equivalentes a los `struct` de `C`.
 
 **`Range`**
+
 > rangos de enteros.
 
 **`def id :: firma`**
+
 > funciones, debe especificarse los tipos de entrada y salida.
 
 **`{Range}`**
-> enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
 
-***
+> enums, si es de enteros o elementos naturamente ordenados se puede usar `..`, sino se especifica el orden listando cada elemento.
 
 El espacio de nombres definido para los tipos de datos es disjunto del espacio de nombres de los identificadores, además todos los tipos de datos empiezan por una letra mayuscula.
 

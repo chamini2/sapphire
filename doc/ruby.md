@@ -1,52 +1,48 @@
-[prev](options.html) - [next](function.html) - [index](index.html)
-
-* * * * *
-
 Ruby syntax
 ===========
 
 * * * * *
 
--   [Lexical structure](#lexical)
-    -   [Identifiers](#ident)
+-   [Lexical structure](#lexicalstructure)
+    -   [Identifiers](#identifiers)
     -   [Comment](#comment)
-    -   [Embedded Documentation](#embed_doc)
-    -   [Reserved words](#resword)
--   [Program](#program)
--   [Expressions](#expression)
-    -   [String literals](#string)
-    -   [Command output](#command)
-    -   [Regular expressions](#regexp)
-    -   [Expression substitution in strings](#exprsub)
-    -   [line-oriented string literals (Here document)](#here_doc)
-    -   [Numeric literals](#numeric)
-    -   [Variables and constants](#variable)
-    -   [Global variables](#gvar)
-    -   [Instance variables](#ivar)
-    -   [Local variables](#lvar)
-    -   [Pseudo variables](#pvar)
-    -   [Constants](#const)
-    -   [Array expressions](#array)
-    -   [Hash expressions](#hash)
-    -   [Method invocation](#method)
+    -   [Embedded Documentation](#embeddeddocumentation)
+    -   [Reserved words](#reservedwords)
+-   [Program](#Program)
+-   [Expressions](#Expressions)
+    -   [String literals](#stringliterals)
+    -   [Command output](#commandoutput)
+    -   [Regular expressions](#regularexpressions)
+    -   [Expression substitution in strings](#expressionsubstitutioninstrings)
+    -   [line-oriented string literals (Here document)](#line-orientedstringliterals(heredocument))
+    -   [Numeric literals](#numericliterals)
+    -   [Variables and constants](#variablesandconstants)
+    -   [Global variables](#globalvariables)
+    -   [Instance variables](#instancevariables)
+    -   [Local variables](#localvariables)
+    -   [Pseudo variables](#pseudovariables)
+    -   [Constants](#Constants)
+    -   [Array expressions](#arrayexpressions)
+    -   [Hash expressions](#hashexpressions)
+    -   [Method invocation](#methodinvocation)
     -   [`super`](#super)
-    -   [Assignment](#assign)
-    -   [Operator expressions](#operator)
-    -   [Control structure](#control)
+    -   [Assignment](#assignment)
+    -   [Operator expressions](#operatorexpressions)
+    -   [Control structure](#controlstructure)
         -   [`if`](#if)
-        -   [`if` modifier](#if-mod)
+        -   [`if` modifier](#ifmodifier)
         -   [`unless`](#unless)
-        -   [`unless` modifier](#unless-mod)
+        -   [`unless` modifier](#unlessmodifier)
         -   [`case`](#case)
         -   [`and`](#and)
         -   [`or`](#or)
         -   [`not`](#not)
         -   [Range expressions](#range)
         -   [`while`](#while)
-        -   [`while` modifier](#while-mod)
+        -   [`while` modifier](#whilemodifier)
         -   [`until`](#until)
-        -   [`until` modifier](#until-mod)
-        -   [Iterators](#iter)
+        -   [`until` modifier](#untilmodifier)
+        -   [Iterators](#iterators)
         -   [`for`](#for)
         -   [`yield`](#yield)
         -   [`raise`](#raise)
@@ -56,16 +52,16 @@ Ruby syntax
         -   [`break`](#break)
         -   [`next`](#next)
         -   [`redo`](#redo)
-        -   [BEGIN](#BEGIN_proc)
-        -   [END](#END_proc)
-    -   [Class definitions](#cdef)
-    -   [Singleton-class definitions](#scdef)
-    -   [Module definitions](#mdef)
-    -   [Method definitions](#method-def)
-    -   [Singleton-method definitions](#singleton-def)
+        -   [BEGIN](#begin)
+        -   [END](#end)
+    -   [Class definitions](#classdefinitions)
+    -   [Singleton-class definitions](#singleton-classdefinitions)
+    -   [Module definitions](#moduledefinitions)
+    -   [Method definitions](#methoddefinitions)
+    -   [Singleton-method definitions](#singleton-methoddefinitions)
     -   [`alias`](#alias)
     -   [`undef`](#undef)
-    -   [`defined?`](#defined_p)
+    -   [`defined?`](#defined?)
 
 * * * * *
 
@@ -753,7 +749,7 @@ form. Ruby has operators show below:
 Most of operators are just method invocation in special form. But some
 operators are not methods, but built in to the syntax:
 
-        =, .., ..., !, not, &&, and, ||, or, !=, !~ 
+        =, .., ..., !, not, &&, and, ||, or, !=, !~
 
 In addition, assignment operators(`+=` etc.) are not user-definable.
 
@@ -1064,7 +1060,7 @@ The difference between `do` and braces are:
               i = 20        # local variable `i' declared in the block.
               ...
             }
-            print defined? i    # `i' is not defined here.     
+            print defined? i    # `i' is not defined here.
             foobar a, b { .. }  # it is not valid outside of the block
 
 #### `for`
@@ -1389,7 +1385,7 @@ Examples:
 
         def fact(n)
           if n == 1 then
-             1 
+             1
           else
             n * fact(n-1)
           end
