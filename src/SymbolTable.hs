@@ -79,7 +79,7 @@ data Value
     | ValBool     Bool
     | ValChar     Char
     | ValFloat    Float
-    | ValFunction { parameters :: Seq (Lexeme DataType), impl :: Seq (Lexeme Statement) }
+    | ValFunction { parameters :: Seq (Lexeme DataType), impl :: StBlock }
 
 instance Show Value where
     show (ValInt v)        = show v

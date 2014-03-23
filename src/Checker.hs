@@ -307,7 +307,7 @@ checkProgram lexErrors pr@(Program sts) = do
     tell lexErrors
     checkStatements sts
 
-checkStatements :: Seq (Lexeme Statement) -> Checker ()
+checkStatements :: StBlock -> Checker ()
 checkStatements = mapM_ checkStatement
 
 {- |
