@@ -30,7 +30,7 @@ import           Language
 
 import qualified Data.Foldable as DF
 import qualified Data.Map      as DM
-import           Data.Sequence as DS hiding (update, drop)
+import           Data.Sequence as DS hiding (drop, update)
 import           Prelude       as P  hiding (lookup)
 
 data SymInfo = SymInfo
@@ -79,7 +79,7 @@ data Value
     | ValBool     Bool
     | ValChar     Char
     | ValFloat    Float
-    | ValFunction { parameters :: Seq (Lexeme DataType), body :: Seq (Lexeme Statement) }
+    | ValFunction { parameters :: Seq (Lexeme DataType), impl :: Seq (Lexeme Statement) }
 
 instance Show Value where
     show (ValInt v)        = show v
