@@ -423,6 +423,7 @@ checkStatement (Lex st posn) = case st of
 
         enterScope >> enterLoop
         processDeclaration $ Declaration var (Int <$ var) CatVariable <$ var
+        markInitialized var
         checkStatements body
         exitLoop >> exitScope
 

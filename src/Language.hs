@@ -1,12 +1,12 @@
 module Language where
 
-import           Prelude
-import           Control.Monad.State
-import           Control.Monad.Writer
-import           Control.Monad.Identity
-import           Data.Char           (toLower)
-import qualified Data.Foldable as DF (mapM_, foldr, toList)
-import           Data.Sequence as DS (Seq, singleton)
+import           Control.Monad.Identity hiding (forM_, mapM_)
+import           Control.Monad.State    hiding (forM_, mapM_)
+import           Control.Monad.Writer   hiding (forM_, mapM_)
+import           Data.Char              (toLower)
+import           Data.Foldable          as DF (foldr, forM_, mapM_, toList)
+import           Data.Sequence          as DS (Seq, singleton)
+import           Prelude                hiding (mapM_)
 
 type Position = (Int, Int) -- (Fila, Columna)
 
@@ -30,12 +30,13 @@ instance Functor Lexeme where
 
 --------------------------------------------------------------------------------
 
-newtype Program = Program (Seq (Lexeme Statement))
+newtype Program = Program StBlock
 
 instance Show Program where
-    show (Program sts) = concatMap show $ DF.toList sts
+    show (Program sts) = concatMap show $ toList sts
 
 type Identifier = String
+type StBlock = Seq (Lexeme Statement)
 
 data DataType
     = Void | Int | Float | Bool | Char | String | Range | Type
@@ -53,21 +54,19 @@ data Statement
     | StDeclaration     (Lexeme Declaration)
     | StDeclarationList (Seq (Lexeme Declaration, Maybe (Lexeme Expression)))
     -- Functions
-    | StReturn      (Lexeme Expression)
+    | StReturn       (Lexeme Expression)
     | StFunctionDef  (Lexeme Declaration) (Seq (Lexeme DataType))
-    | StFunctionImp  (Lexeme Identifier)  (Seq (Lexeme Identifier)) (Seq (Lexeme Statement))
+    | StFunctionImp  (Lexeme Identifier)  (Seq (Lexeme Identifier)) StBlock
     | StFunctionCall (Lexeme Identifier)  (Seq (Lexeme Expression))
     -- I/O
     | StRead  (Seq (Lexeme Identifier))
     | StPrint (Seq (Lexeme Expression))
     -- Conditional
-    | StIf   (Lexeme Expression) (Seq (Lexeme Statement)) (Seq (Lexeme Statement))
-    | StCase (Lexeme Expression) (Seq (Lexeme Case))      (Seq (Lexeme Statement))
+    | StIf   (Lexeme Expression) StBlock StBlock
+    | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
     -- Loops
-    | StLoop     (Seq (Lexeme Statement)) (Lexeme Expression) (Seq (Lexeme Statement))
---    | StWhile    (Lexeme Expression) (Seq (Lexeme Statement))
---    | StRepeat   (Seq (Lexeme Statement)) (Lexeme Expression) (Seq (Lexeme Statement))
-    | StFor      (Lexeme Identifier) (Lexeme Expression)  (Seq (Lexeme Statement))
+    | StLoop     StBlock (Lexeme Expression) StBlock
+    | StFor      (Lexeme Identifier) (Lexeme Expression)  StBlock
     | StBreak
     | StContinue
 
@@ -88,7 +87,7 @@ data Category
     | CatDataType
     deriving (Eq, Show)
 
-data Case = Case (Lexeme Expression) (Seq (Lexeme Statement))
+data When = When (Seq (Lexeme Expression)) StBlock
     deriving (Show)
 
 ----------------------------------------
@@ -220,7 +219,7 @@ printStatement st = case st of
         lowerTabs
         printNonTerminal "- arguments: "
         raiseTabs
-        DF.mapM_ (printExpression . lexInfo) args
+        mapM_ (printExpression . lexInfo) args
         lowerTabs
         lowerTabs
 
@@ -229,14 +228,14 @@ printStatement st = case st of
         raiseTabs
         let Declaration iden rt cat = lexInfo dc
             in do
-            printNonTerminal "- id: "
+            printNonTerminal "- function name: "
             raiseTabs
             printNonTerminal . show $ lexInfo iden
             lowerTabs
 
             printNonTerminal "- signature: "
             raiseTabs
-            DF.mapM_ (printNonTerminal . show) dts
+            mapM_ (printNonTerminal . show) dts
             lowerTabs
 
             printNonTerminal "- return type: "
@@ -248,7 +247,7 @@ printStatement st = case st of
     StFunctionImp iden _ body -> do
         printNonTerminal "FUNCTION IMPLEMENTATION"
         raiseTabs
-        printNonTerminal "- id: "
+        printNonTerminal "- function name: "
         raiseTabs
         printNonTerminal . show $ lexInfo iden
         lowerTabs
@@ -258,13 +257,13 @@ printStatement st = case st of
     StRead vars -> do
         printNonTerminal "READ"
         raiseTabs
-        DF.mapM_ (printExpression . Variable) vars
+        mapM_ (printExpression . Variable) vars
         lowerTabs
 
     StPrint exprs -> do
         printNonTerminal "PRINT"
         raiseTabs
-        DF.mapM_ (printExpression . lexInfo) exprs
+        mapM_ (printExpression . lexInfo) exprs
         lowerTabs
 
     StIf cond success failure -> do
@@ -275,7 +274,18 @@ printStatement st = case st of
         printStatements "- failure: " failure
         lowerTabs
 
-    StCase expr cases othrw -> printNonTerminal "CASE"
+    StCase expr cases othrw -> do
+        printNonTerminal "CASE"
+        raiseTabs
+        printExpressionWithTag "- expression: " $ lexInfo expr
+        forM_ cases $ \(Lex (When exps body) _) -> do
+            printNonTerminal "- when: "
+            raiseTabs
+            mapM_ (printExpression . lexInfo) exps
+            printStatements "- body: " body
+            lowerTabs
+        printStatements "- otherwise: " othrw
+        lowerTabs
 
     StLoop rep cond body -> do
         printNonTerminal "LOOP"
@@ -291,7 +301,7 @@ printStatement st = case st of
         printNonTerminal $ "- variable: " ++ lexInfo var
         printExpressionWithTag "- range: " (lexInfo range)
         printNonTerminal "- body: "
-        raiseTabs >> DF.mapM_ (printStatement . lexInfo) body >> lowerTabs
+        raiseTabs >> mapM_ (printStatement . lexInfo) body >> lowerTabs
         lowerTabs
 
     StBreak    -> printNonTerminal "BREAK"
@@ -308,7 +318,8 @@ printExpression e = case e of
         printNonTerminal "FUNCTION CALL"
         raiseTabs
         printNonTerminal "- function name:"
-        DF.mapM_ (printExpression . lexInfo) args
+        printNonTerminal $ lexInfo iden
+        mapM_ (printExpression . lexInfo) args
         lowerTabs
     LitInt    i      -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
     LitChar   c      -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)
@@ -345,7 +356,7 @@ printNonTerminal str = do
     t <- gets tabs
     tell $ DS.singleton $ replicate t '\t' ++ str ++ "\n"
 
-printStatements :: String -> Seq (Lexeme Statement) -> Printer ()
+printStatements :: String -> StBlock -> Printer ()
 printStatements tag is = do
     printNonTerminal tag
-    raiseTabs >> DF.mapM_ (printStatement . lexInfo) is >> lowerTabs
+    raiseTabs >> mapM_ (printStatement . lexInfo) is >> lowerTabs
