@@ -60,7 +60,7 @@ Las palabras reservadas son las siguientes
 ~~~ruby
     def, imp, as, end, return
     true, false, or, and, not
-    if, then, else, unless, case, when
+    if, then, else, unless, case, when, otherwise
     for, in, while, do, until, break, continue
     print, read
     Void, Int, Bool, Float, Char
@@ -395,14 +395,14 @@ Ejemplos:
 
 ~~~ruby
     case age
-    when 0 .. 3 do
+    when 0,1,2,3 do
         print "bebé"
-    when 4 .. 12 do
+    when 4,5,6,7,8,9,10,11,12 do
         print "niño"
-    when 12 .. 17 do
-        # notar que el 12 está en "niño" y "joven"
+    when 10,11,12,13,14,15,16,17 do
+        # notar que el 10,11 y 12 están en "niño" y "joven"
         print "joven"
-    else
+    otherwise
         print "adulto"
     end
 ~~~
@@ -413,7 +413,7 @@ Sintaxis:
     case <expr>
     when <expr> do <stats..>
     [when <expr> do <stats..>..]
-    [else <stats..>]
+    [otherwise <stats..>]
     end
 ~~~
 
@@ -574,7 +574,7 @@ Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
 * `def to_Float :: Int -> Float`
 
-* `def to_String :: a -> String`
+* `def to_String :: a -> String` *(no es necesaria para `print`)*
 
 * `def length :: [a] -> Int`
 
