@@ -69,6 +69,7 @@ import           Prelude
         "unless"        { Lex TkUnless      _ }
         "case"          { Lex TkCase        _ }
         "when"          { Lex TkWhen        _ }
+        "otherwise"     { Lex TkOtherwise   _ }
 
         -- -- Loops
         "for"           { Lex TkFor         _ }
@@ -144,7 +145,7 @@ import           Prelude
 Program :: { Program }
     : StatementList         { Program $1 }
 
-StatementList :: { Seq (Lexeme Statement) }
+StatementList :: { StBlock }
     : Statement                             { fromDeclarationList $1       }
     | StatementList Separator Statement     { $1 >< fromDeclarationList $3 }
 
@@ -165,8 +166,8 @@ Statement :: { Lexeme Statement }
     | "if"     Expression "then" StatementList ElIfs "end"                      { StIf $2 $4 $5 <$ $1 }
     | "unless" Expression "then" StatementList "end"                            { StIf (negateExp $2) $4 empty <$ $1 }
     | "unless" Expression "then" StatementList "else" StatementList "end"       { StIf (negateExp $2) $4 $6    <$ $1 }
-    | "case" Expression MaybeNewLine CaseList "end"                             { StCase $2 $4 empty <$ $1 }
-    | "case" Expression MaybeNewLine CaseList "else" StatementList "end"        { StCase $2 $4 $6    <$ $1 }
+    | "case" Expression MaybeNewLine WhenList "end"                             { StCase $2 $4 empty <$ $1 }
+    | "case" Expression MaybeNewLine WhenList "otherwise" StatementList "end"   { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
     | "read" VariableList       { StRead  $2 <$ $1 }
@@ -194,17 +195,17 @@ Separator :: { () }
     : ";"           { }
     | newline       { }
 
-ElIfs :: { Seq (Lexeme Statement) }
+ElIfs :: { StBlock }
     :                           { empty }
     | "else" StatementList      { $2    }
     | "elif" Expression "then" StatementList ElIfs { singleton $ StIf $2 $4 $5 <$ $1 }
 
-Case :: { Lexeme Case }
-    : "when" Expression "do" StatementList      { Case $2 $4 <$ $1 }
+When :: { Lexeme When }
+    : "when" ExpressionList "do" StatementList      { When $2 $4 <$ $1 }
 
-CaseList :: { Seq (Lexeme Case) }
-    : Case              { singleton $1 }
-    | CaseList Case     { $1 |> $2     }
+WhenList :: { Seq (Lexeme When) }
+    : When              { singleton $1 }
+    | WhenList When     { $1 |> $2     }
 
 ---------------------------------------
 
@@ -231,10 +232,10 @@ MaybeVariableList :: { Seq (Lexeme Identifier) }
     | VariableList              { $1    }
 
 DeclareVariableList :: { Seq (Lexeme Identifier, Maybe (Lexeme Expression)) }
-    : MaybeDeclareVariable                          { singleton $1 }
-    | DeclareVariableList "," MaybeDeclareVariable  { $1     |> $3 }
+    : MaybeInitializeVariable                               { singleton $1 }
+    | DeclareVariableList "," MaybeInitializeVariable       { $1     |> $3 }
 
-MaybeDeclareVariable :: { (Lexeme Identifier, Maybe (Lexeme Expression)) }
+MaybeInitializeVariable :: { (Lexeme Identifier, Maybe (Lexeme Expression)) }
     : varid "=" Expression      { (unTkVarId `fmap` $1, Just $3) }
     | varid                     { (unTkVarId `fmap` $1, Nothing) }
 
@@ -301,7 +302,7 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 negateExp :: Lexeme Expression -> Lexeme Expression
 negateExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
-fromDeclarationList :: Lexeme Statement -> Seq (Lexeme Statement)
+fromDeclarationList :: Lexeme Statement -> StBlock
 fromDeclarationList st = case lexInfo st of
     StDeclarationList dcls -> DF.foldr func empty dcls
         where
@@ -314,7 +315,7 @@ fromDeclarationList st = case lexInfo st of
 
 --parseError :: Lexeme Token -> Checker ()
 --parseError (Lex tk posn) = do
---    tell [PError posn $ UnexpectedToken (show tk)]
+--    tell (singleton $ PError posn $ UnexpectedToken (show tk))
 
 --------------------------------------------------------------------------------
 
