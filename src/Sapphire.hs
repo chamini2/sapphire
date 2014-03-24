@@ -4,6 +4,7 @@ import           Checker            (CheckState (..), Checker, checkProgram,
                                      getErrors, runProgramChecker)
 import           Parser
 
+import           Control.Monad      (when)
 import           Data.Foldable      (mapM_)
 import           Data.Sequence      as DS (null)
 import           Prelude            as P hiding (mapM_)
@@ -33,4 +34,15 @@ printProgram chk = do
             mapM_ print lexErrors
             mapM_ print parseErrors
             mapM_ print staticErrors
-            mapM_ print warnings
+            -- Only print warnings if there are no errors
+            when (all DS.null [lexErrors,parseErrors, staticErrors]) $
+                mapM_ print warnings
+
+            -- Only print errors if there are no errors of more basic type
+            --mapM_ print lexErrors
+            --when (DS.null lexErrors) $ do
+            --    mapM_ print parseErrors
+            --    when (DS.null parseErrors) $ do
+            --        mapM_ print staticErrors
+            --        when (DS.null staticErrors) $
+            --            mapM_ print warnings

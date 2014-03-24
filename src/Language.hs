@@ -5,7 +5,7 @@ import           Control.Monad.State    hiding (forM_, mapM_)
 import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
 import           Data.Foldable          as DF (foldr, forM_, mapM_, toList)
-import           Data.Sequence          as DS (Seq, singleton)
+import           Data.Sequence          as DS (Seq, singleton, fromList)
 import           Prelude                hiding (mapM_)
 
 type Position = (Int, Int) -- (Fila, Columna)
@@ -139,8 +139,8 @@ instance Show Binary where
         OpGreatEq -> "Greater than or equal to"
         OpBelongs -> "Belongs to Range"
 
-binaryOperation :: Binary -> [((DataType, DataType), DataType)]
-binaryOperation op = case op of
+binaryOperation :: Binary -> Seq ((DataType, DataType), DataType)
+binaryOperation op = fromList $ case op of
     OpPlus    -> zip numbers [Int, Float]
     OpMinus   -> zip numbers [Int, Float]
     OpTimes   -> zip numbers [Int, Float]
@@ -167,8 +167,8 @@ instance Show Unary where
         OpNegate -> "Arithmetic negation"
         OpNot    -> "Logical negation"
 
-unaryOperation :: Unary -> [(DataType, DataType)]
-unaryOperation op = case op of
+unaryOperation :: Unary -> Seq (DataType, DataType)
+unaryOperation op = fromList $ case op of
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
 

@@ -185,9 +185,9 @@ instance DF.Foldable Stack where
 {- |
     Shows the first element in the stack, if there are any, without popping it.
 -}
-peek :: Stack a -> (Maybe a, Stack a)
-peek s@(Stack [])      = (Nothing, s)
-peek s@(Stack (x : _)) = (Just x , s)
+peek :: Stack a -> Maybe a
+peek (Stack [])      = Nothing
+peek (Stack (x : _)) = Just x
 
 {- |
     Pushes an element to the stack.
