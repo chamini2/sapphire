@@ -335,10 +335,11 @@ checkArguments fname mayVal args posn = case mayVal of
 ----------------------------------------
 
 {- |
-    Adds the declaration of var to the symbol table
+    Adds a declaration to the symbol table.
+    Returns a Bool indicating if it was added successfully.
 -}
 processDeclaration :: Lexeme Declaration -> Checker Bool
-processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
+processDeclaration (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
     tab <- gets table
     cs  <- gets currtSc
     let info = emptySymInfo {
@@ -347,11 +348,11 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
                  scopeNum = cs,
                  declPosn = posn
                }
-    case lookup var tab of
-        Nothing -> addSymbol varL info >> return True
+    case lookup iden tab of
+        Nothing -> addSymbol idenL info >> return True
         Just si
-            | scopeNum si == cs  -> tell (singleton $ SError posn $ AlreadyDeclared var (declPosn si)) >> return False
-            | otherwise          -> addSymbol varL info >> return True
+            | scopeNum si == cs  -> tell (singleton $ SError posn $ AlreadyDeclared iden (declPosn si)) >> return False
+            | otherwise          -> addSymbol idenL info >> return True
 
 ----------------------------------------
 
