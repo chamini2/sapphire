@@ -30,11 +30,13 @@ data CheckError
     = LError Position LexerError
     | PError Position ParseError
     | SError Position StaticError
+    | CWarn  Position CheckWarning
 
 instance Show CheckError where
     show (LError p e) = "Lexer error on "   ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
     show (PError p e) = "Parsing error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
     show (SError p e) = "Static error on "  ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
+    show (CWarn  p w) = "Warning on "       ++ showPosn p ++ "\n\t" ++ show w ++ "\n"
 
 instance Eq CheckError where
     (==) = (==) `on` errorPos
@@ -70,6 +72,7 @@ data StaticError
     | ProcedureInExpression  Identifier
     | FunctionAsStatement    Identifier
     | NonFunctionCall        Identifier
+    | UsedNotImplemented     Identifier
     | FunctionArguments      Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
@@ -95,6 +98,7 @@ instance Show StaticError where
     show (ProcedureInExpression fname) = "cannot use procedure '" ++ fname ++ "' inside an expression"
     show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
     show (NonFunctionCall fname)       = "using '" ++ fname ++ "' as if it is a function, but it is not"
+    show (UsedNotImplemented fname)    = "function '" ++ fname ++ "' is used but never implemented"
     show (FunctionArguments fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
         where
             showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
@@ -111,6 +115,16 @@ instance Show StaticError where
     show (NotDeclared iden)            = "identifier '" ++ iden ++ "' has not been declared"
     show (AlreadyDeclared var p)       = "identifier '" ++ var ++ "' has already been declared at " ++ show p
     show (StaticError msg)             = msg
+
+--------------------------------------------------------------------------------
+
+data CheckWarning
+    = DefinedNotUsed        Identifier
+    | DefinedNotImplemented Identifier
+
+instance Show CheckWarning where
+    show (DefinedNotUsed iden)         = "identifier '" ++ iden ++ "' is denfined but never used"
+    show (DefinedNotImplemented fname) = "function '" ++ fname ++ "' is defined but never implemented"
 
 --------------------------------------------------------------------------------
 
@@ -138,6 +152,7 @@ errorPos :: CheckError -> Position
 errorPos (LError p _) = p
 errorPos (PError p _) = p
 errorPos (SError p _) = p
+errorPos (CWarn  p _) = p
 
 flags :: CheckReader
 flags = []
@@ -168,8 +183,8 @@ getCheck = (\(c,_,_) -> c) . runChecker
 getState :: Checker a -> CheckState
 getState = (\(_,s,_) -> s) . runChecker
 
-getErrors :: CheckWriter -> ([CheckError], [CheckError], [CheckError])
-getErrors errors = (only lexical, only parsing, only static)
+getErrors :: CheckWriter -> ([CheckError], [CheckError], [CheckError], [CheckError])
+getErrors errors = (only lexical, only parsing, only static, only warning)
     where
         only f = sortBy compare . filter f $ toList errors
         lexical e = case e of
@@ -181,6 +196,23 @@ getErrors errors = (only lexical, only parsing, only static)
         static e = case e of
             (SError _ _) -> True
             _            -> False
+        warning w = case w of
+            (CWarn _ _) -> True
+            _           -> False
+
+checkWarnings :: Checker ()
+checkWarnings = do
+    symbols <- gets $ accessible . table
+    forM_ symbols $ \(sym, symIs) ->
+        forM_ symIs $ \(symI) -> do
+            let posn = declPosn symI
+            case category symI of
+                CatFunction -> do
+                    let Just (ValFunction _ body) = value symI
+                    when (null $ toList body) $ do
+                        when (used symI) $ tell (singleton $ SError posn $ UsedNotImplemented sym)
+                        tell (singleton $ CWarn posn $ DefinedNotImplemented sym)
+                _           -> unless (used symI) $ tell (singleton $ CWarn posn $ DefinedNotUsed sym)
 
 --------------------------------------------------------------------------------
 
@@ -253,6 +285,12 @@ markInitialized :: Lexeme Identifier -> Checker ()
 markInitialized var = modifySymInfo var (\sym -> sym { initialized = True })
 
 {- |
+    Marks the specifued variable as used
+-}
+markUsed :: Lexeme Identifier -> Checker ()
+markUsed var = modifySymInfo var (\sym -> sym { used = True })
+
+{- |
     Returns the variables in the current scope
 -}
 getScopeVariables :: Checker (Seq (Identifier, SymInfo))
@@ -299,7 +337,7 @@ checkArguments fname mayVal args posn = case mayVal of
 {- |
     Adds the declaration of var to the symbol table
 -}
-processDeclaration :: Lexeme Declaration -> Checker ()
+processDeclaration :: Lexeme Declaration -> Checker Bool
 processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
     tab <- gets table
     cs  <- gets currtSc
@@ -310,10 +348,10 @@ processDeclaration (Lex (Declaration varL@(Lex var _) (Lex t _) c) posn) = do
                  declPosn = posn
                }
     case lookup var tab of
-        Nothing -> addSymbol varL info
+        Nothing -> addSymbol varL info >> return True
         Just si
-            | scopeNum si == cs  -> tell (singleton $ SError posn $ AlreadyDeclared var (declPosn si))
-            | otherwise          -> addSymbol varL info
+            | scopeNum si == cs  -> tell (singleton $ SError posn $ AlreadyDeclared var (declPosn si)) >> return False
+            | otherwise          -> addSymbol varL info >> return True
 
 ----------------------------------------
 
@@ -325,6 +363,7 @@ checkProgram lexErrors pr@(Program sts) = do
     modify (\s -> s { ast = pr })
     tell lexErrors
     checkStatements sts
+    checkWarnings
 
 checkStatements :: StBlock -> Checker ()
 checkStatements = mapM_ checkStatement
@@ -346,16 +385,15 @@ checkStatement (Lex st posn) = case st of
                     tell (singleton $ SError posn $ InvalidAssignType var varDt expDt)
             Nothing -> return ()
 
-    StDeclaration dcl -> processDeclaration dcl
+    StDeclaration dcl -> void $ processDeclaration dcl
 
     StReturn ex       -> void $ checkExpression ex
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
-        processDeclaration decl
-        putValue iden $ ValFunction dts empty
+        defined <- processDeclaration decl
+        when defined $ putValue iden $ ValFunction dts empty
 
-    --StFunctionImp fname@(Lex iden _) params body -> do
-    StFunctionImp fname@(Lex iden _) _ body -> do
+    StFunctionImp fname@(Lex iden _) params body -> do
         val <- getsSymInfo fname value
         maybe failure (maybe failure success) val
         where
@@ -366,6 +404,7 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionCall fnameL@(Lex fname _) args -> do
         mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
+        markUsed fnameL
         case mayInf of
             Just (CatFunction, mayVal, Void) -> checkArguments fname mayVal args posn
             Just (CatFunction, _, _) -> tell (singleton $ SError posn $ FunctionAsStatement fname)
@@ -375,14 +414,14 @@ checkStatement (Lex st posn) = case st of
     StRead vars -> forM_ vars $ \varL -> do
         mayInf <- getsSymInfo varL dataType
         case mayInf of
-            --Just dt -> markInitialized varL
-            Just _ -> markInitialized varL
+            Just dt -> markInitialized varL
             Nothing -> return ()
 
     StPrint exs -> mapM_ checkExpression exs
 
     StIf cnd success failure -> do
-        checkExpression cnd >>= \dt -> unless (dt == Bool) $ tell (singleton $ SError posn $ ConditionDataType dt)
+        dt <- checkExpression cnd
+        unless (dt == Bool) $ tell (singleton $ SError posn $ ConditionDataType dt)
 
         before <- getScopeVariables
 
@@ -400,16 +439,15 @@ checkStatement (Lex st posn) = case st of
 
         putScopeVariables before
 
-        forM_ (checkInitialization $ fromList [varSucc,varFail]) $
-            \(var,info) -> when (initialized info) $ markInitialized (Lex var (declPosn info))
+        forM_ (checkInitialization $ fromList [varSucc,varFail]) $ \(var,info) ->
+            when (initialized info) $ markInitialized (Lex var (declPosn info))
 
     StCase ex cs els -> do
         dt <- checkExpression ex
         before <- getScopeVariables
 
         varScopes <- forM cs $ \(Lex (When wexps sts) wposn) -> do
-            --forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
-            forM_ wexps $ checkExpression >=> \wd ->
+            forM_ wexps $ checkExpression >=> \wd ->        -- forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
                 when (wd /= dt) $ tell (singleton $ SError wposn $ CaseWhenDataType dt wd)
 
             enterScope
@@ -423,8 +461,8 @@ checkStatement (Lex st posn) = case st of
         varOtherwise <- getScopeVariables
 
         putScopeVariables before
-        forM_ (checkInitialization $ varScopes |> varOtherwise) $
-            \(var,info) -> when (initialized info) $ markInitialized (Lex var (declPosn info))
+        forM_ (checkInitialization $ varScopes |> varOtherwise) $ \(var,info) ->
+            when (initialized info) $ markInitialized (Lex var (declPosn info))
 
     StLoop rep cnd body -> do
         enterScope >> enterLoop
@@ -470,6 +508,7 @@ checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable varL@(Lex var _) -> do
         mayInf <- getsSymInfo varL (\si -> (category si, initialized si, dataType si))
+        markUsed varL
         case mayInf of
             Just (CatVariable, ini, dt) -> do
                 unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
@@ -481,6 +520,7 @@ checkExpression (Lex e posn) = case e of
 
     FunctionCall fnameL@(Lex fname _) args -> do
         mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
+        markUsed fnameL
         case mayInf of
             Just (CatFunction, _, Void) -> tell (singleton $ SError posn $ ProcedureInExpression fname) >> return Void
             Just (CatFunction, mayVal, dt) -> checkArguments fname mayVal args posn >> return dt
