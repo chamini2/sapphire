@@ -70,7 +70,7 @@ data StaticError
     | ProcedureInExpression  Identifier
     | FunctionAsStatement    Identifier
     | NonFunctionCall        Identifier
-    | ArgumentsDataType      Identifier (Seq DataType) (Seq DataType)
+    | FunctionArguments      Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
     | CaseWhenDataType  DataType DataType
@@ -95,7 +95,7 @@ instance Show StaticError where
     show (ProcedureInExpression fname) = "cannot use procedure '" ++ fname ++ "' inside an expression"
     show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
     show (NonFunctionCall fname)       = "using '" ++ fname ++ "' as if it is a function, but it is not"
-    show (ArgumentsDataType fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
+    show (FunctionArguments fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
         where
             showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
     -- Statements
@@ -291,7 +291,7 @@ checkArguments fname mayVal args posn = case mayVal of
         let prms = fmap lexInfo $ parameters val
         dts <- mapM checkExpression args
         unless (length args == length prms && and (zipWith (==) dts prms)) $
-            tell (singleton $ SError posn $ ArgumentsDataType fname prms dts)
+            tell (singleton $ SError posn $ FunctionArguments fname prms dts)
     Nothing -> error "Checker.checkArguments: function with no SymInfo value"
 
 ----------------------------------------
