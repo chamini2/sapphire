@@ -226,7 +226,7 @@ printStatement st = case st of
     StFunctionDef dc dts      -> do
         printNonTerminal "FUNCTION DEFINITION"
         raiseTabs
-        let Declaration iden rt cat = lexInfo dc
+        let Declaration iden rt _ = lexInfo dc
             in do
             printNonTerminal "- function name: "
             raiseTabs

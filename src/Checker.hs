@@ -5,17 +5,17 @@ import           SymbolTable
 
 import           Control.Arrow          (second, (&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
-import           Control.Monad.RWS      hiding (forM, forM_, mapM_)
+import           Control.Monad.RWS      hiding (forM, mapM, forM_, mapM_)
 import           Data.Foldable          as DF (elem, foldr, forM_, mapM_,
-                                               toList)
+                                               toList, concatMap, and)
 import           Data.Function          (on)
 import           Data.Functor           ((<$))
 import           Data.List              (find, sortBy)
 import           Data.Sequence          as DS (Seq, empty, fromList, index,
-                                               singleton, zipWith, (<|), (|>))
-import           Data.Traversable       as DT (forM)
-import           Prelude                as P hiding (elem, foldr, lookup, mapM_,
-                                              zipWith)
+                                               singleton, zipWith, (<|), (|>), length)
+import           Data.Traversable       as DT (forM, mapM)
+import           Prelude                as P hiding (elem, foldr, lookup, mapM,
+                                              mapM_, zipWith, concatMap, length, and)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -62,12 +62,16 @@ instance Show ParseError where
 
 data StaticError
     -- Variables
-    = VariableNotDeclared    Identifier
-    | VariableNotInitialized Identifier
+    = VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
+    | NonVariable            Identifier
     -- Functions
     | FunctionNotDefined     Identifier
-    | FunctionNotDeclared    Identifier
+    | ProcedureInExpression  Identifier
+    | FunctionAsStatement    Identifier
+    | NonFunctionCall        Identifier
+    | ArgumentsNumber        Identifier Int Int
+    | ArgumentsDataType      Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
     | CaseWhenDataType  DataType DataType
@@ -78,17 +82,24 @@ data StaticError
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
-    | StaticError String
-    | AlreadyDeclared        Identifier Position
+    | NotDeclared     Identifier
+    | AlreadyDeclared Identifier Position
+    | StaticError     String
 
 instance Show StaticError where
     -- Variables
-    show (VariableNotDeclared var)     = "variable '" ++ var ++ "' has not been declared"
     show (VariableNotInitialized var)  = "variable '" ++ var ++ "' has not been initialized"
-    show (InvalidAssignType var vt et) = "cant assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
+    show (InvalidAssignType var vt et) = "cannot assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
+    show (NonVariable var)             = "using '" ++ var ++ "' as if it is a variable, but it is not"
     -- Functions
-    show (FunctionNotDeclared fname)   = "function '" ++ fname ++ "' has not been declared"
     show (FunctionNotDefined fname)    = "must define function '" ++ fname ++ "' before implementing it"
+    show (ProcedureInExpression fname) = "cannot use procedure '" ++ fname ++ "' inside an expression"
+    show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
+    show (NonFunctionCall fname)       = "using '" ++ fname ++ "' as if it is a function, but it is not"
+    show (ArgumentsNumber fname e g)   = "function '" ++ fname ++ "' expects " ++ show e ++ " arguments, but was given " ++ show g
+    show (ArgumentsDataType fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
+        where
+            showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
     -- Statements
     show (ConditionDataType dt)        = "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
     show (CaseWhenDataType dt wd)      = "case has expression of type '" ++ show dt ++ "' but when has expression of type '" ++ show wd ++ "'"
@@ -99,8 +110,9 @@ instance Show StaticError where
     show (UnaryTypes op dt)            = "operator '" ++ show op ++ "' doesn't work with arguments '" ++ show dt ++ "'"
     show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' doesn't work with arguments '(" ++ show dl ++ ", " ++ show dr ++ ")'"
     -- General
-    show (StaticError msg)             = msg
+    show (NotDeclared iden)            = "identifier '" ++ iden ++ "' has not been declared"
     show (AlreadyDeclared var p)       = "identifier '" ++ var ++ "' has already been declared at " ++ show p
+    show (StaticError msg)             = msg
 
 --------------------------------------------------------------------------------
 
@@ -217,7 +229,7 @@ getsSymInfo (Lex iden posn) f = do
     maybe failure success $ lookupWithScope iden stck tab
     where
         success = return . Just . f
-        failure = tell (singleton $ SError posn $ VariableNotDeclared iden) >> return Nothing
+        failure = tell (singleton $ SError posn $ NotDeclared iden) >> return Nothing
 
 {- |
     Modifies a symbol if said symbol exists in the table
@@ -274,6 +286,15 @@ checkInitialization scopes = foldr (zipWith func) (index scopes 0) scopes
         func (a,sa) (b,sb) = if a /= b
             then error "Checker.checkInitialization: zipping different variabls"
             else (a, sa { initialized = initialized sa && initialized sb })
+
+checkArguments :: Identifier -> Maybe Value -> Seq (Lexeme Expression) -> Position -> Checker ()
+checkArguments fname mayVal args posn = case mayVal of
+    Just val -> do
+        let prms = fmap lexInfo $ parameters val
+        dts <- mapM checkExpression args
+        unless (length args == length prms && and (zipWith (==) dts prms)) $
+            tell (singleton $ SError posn $ ArgumentsDataType fname prms dts)
+    Nothing -> error "Checker.checkArguments: function with no SymInfo value"
 
 ----------------------------------------
 
@@ -338,13 +359,20 @@ checkStatement (Lex st posn) = case st of
     --StFunctionImp fname@(Lex iden _) params body -> do
     StFunctionImp fname@(Lex iden _) _ body -> do
         val <- getsSymInfo fname value
-        maybe failure success val
-        where failure = tell (singleton $ SError posn $ FunctionNotDefined iden)
-              success = maybe failure func
-              func v  = putValue fname $ ValFunction (parameters v) body
+        maybe failure (maybe failure success) val
+        where
+            failure   = tell (singleton $ SError posn $ FunctionNotDefined iden)
+            success v = do
+                putValue fname $ ValFunction (parameters v) body
+                markInitialized fname
 
-    --StFunctionCall fname args -> return ()
-    StFunctionCall _ _ -> return ()
+    StFunctionCall fnameL@(Lex fname _) args -> do
+        mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
+        case mayInf of
+            Just (CatFunction, mayVal, Void) -> checkArguments fname mayVal args posn
+            Just (CatFunction, _, _) -> tell (singleton $ SError posn $ FunctionAsStatement fname)
+            Just _ -> tell (singleton $ SError posn $ NonFunctionCall fname)
+            Nothing -> return ()
 
     StRead vars -> forM_ vars $ \varL -> do
         mayInf <- getsSymInfo varL dataType
@@ -443,15 +471,23 @@ checkStatement (Lex st posn) = case st of
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable varL@(Lex var _) -> do
-        mayInf <- getsSymInfo varL (initialized &&& dataType)       -- (\si -> (initialized si, dataType si))
+        mayInf <- getsSymInfo varL (\si -> (category si, initialized si, dataType si))
         case mayInf of
-            Just (ini, dt) -> do
+            Just (CatVariable, ini, dt) -> do
                 unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
                 return dt
+            Just _ -> do
+                tell (singleton $ SError posn $ NonVariable var)
+                return Void
             Nothing -> return Void
 
-    --FunctionCall iden exs -> undefined
-    FunctionCall _ _ -> undefined
+    FunctionCall fnameL@(Lex fname _) args -> do
+        mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
+        case mayInf of
+            Just (CatFunction, _, Void) -> tell (singleton $ SError posn $ ProcedureInExpression fname) >> return Void
+            Just (CatFunction, mayVal, dt) -> checkArguments fname mayVal args posn >> return dt
+            Just _ -> tell (singleton $ SError posn $ NonFunctionCall fname) >> return Void
+            Nothing -> return Void
 
     LitInt _    -> return Int
 
@@ -467,7 +503,7 @@ checkExpression (Lex e posn) = case e of
         ldt <- checkExpression l
         rdt <- checkExpression r
         let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
-        if null dts
+        if null dts && notElem Void [ldt,rdt]
             then do
                 tell (singleton $ SError posn $ BinaryTypes op (ldt,rdt))
                 return . snd . head $ binaryOperation op
