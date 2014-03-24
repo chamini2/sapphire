@@ -29,7 +29,8 @@ printProgram chk = do
     if DS.null writer
         then print stAst
         else do
-            let (lexErrors,parseErrors,staticErrors) = getErrors writer
+            let (lexErrors,parseErrors,staticErrors,warnings) = getErrors writer
             mapM_ print lexErrors
             mapM_ print parseErrors
             mapM_ print staticErrors
+            mapM_ print warnings

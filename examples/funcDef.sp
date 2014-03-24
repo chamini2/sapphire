@@ -1,5 +1,11 @@
 def a :: Int,Int -> Int
 
+def a :: Int,Int -> Bool
+
+imp a (a,b) as
+    return a + b
+end
+
 # Function as a statement
 a(2,3)
 

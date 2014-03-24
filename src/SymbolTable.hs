@@ -28,10 +28,10 @@ module SymbolTable
 
 import           Language
 
-import qualified Data.Foldable as DF
+import           Data.Foldable as DF
 import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (drop, update)
-import           Prelude       as P  hiding (lookup)
+import           Prelude       as P  hiding (lookup, concatMap)
 
 data SymInfo = SymInfo
     { dataType    :: DataType
@@ -40,28 +40,32 @@ data SymInfo = SymInfo
     , scopeNum    :: ScopeNum
     , declPosn    :: Position
     , initialized :: Bool
+    , used        :: Bool
     }
 
 instance Show SymInfo where
-    show (SymInfo dt ct v sn dp i) = showSN ++ showCT ++ showDT ++ showV ++ showDP
+    show (SymInfo dt ct v sn dp i u) = showSN ++ showCT ++ showDT ++ showV ++ showDP ++ showU
         where
             showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
             showDT = show dt
             showV  = case v of
                 Just val -> " (" ++ show val ++ ") "
-                Nothing  -> " (" ++ show i ++ ") "
+                Nothing  -> " (" ++ showI ++ ") "
+            showI  = if i then "init" else "NOT init"
             showDP = show dp
+            showU  = " " ++ if u then "used" else "NOT used"
 
 emptySymInfo :: SymInfo
-emptySymInfo = SymInfo {
-                 dataType    = Void,
-                 category    = CatVariable,
-                 value       = Nothing,
-                 scopeNum    = -1,
-                 declPosn    = (0, 0),
-                 initialized = False
-               }
+emptySymInfo = SymInfo
+    { dataType    = Void
+    , category    = CatVariable
+    , value       = Nothing
+    , scopeNum    = -1
+    , declPosn    = (0, 0)
+    , initialized = False
+    , used        = False
+    }
 
 --------------------------------------------------------------------------------
 
@@ -86,7 +90,10 @@ instance Show Value where
     show (ValBool v)       = show v
     show (ValChar v)       = show v
     show (ValFloat v)      = show v
-    show (ValFunction p b) = DF.concatMap show p ++ DF.concatMap show b
+    show (ValFunction p i) = showP ++ showI
+        where
+            showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
+            showI = concatMap show $ toList i
 
 ----------------------------------------
 
