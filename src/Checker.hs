@@ -70,7 +70,6 @@ data StaticError
     | ProcedureInExpression  Identifier
     | FunctionAsStatement    Identifier
     | NonFunctionCall        Identifier
-    | ArgumentsNumber        Identifier Int Int
     | ArgumentsDataType      Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
@@ -96,7 +95,6 @@ instance Show StaticError where
     show (ProcedureInExpression fname) = "cannot use procedure '" ++ fname ++ "' inside an expression"
     show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
     show (NonFunctionCall fname)       = "using '" ++ fname ++ "' as if it is a function, but it is not"
-    show (ArgumentsNumber fname e g)   = "function '" ++ fname ++ "' expects " ++ show e ++ " arguments, but was given " ++ show g
     show (ArgumentsDataType fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
         where
             showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
