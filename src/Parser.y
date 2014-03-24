@@ -210,8 +210,7 @@ WhenList :: { Seq (Lexeme When) }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Void"            { Void   <$ $1 }
-    | "Int"             { Int    <$ $1 }
+    : "Int"             { Int    <$ $1 }
     | "Float"           { Float  <$ $1 }
     | "Bool"            { Bool   <$ $1 }
     | "Char"            { Char   <$ $1 }
@@ -243,9 +242,13 @@ DataTypeList :: { Seq (Lexeme DataType) }
     : DataType                   { singleton $1 }
     | DataTypeList "," DataType  { $1 |> $3     }
 
+MaybeDataTypeList :: { Seq (Lexeme DataType) }
+    :                   { empty }
+    | DataTypeList      { $1    }
+
 Signature :: { (Seq (Lexeme DataType), Lexeme DataType) }
-    : "(" DataTypeList ")" SignatureReturn { ($2,$4) }
-    | DataTypeList         SignatureReturn { ($1,$2) }
+    : "(" MaybeDataTypeList ")" SignatureReturn { ($2,$4) }
+    | DataTypeList              SignatureReturn { ($1,$2) }
 
 SignatureReturn :: { Lexeme DataType }
     : "->" DataType         { $2 }
