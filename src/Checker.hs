@@ -10,6 +10,7 @@ import           Data.Foldable          as DF (elem, foldr, forM_, mapM_,
                                                toList, concatMap, and, find)
 import           Data.Function          (on)
 import           Data.Functor           ((<$))
+import           Data.Maybe             (isJust, fromJust, isNothing)
 import           Data.Sequence          as DS (Seq, empty, fromList, index, sortBy,
                                                singleton, zipWith, (<|), (|>), length, filter, null)
 import           Data.Traversable       as DT (forM, mapM)
@@ -19,8 +20,8 @@ import           Prelude                as P hiding (elem, foldr, lookup, mapM, 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
 type CheckReader = Seq Flag
-data Flag = OutputFile String | SupressWarnings
-
+data Flag = OutputFile String | SupressWarnings | AllWarnings
+    deriving (Eq)
 --------------------------------------------------------------------------------
 
 type CheckWriter = Seq CheckError
@@ -32,10 +33,10 @@ data CheckError
     | CWarn  Position CheckWarning
 
 instance Show CheckError where
-    show (LError p e) = "Lexer error on "   ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
-    show (PError p e) = "Parsing error on " ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
-    show (SError p e) = "Static error on "  ++ showPosn p ++ "\n\t" ++ show e ++ "\n"
-    show (CWarn  p w) = "Warning on "       ++ showPosn p ++ "\n\t" ++ show w ++ "\n"
+    show (LError p e) = "Lexer error on "   ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
+    show (PError p e) = "Parsing error on " ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
+    show (SError p e) = "Static error on "  ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
+    show (CWarn  p w) = "Warning on "       ++ showPosn p ++ ": \n\t" ++ show w ++ "\n"
 
 instance Eq CheckError where
     (==) = (==) `on` errorPos
@@ -65,13 +66,13 @@ data StaticError
     -- Variables
     = VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
-    | NonVariable            Identifier
     -- Functions
     | FunctionNotDefined     Identifier
     | ProcedureInExpression  Identifier
     | FunctionAsStatement    Identifier
-    | NonFunctionCall        Identifier
     | UsedNotImplemented     Identifier
+    | ImpInDefScope          Identifier Position
+    | AleradyImplemented     Identifier Position
     | FunctionArguments      Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
@@ -83,6 +84,7 @@ data StaticError
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
+    | NonCategory     Identifier Category Category
     | NotDeclared     Identifier
     | AlreadyDeclared Identifier Position
     | StaticError     String
@@ -91,13 +93,13 @@ instance Show StaticError where
     -- Variables
     show (VariableNotInitialized var)  = "variable '" ++ var ++ "' has not been initialized"
     show (InvalidAssignType var vt et) = "cannot assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
-    show (NonVariable var)             = "using '" ++ var ++ "' as if it is a variable, but it is not"
     -- Functions
     show (FunctionNotDefined fname)    = "must define function '" ++ fname ++ "' before implementing it"
     show (ProcedureInExpression fname) = "cannot use procedure '" ++ fname ++ "' inside an expression"
     show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
-    show (NonFunctionCall fname)       = "using '" ++ fname ++ "' as if it is a function, but it is not"
     show (UsedNotImplemented fname)    = "function '" ++ fname ++ "' is used but never implemented"
+    show (ImpInDefScope fname p)       = "must implement function '" ++ fname ++ "' in same scope that it is defined, at " ++ showPosn p
+    show (AleradyImplemented fname p)  = "function '" ++ fname ++ "' has already been implemented at " ++ showPosn p
     show (FunctionArguments fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
         where
             showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
@@ -111,6 +113,7 @@ instance Show StaticError where
     show (UnaryTypes op dt)            = "operator '" ++ show op ++ "' does not work with argument (" ++ show dt ++ ")"
     show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' does not work with arguments (" ++ show dl ++ ", " ++ show dr ++ ")"
     -- General
+    show (NonCategory iden e g)        = "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
     show (NotDeclared iden)            = "identifier '" ++ iden ++ "' has not been declared"
     show (AlreadyDeclared var p)       = "identifier '" ++ var ++ "' has already been declared at " ++ show p
     show (StaticError msg)             = msg
@@ -207,8 +210,8 @@ checkWarnings = do
             let posn = declPosn symI
             case category symI of
                 CatFunction -> do
-                    let Just (ValFunction _ body) = value symI
-                    when (null body) $ do
+                    let Just (ValFunction _ body _) = value symI
+                    when (isNothing body) $ do
                         when (used symI) $ tell (singleton $ SError posn $ UsedNotImplemented sym)
                         tell (singleton $ CWarn posn $ DefinedNotImplemented sym)
                 _           -> unless (used symI) $ tell (singleton $ CWarn posn $ DefinedNotUsed sym)
@@ -295,9 +298,8 @@ markUsed var = modifySymInfo var (\sym -> sym { used = True })
 getScopeVariables :: Checker (Seq (Identifier, SymInfo))
 getScopeVariables = do
     vars <- gets $ accessible . table
-    stck <- gets stack
-    let stckS = fmap serial stck
-    return $ foldr (func stckS) empty vars
+    stck <- liftM (fmap serial) $ gets stack
+    return $ foldr (func stck) empty vars
     where
         func stc a b = case funcFind stc a of
             (v,Just x)  -> (v,x) <| b
@@ -392,16 +394,37 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
         defined <- processDeclaration decl
-        when defined $ putValue iden $ ValFunction dts empty
+        when defined $ putValue iden $ ValFunction dts Nothing (0,0)
 
-    StFunctionImp fname@(Lex iden _) params body -> do
-        val <- getsSymInfo fname value
-        maybe failure (maybe failure success) val
-        where
-            failure   = tell (singleton $ SError posn $ FunctionNotDefined iden)
-            success v = do
-                putValue fname $ ValFunction (parameters v) body
-                markInitialized fname
+    StFunctionImp fnameL@(Lex fname _) params body -> do
+        currSc <- liftM (serial . fromJust . peek) $ gets stack
+        mayInf <- getsSymInfo fnameL (\si -> (value si, scopeNum si, category si, initialized si, declPosn si))
+        case mayInf of
+            Just (Just val, sc, ct, ini, defp) -> if ct == CatFunction
+                then do
+                    when ini $ tell (singleton $ SError posn $ AleradyImplemented fname (implPosn val))
+                    if currSc /= sc
+                        then tell (singleton $ SError posn $ ImpInDefScope fname defp)
+                        else do
+                            markInitialized fnameL
+                            putValue fnameL $ ValFunction (parameters val) (Just body) posn
+
+                            before <- getScopeVariables
+                            enterScope
+
+                            forM_ (zipWith func params (parameters val)) $ \dcl -> do
+                                processDeclaration dcl
+                                let Declaration varL _ _ = lexInfo dcl
+                                markInitialized varL
+
+                            checkStatements body
+                            exitScope
+                            putScopeVariables before
+                    else tell (singleton $ SError posn $ NonCategory fname CatFunction ct)
+
+            _ -> tell (singleton $ SError posn $ FunctionNotDefined fname)
+            where
+                func iden dt = Declaration iden dt CatParameter <$ iden
 
     StFunctionCall fnameL@(Lex fname _) args -> do
         mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
@@ -409,15 +432,15 @@ checkStatement (Lex st posn) = case st of
             Just inf -> do
                 markUsed fnameL
                 case inf of
-                    (CatFunction, mayVal, Void) -> checkArguments fname mayVal args posn
-                    (CatFunction, _, _)         -> tell (singleton $ SError posn $ FunctionAsStatement fname)
-                    _                           -> tell (singleton $ SError posn $ NonFunctionCall fname)
+                    (CatFunction,mayVal,Void) -> checkArguments fname mayVal args posn
+                    (CatFunction,_,_)         -> tell (singleton $ SError posn $ FunctionAsStatement fname)
+                    (ct,_,_)                  -> tell (singleton $ SError posn $ NonCategory fname CatFunction ct)
             Nothing -> return ()
 
     StRead vars -> forM_ vars $ \varL -> do
         mayInf <- getsSymInfo varL dataType
         case mayInf of
-            Just dt -> markInitialized varL
+            Just _  -> markInitialized varL
             Nothing -> return ()
 
     StPrint exs -> mapM_ checkExpression exs
@@ -512,11 +535,14 @@ checkExpression (Lex e posn) = case e of
             Just inf -> do
                 markUsed varL
                 case inf of
-                    (CatVariable, ini, dt) -> do
+                    (CatVariable,ini,dt)  -> do
                         unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
                         return dt
-                    _                      -> do
-                        tell (singleton $ SError posn $ NonVariable var)
+                    (CatParameter,ini,dt) -> do
+                        unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
+                        return dt
+                    (ct,_,_)              -> do
+                        tell (singleton $ SError posn $ NonCategory var CatVariable ct)
                         return Void
             Nothing -> return Void
 
@@ -526,14 +552,14 @@ checkExpression (Lex e posn) = case e of
             Just inf -> do
                 markUsed fnameL
                 case inf of
-                    (CatFunction, _, Void)    -> do
+                    (CatFunction,_,Void)    -> do
                         tell (singleton $ SError posn $ ProcedureInExpression fname)
                         return Void
-                    (CatFunction, mayVal, dt) -> do
+                    (CatFunction,mayVal,dt) -> do
                         checkArguments fname mayVal args posn
                         return dt
-                    _                         -> do
-                        tell (singleton $ SError posn $ NonFunctionCall fname)
+                    (ct,_,_)                -> do
+                        tell (singleton $ SError posn $ NonCategory fname CatFunction ct)
                         return Void
             Nothing -> return Void
 
