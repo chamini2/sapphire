@@ -146,8 +146,8 @@ Program :: { Program }
     : StatementList         { Program $1 }
 
 StatementList :: { StBlock }
-    : Statement                             { fromDeclarationList $1       }
-    | StatementList Separator Statement     { $1 >< fromDeclarationList $3 }
+    : Statement                             { filterSt $1       }
+    | StatementList Separator Statement     { $1 >< filterSt $3 }
 
 Statement :: { Lexeme Statement }
     :                           { Lex StNoop (0,0) }      -- λ, no-operation
@@ -305,14 +305,15 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 negateExp :: Lexeme Expression -> Lexeme Expression
 negateExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
-fromDeclarationList :: Lexeme Statement -> StBlock
-fromDeclarationList st = case lexInfo st of
+filterSt :: Lexeme Statement -> StBlock
+filterSt st = case lexInfo st of
+    StNoop                 -> empty
     StDeclarationList dcls -> DF.foldr func empty dcls
         where
             func (dcl@(Lex (Declaration var _ _) _), mayExpr) sts = flip (><) sts $ case mayExpr of
                 Just expr -> fromList [StDeclaration dcl <$ dcl, StAssign var expr <$ expr]
                 Nothing   -> singleton $ StDeclaration dcl <$ dcl
-    -- Any other statement
+    -- No other statement needs a filter
     _ -> singleton st
 
 
@@ -338,7 +339,7 @@ lexWrap cont = do
         _         -> cont t
 
 happyError :: Lexeme Token -> Alex a
-happyError (Lex t p) = fail $ showPosn p ++ "Parse error on Token: " ++ show t ++ "\n"
+happyError (Lex t p) = fail $ showPosn p ++ ": Parse error on Token: " ++ show t ++ "\n"
 
 parseProgram :: String -> (Seq CheckError, Program)
 parseProgram input = runAlex' input parse
