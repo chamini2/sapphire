@@ -12,10 +12,10 @@ import           Data.Function          (on)
 import           Data.Functor           ((<$))
 import           Data.Maybe             (isJust, fromJust, isNothing)
 import           Data.Sequence          as DS (Seq, empty, fromList, index, sortBy,
-                                               singleton, zipWith, (<|), (|>), length, filter, null)
+                                               singleton, zipWith, (<|), (|>), length, filter, null, zip)
 import           Data.Traversable       as DT (forM, mapM)
 import           Prelude                as P hiding (elem, foldr, lookup, mapM, filter,
-                                              mapM_, zipWith, concatMap, length, and, null)
+                                              mapM_, zipWith, concatMap, length, and, null, zip)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -67,13 +67,13 @@ data StaticError
     = VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
     -- Functions
-    | FunctionNotDefined     Identifier
-    | ProcedureInExpression  Identifier
-    | FunctionAsStatement    Identifier
-    | UsedNotImplemented     Identifier
-    | ImpInDefScope          Identifier Position
-    | AleradyImplemented     Identifier Position
-    | FunctionArguments      Identifier (Seq DataType) (Seq DataType)
+    | FunctionNotDefined    Identifier
+    | ProcedureInExpression Identifier
+    | FunctionAsStatement   Identifier
+    | UsedNotImplemented    Identifier
+    | ImpInDefScope         Identifier Position
+    | AleradyImplemented    Identifier Position
+    | FunctionArguments     Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
     | CaseWhenDataType  DataType DataType
@@ -85,8 +85,8 @@ data StaticError
     | UnaryTypes  Unary  DataType
     -- General
     | NonCategory     Identifier Category Category
-    | NotDeclared     Identifier
-    | AlreadyDeclared Identifier Position
+    | NotDefined      Identifier
+    | AlreadyDefined  Identifier Position
     | StaticError     String
 
 instance Show StaticError where
@@ -104,19 +104,19 @@ instance Show StaticError where
         where
             showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
     -- Statements
-    show (ConditionDataType dt)        = "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
-    show (CaseWhenDataType dt wd)      = "case has expression of type '" ++ show dt ++ "' but when has expression of type '" ++ show wd ++ "'"
-    show (ForInDataType dt)            = "for statement must iterate over expression of type 'Range', but it is of type '" ++ show dt ++ "'"
-    show BreakOutsideLoop              = "break statement not within loop"
-    show ContinueOutsideLoop           = "continue statement not within loop"
+    show (ConditionDataType dt)   = "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
+    show (CaseWhenDataType dt wd) = "case has expression of type '" ++ show dt ++ "' but when has expression of type '" ++ show wd ++ "'"
+    show (ForInDataType dt)       = "for statement must iterate over expression of type 'Range', but it is of type '" ++ show dt ++ "'"
+    show BreakOutsideLoop         = "break statement not within loop"
+    show ContinueOutsideLoop      = "continue statement not within loop"
     -- Operators
-    show (UnaryTypes op dt)            = "operator '" ++ show op ++ "' does not work with argument (" ++ show dt ++ ")"
-    show (BinaryTypes op (dl,dr))      = "operator '" ++ show op ++ "' does not work with arguments (" ++ show dl ++ ", " ++ show dr ++ ")"
+    show (UnaryTypes op dt)       = "operator '" ++ show op ++ "' does not work with argument (" ++ show dt ++ ")"
+    show (BinaryTypes op (dl,dr)) = "operator '" ++ show op ++ "' does not work with arguments (" ++ show dl ++ ", " ++ show dr ++ ")"
     -- General
-    show (NonCategory iden e g)        = "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
-    show (NotDeclared iden)            = "identifier '" ++ iden ++ "' has not been declared"
-    show (AlreadyDeclared var p)       = "identifier '" ++ var ++ "' has already been declared at " ++ show p
-    show (StaticError msg)             = msg
+    show (NonCategory iden e g) = "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
+    show (NotDefined iden)      = "identifier '" ++ iden ++ "' has not been defined"
+    show (AlreadyDefined var p) = "identifier '" ++ var ++ "' has already been declared at " ++ show p
+    show (StaticError msg)      = msg
 
 --------------------------------------------------------------------------------
 
@@ -155,6 +155,22 @@ errorPos (LError p _) = p
 errorPos (PError p _) = p
 errorPos (SError p _) = p
 errorPos (CWarn  p _) = p
+
+----------------------------------------
+
+tellLError :: Position -> LexerError -> Checker ()
+tellLError posn err = tell (singleton $ LError posn err)
+
+tellPError :: Position -> ParseError -> Checker ()
+tellPError posn err = tell (singleton $ PError posn err)
+
+tellSError :: Position -> StaticError -> Checker ()
+tellSError posn err = tell (singleton $ SError posn err)
+
+tellCWarn :: Position -> CheckWarning -> Checker ()
+tellCWarn  posn err = tell (singleton $ CWarn  posn err)
+
+----------------------------------------
 
 flags :: CheckReader
 flags = empty
@@ -208,13 +224,12 @@ checkWarnings = do
     forM_ symbols $ \(sym, symIs) ->
         forM_ symIs $ \(symI) -> do
             let posn = declPosn symI
-            case category symI of
-                CatFunction -> do
-                    let Just (ValFunction _ body _) = value symI
-                    when (isNothing body) $ do
-                        when (used symI) $ tell (singleton $ SError posn $ UsedNotImplemented sym)
-                        tell (singleton $ CWarn posn $ DefinedNotImplemented sym)
-                _           -> unless (used symI) $ tell (singleton $ CWarn posn $ DefinedNotUsed sym)
+            if category symI == CatFunction then do
+                let Just (ValFunction _ body _) = value symI
+                when (isNothing body) $ do
+                    when (used symI) $ tellSError posn (UsedNotImplemented sym)
+                    tellCWarn posn (DefinedNotImplemented sym)
+            else unless (used symI) $ tellCWarn posn (DefinedNotUsed sym)
 
 --------------------------------------------------------------------------------
 
@@ -261,7 +276,7 @@ getsSymInfo (Lex iden posn) f = do
     maybe failure success $ lookupWithScope iden stck tab
     where
         success = return . Just . f
-        failure = tell (singleton $ SError posn $ NotDeclared iden) >> return Nothing
+        failure = tellSError posn (NotDefined iden) >> return Nothing
 
 {- |
     Modifies a symbol if said symbol exists in the table
@@ -330,7 +345,7 @@ checkArguments fname mayVal args posn = case mayVal of
         let prms = fmap lexInfo $ parameters val
         dts <- mapM checkExpression args
         unless (length args == length prms && and (zipWith (==) dts prms)) $
-            tell (singleton $ SError posn $ FunctionArguments fname prms dts)
+            tellSError posn (FunctionArguments fname prms dts)
     Nothing -> error "Checker.checkArguments: function with no SymInfo value"
 
 ----------------------------------------
@@ -353,7 +368,7 @@ processDeclaration (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
     case lookup iden tab of
         Nothing -> addSymbol idenL info >> return True
         Just si
-            | scopeNum si == serial sc  -> tell (singleton $ SError posn $ AlreadyDeclared iden (declPosn si)) >> return False
+            | scopeNum si == serial sc  -> tellSError posn (AlreadyDefined iden (declPosn si)) >> return False
             | otherwise                 -> addSymbol idenL info >> return True
 
 ----------------------------------------
@@ -385,7 +400,7 @@ checkStatement (Lex st posn) = case st of
             Just varDt -> do
                 markInitialized varL
                 unless (varDt == expDt) $
-                    tell (singleton $ SError posn $ InvalidAssignType var varDt expDt)
+                    tellSError posn (InvalidAssignType var varDt expDt)
             Nothing -> return ()
 
     StDeclaration dcl -> void $ processDeclaration dcl
@@ -398,30 +413,26 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
         currSc <- liftM (serial . fromJust . peek) $ gets stack
-        mayInf <- getsSymInfo fnameL (\si -> (value si, scopeNum si, category si, initialized si, declPosn si))
+        mayInf <- getsSymInfo fnameL $ \s -> (value s, currSc == scopeNum s, category s, initialized s, declPosn s)
         case mayInf of
-            Just (mayVal, sc, ct, initi, defp) -> case (mayVal, ct, currSc==sc, initi) of
-                (Just val,CatFunction,True,False) -> do
-                    markInitialized fnameL
-                    putValue fnameL $ ValFunction (parameters val) (Just body) posn
+            Just (Just val,True,CatFunction,False,_) -> do
+                markInitialized fnameL
+                putValue fnameL $ ValFunction (parameters val) (Just body) posn
 
-                    before <- getScopeVariables
-                    enterScope
+                before <- getScopeVariables
+                enterScope
 
-                    forM_ (zipWith func params (parameters val)) $ \dcl -> do
-                        processDeclaration dcl
-                        let Declaration varL _ _ = lexInfo dcl
-                        markInitialized varL
+                forM_ (zip params (parameters val)) $ \(varL,dt) -> do
+                    processDeclaration $ Declaration varL dt CatParameter <$ varL
+                    markInitialized varL
 
-                    checkStatements body
-                    exitScope
-                    putScopeVariables before
-                (Nothing,cat,_,_)   -> tell (singleton $ SError posn $ NonCategory fname CatFunction cat)
-                (Just val,_,_,True) -> tell (singleton $ SError posn $ AleradyImplemented fname (implPosn val))
-                (_,_,False,_)       -> tell (singleton $ SError posn $ ImpInDefScope fname defp)
-            Nothing -> tell (singleton $ SError posn $ FunctionNotDefined fname)
-            where
-                func iden dt = Declaration iden dt CatParameter <$ iden
+                checkStatements body
+                exitScope
+                putScopeVariables before
+            Just (Nothing,_,cat,_,_) -> tellSError posn (NonCategory fname CatFunction cat)
+            Just (Just v,_,_,True,_) -> tellSError posn (AleradyImplemented fname (implPosn v))
+            Just (_,False,_,_,defp)  -> tellSError posn (ImpInDefScope fname defp)
+            Nothing                  -> tellSError posn (FunctionNotDefined fname)
 
     StFunctionCall fnameL@(Lex fname _) args -> do
         mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
@@ -430,8 +441,8 @@ checkStatement (Lex st posn) = case st of
                 markUsed fnameL
                 case inf of
                     (CatFunction,mayVal,Void) -> checkArguments fname mayVal args posn
-                    (CatFunction,_,_)         -> tell (singleton $ SError posn $ FunctionAsStatement fname)
-                    (ct,_,_)                  -> tell (singleton $ SError posn $ NonCategory fname CatFunction ct)
+                    (CatFunction,_,_)         -> tellSError posn (FunctionAsStatement fname)
+                    (ct,_,_)                  -> tellSError posn (NonCategory fname CatFunction ct)
             Nothing -> return ()
 
     StRead vars -> forM_ vars $ \varL -> do
@@ -444,7 +455,7 @@ checkStatement (Lex st posn) = case st of
 
     StIf cnd success failure -> do
         dt <- checkExpression cnd
-        unless (dt == Bool || dt == Void) $ tell (singleton $ SError posn $ ConditionDataType dt)
+        unless (dt == Bool || dt == Void) $ tellSError posn (ConditionDataType dt)
         before <- getScopeVariables
 
         enterScope
@@ -468,7 +479,7 @@ checkStatement (Lex st posn) = case st of
 
         varScopes <- forM cs $ \(Lex (When wexps sts) wposn) -> do
             forM_ wexps $ checkExpression >=> \wd ->        -- forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
-                when (wd /= dt) $ tell (singleton $ SError wposn $ CaseWhenDataType dt wd)
+                when (wd /= dt) $ tellSError wposn (CaseWhenDataType dt wd)
 
             enterScope
             checkStatements sts
@@ -489,7 +500,7 @@ checkStatement (Lex st posn) = case st of
         checkStatements rep
         exitLoop >> exitScope
 
-        checkExpression cnd >>= \dt -> unless (dt == Bool) $ tell (singleton $ SError posn $ ConditionDataType dt)
+        checkExpression cnd >>= \dt -> unless (dt == Bool) $ tellSError posn (ConditionDataType dt)
 
         before <- getScopeVariables
 
@@ -501,7 +512,7 @@ checkStatement (Lex st posn) = case st of
 
     StFor var rng body -> do
         dt <- checkExpression rng
-        unless (dt == Range) $ tell (singleton $ SError posn $ ForInDataType dt)
+        unless (dt == Range) $ tellSError posn (ForInDataType dt)
 
         before <- getScopeVariables
 
@@ -515,11 +526,11 @@ checkStatement (Lex st posn) = case st of
 
     StBreak -> do
         loopL <- gets loop
-        unless (loopL > 0) $ tell (singleton $ SError posn BreakOutsideLoop)
+        unless (loopL > 0) $ tellSError posn BreakOutsideLoop
 
     StContinue -> do
         loopL <- gets loop
-        unless (loopL > 0) $ tell (singleton $ SError posn ContinueOutsideLoop)
+        unless (loopL > 0) $ tellSError posn ContinueOutsideLoop
 
 {- |
     Checks the validity of an expression and returns it's value.
@@ -533,13 +544,13 @@ checkExpression (Lex e posn) = case e of
                 markUsed varL
                 case inf of
                     (CatVariable,ini,dt)  -> do
-                        unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
+                        unless ini $ tellSError posn (VariableNotInitialized var)
                         return dt
                     (CatParameter,ini,dt) -> do
-                        unless ini $ tell (singleton $ SError posn $ VariableNotInitialized var)
+                        unless ini $ tellSError posn (VariableNotInitialized var)
                         return dt
                     (ct,_,_)              -> do
-                        tell (singleton $ SError posn $ NonCategory var CatVariable ct)
+                        tellSError posn (NonCategory var CatVariable ct)
                         return Void
             Nothing -> return Void
 
@@ -550,13 +561,13 @@ checkExpression (Lex e posn) = case e of
                 markUsed fnameL
                 case inf of
                     (CatFunction,_,Void)    -> do
-                        tell (singleton $ SError posn $ ProcedureInExpression fname)
+                        tellSError posn (ProcedureInExpression fname)
                         return Void
                     (CatFunction,mayVal,dt) -> do
                         checkArguments fname mayVal args posn
                         return dt
                     (ct,_,_)                -> do
-                        tell (singleton $ SError posn $ NonCategory fname CatFunction ct)
+                        tellSError posn (NonCategory fname CatFunction ct)
                         return Void
             Nothing -> return Void
 
@@ -577,7 +588,7 @@ checkExpression (Lex e posn) = case e of
         if null dts
             then do
                 -- If there's a 'Void' an error has already been raised about this.
-                when (Void `notElem` [ldt,rdt]) $ tell (singleton $ SError posn $ BinaryTypes op (ldt,rdt))
+                when (Void `notElem` [ldt,rdt]) $ tellSError posn (BinaryTypes op (ldt,rdt))
                 return . snd . flip index 0 $ binaryOperation op
             else return . snd $ index dts 0
 
@@ -586,6 +597,6 @@ checkExpression (Lex e posn) = case e of
         let dts = filter ((dt==) . fst) $ unaryOperation op
         if null dts
             then do
-                tell (singleton $ SError posn $ UnaryTypes op dt)
+                tellSError posn (UnaryTypes op dt)
                 return . snd . flip index 0 $ unaryOperation op
             else return . snd $ index dts 0
