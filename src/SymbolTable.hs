@@ -83,17 +83,22 @@ data Value
     | ValBool     Bool
     | ValChar     Char
     | ValFloat    Float
-    | ValFunction { parameters :: Seq (Lexeme DataType), impl :: StBlock }
+    | ValFunction { parameters :: Seq (Lexeme DataType)
+                  , impl       :: Maybe StBlock
+                  , implPosn   :: Position
+                  }
 
 instance Show Value where
-    show (ValInt v)        = show v
-    show (ValBool v)       = show v
-    show (ValChar v)       = show v
-    show (ValFloat v)      = show v
-    show (ValFunction p i) = showP ++ showI
+    show (ValInt v)          = show v
+    show (ValBool v)         = show v
+    show (ValChar v)         = show v
+    show (ValFloat v)        = show v
+    show (ValFunction p i _) = showP ++ ": " ++ showI
         where
             showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
-            showI = concatMap show $ toList i
+            showI = case i of
+                Just _  -> "implemented"
+                Nothing -> "NOT implemented"
 
 ----------------------------------------
 

@@ -11,7 +11,7 @@ import           Prelude                hiding (mapM_)
 type Position = (Int, Int) -- (Fila, Columna)
 
 showPosn :: Position -> String
-showPosn (line, col) = show line ++ "," ++ show col ++ ": "
+showPosn (line, col) = show line ++ "," ++ show col
 
 ----------------------------------------
 
@@ -85,7 +85,15 @@ data Category
     | CatRecordField
     | CatUnionField
     | CatDataType
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show Category where
+    show CatVariable    = "Variable"
+    show CatFunction    = "Function"
+    show CatParameter   = "Parameter"
+    show CatRecordField = "Record Field"
+    show CatUnionField  = "Union Field"
+    show CatDataType    = "Data Type"
 
 data When = When (Seq (Lexeme Expression)) StBlock
     deriving (Show)
