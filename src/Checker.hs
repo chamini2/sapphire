@@ -400,29 +400,26 @@ checkStatement (Lex st posn) = case st of
         currSc <- liftM (serial . fromJust . peek) $ gets stack
         mayInf <- getsSymInfo fnameL (\si -> (value si, scopeNum si, category si, initialized si, declPosn si))
         case mayInf of
-            Just (Just val, sc, ct, ini, defp) -> if ct == CatFunction
-                then do
-                    when ini $ tell (singleton $ SError posn $ AleradyImplemented fname (implPosn val))
-                    if currSc /= sc
-                        then tell (singleton $ SError posn $ ImpInDefScope fname defp)
-                        else do
-                            markInitialized fnameL
-                            putValue fnameL $ ValFunction (parameters val) (Just body) posn
+            Just (mayVal, sc, ct, initi, defp) -> case (mayVal, ct, currSc==sc, initi) of
+                (Just val,CatFunction,True,False) -> do
+                    markInitialized fnameL
+                    putValue fnameL $ ValFunction (parameters val) (Just body) posn
 
-                            before <- getScopeVariables
-                            enterScope
+                    before <- getScopeVariables
+                    enterScope
 
-                            forM_ (zipWith func params (parameters val)) $ \dcl -> do
-                                processDeclaration dcl
-                                let Declaration varL _ _ = lexInfo dcl
-                                markInitialized varL
+                    forM_ (zipWith func params (parameters val)) $ \dcl -> do
+                        processDeclaration dcl
+                        let Declaration varL _ _ = lexInfo dcl
+                        markInitialized varL
 
-                            checkStatements body
-                            exitScope
-                            putScopeVariables before
-                    else tell (singleton $ SError posn $ NonCategory fname CatFunction ct)
-
-            _ -> tell (singleton $ SError posn $ FunctionNotDefined fname)
+                    checkStatements body
+                    exitScope
+                    putScopeVariables before
+                (Nothing,cat,_,_)   -> tell (singleton $ SError posn $ NonCategory fname CatFunction cat)
+                (Just val,_,_,True) -> tell (singleton $ SError posn $ AleradyImplemented fname (implPosn val))
+                (_,_,False,_)       -> tell (singleton $ SError posn $ ImpInDefScope fname defp)
+            Nothing -> tell (singleton $ SError posn $ FunctionNotDefined fname)
             where
                 func iden dt = Declaration iden dt CatParameter <$ iden
 
