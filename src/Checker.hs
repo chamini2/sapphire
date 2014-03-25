@@ -5,17 +5,19 @@ import           SymbolTable
 
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
-import           Control.Monad.RWS      hiding (forM, mapM, forM_, mapM_)
-import           Data.Foldable          as DF (elem, foldr, forM_, mapM_,
-                                               toList, concatMap, and, find)
+import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
+import           Data.Foldable          as DF (and, concatMap, elem, find,
+                                               foldr, forM_, mapM_, toList)
 import           Data.Function          (on)
 import           Data.Functor           ((<$))
-import           Data.Maybe             (isJust, fromJust, isNothing)
-import           Data.Sequence          as DS (Seq, empty, fromList, index, sortBy,
-                                               singleton, zipWith, (<|), (|>), length, filter, null, zip)
+import           Data.Maybe             (fromJust, isJust, isNothing)
+import           Data.Sequence          as DS (Seq, empty, filter, fromList,
+                                               index, length, null, singleton,
+                                               sortBy, zip, zipWith, (<|), (|>))
 import           Data.Traversable       as DT (forM, mapM)
-import           Prelude                as P hiding (elem, foldr, lookup, mapM, filter,
-                                              mapM_, zipWith, concatMap, length, and, null, zip)
+import           Prelude                as P hiding (and, concatMap, elem,
+                                              filter, foldr, length, lookup,
+                                              mapM, mapM_, null, zip, zipWith)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -72,7 +74,7 @@ data StaticError
     | FunctionAsStatement   Identifier
     | UsedNotImplemented    Identifier
     | ImpInDefScope         Identifier Position
-    | AleradyImplemented    Identifier Position
+    | AlreadyImplemented    Identifier Position
     | FunctionArguments     Identifier (Seq DataType) (Seq DataType)
     -- Statements
     | ConditionDataType DataType
@@ -99,7 +101,7 @@ instance Show StaticError where
     show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
     show (UsedNotImplemented fname)    = "function '" ++ fname ++ "' is used but never implemented"
     show (ImpInDefScope fname p)       = "must implement function '" ++ fname ++ "' in same scope that it is defined, at " ++ showPosn p
-    show (AleradyImplemented fname p)  = "function '" ++ fname ++ "' has already been implemented at " ++ showPosn p
+    show (AlreadyImplemented fname p)  = "function '" ++ fname ++ "' has already been implemented at " ++ showPosn p
     show (FunctionArguments fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
         where
             showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
@@ -125,7 +127,7 @@ data CheckWarning
     | DefinedNotImplemented Identifier
 
 instance Show CheckWarning where
-    show (DefinedNotUsed iden)         = "identifier '" ++ iden ++ "' is denfined but never used"
+    show (DefinedNotUsed iden)         = "identifier '" ++ iden ++ "' is defined but never used"
     show (DefinedNotImplemented fname) = "function '" ++ fname ++ "' is defined but never implemented"
 
 --------------------------------------------------------------------------------
@@ -133,7 +135,7 @@ instance Show CheckWarning where
 data CheckState = CheckState
     { table   :: SymTable
     , stack   :: Stack Scope
-    , scopeID :: ScopeNum
+    , scopeId :: ScopeNum
     , ast     :: Program
     , loop    :: LoopLevel
     }
@@ -155,6 +157,9 @@ errorPos (LError p _) = p
 errorPos (PError p _) = p
 errorPos (SError p _) = p
 errorPos (CWarn  p _) = p
+
+currentScope :: Checker ScopeNum
+currentScope = gets (serial . peek . stack)
 
 ----------------------------------------
 
@@ -179,7 +184,7 @@ initialState :: CheckState
 initialState = CheckState
     { table    = emptyTable
     , stack    = initialStack
-    , scopeID  = 0
+    , scopeId  = 0
     , ast      = Program DS.empty
     , loop     = 0
     }
@@ -222,8 +227,8 @@ checkWarnings :: Checker ()
 checkWarnings = do
     symbols <- gets $ accessible . table
     forM_ symbols $ \(sym, symIs) ->
-        forM_ symIs $ \(symI) -> do
-            let posn = declPosn symI
+        forM_ symIs $ \symI -> do
+            let posn = defPosn symI
             if category symI == CatFunction then do
                 let Just (ValFunction _ body _) = value symI
                 when (isNothing body) $ do
@@ -238,9 +243,9 @@ checkWarnings = do
 -}
 enterScope :: Checker ()
 enterScope = do
-    cs <- gets scopeID
+    cs <- gets scopeId
     let sc = Scope { serial = cs + 1 }
-    modify (\s -> s { stack = push sc (stack s), scopeID = cs + 1 })
+    modify (\s -> s { stack = push sc (stack s), scopeId = cs + 1 })
 
 {- |
     Exiting a scope that has just been checked
@@ -356,19 +361,18 @@ checkArguments fname mayVal args posn = case mayVal of
 -}
 processDeclaration :: Lexeme Declaration -> Checker Bool
 processDeclaration (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
-    tab   <- gets table
-    maySc <- gets (peek . stack)
-    let Just sc = maySc
-        info = emptySymInfo {
+    tab <- gets table
+    sc  <- currentScope
+    let info = emptySymInfo {
                  dataType = t,
                  category = c,
-                 scopeNum = serial sc,
-                 declPosn = posn
+                 scopeNum = sc,
+                 defPosn = posn
                }
     case lookup iden tab of
         Nothing -> addSymbol idenL info >> return True
         Just si
-            | scopeNum si == serial sc  -> tellSError posn (AlreadyDefined iden (declPosn si)) >> return False
+            | scopeNum si == sc  -> tellSError posn (AlreadyDefined iden (defPosn si)) >> return False
             | otherwise                 -> addSymbol idenL info >> return True
 
 ----------------------------------------
@@ -412,12 +416,12 @@ checkStatement (Lex st posn) = case st of
         when defined $ putValue iden $ ValFunction dts Nothing (0,0)
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
-        currSc <- liftM (serial . fromJust . peek) $ gets stack
-        mayInf <- getsSymInfo fnameL $ \s -> (value s, currSc == scopeNum s, category s, initialized s, declPosn s)
+        currSc <- currentScope
+        mayInf <- getsSymInfo fnameL $ \s -> (value s, currSc == scopeNum s, category s, initialized s, defPosn s)
         case mayInf of
             Just (Just val,True,CatFunction,False,_) -> do
                 markInitialized fnameL
-                putValue fnameL $ ValFunction (parameters val) (Just body) posn
+                putValue fnameL $ val { impl = Just body, implPosn = posn }
 
                 before <- getScopeVariables
                 enterScope
@@ -430,7 +434,7 @@ checkStatement (Lex st posn) = case st of
                 exitScope
                 putScopeVariables before
             Just (Nothing,_,cat,_,_) -> tellSError posn (NonCategory fname CatFunction cat)
-            Just (Just v,_,_,True,_) -> tellSError posn (AleradyImplemented fname (implPosn v))
+            Just (Just v,_,_,True,_) -> tellSError posn (AlreadyImplemented fname (implPosn v))
             Just (_,False,_,_,defp)  -> tellSError posn (ImpInDefScope fname defp)
             Nothing                  -> tellSError posn (FunctionNotDefined fname)
 
@@ -471,7 +475,7 @@ checkStatement (Lex st posn) = case st of
         putScopeVariables before
 
         forM_ (checkInitialization $ fromList [varSucc,varFail]) $ \(var,info) ->
-            when (initialized info) $ markInitialized (Lex var (declPosn info))
+            when (initialized info) $ markInitialized (Lex var (defPosn info))
 
     StCase ex cs els -> do
         dt <- checkExpression ex
@@ -493,7 +497,7 @@ checkStatement (Lex st posn) = case st of
 
         putScopeVariables before
         forM_ (checkInitialization $ varScopes |> varOtherwise) $ \(var,info) ->
-            when (initialized info) $ markInitialized (Lex var (declPosn info))
+            when (initialized info) $ markInitialized (Lex var (defPosn info))
 
     StLoop rep cnd body -> do
         enterScope >> enterLoop

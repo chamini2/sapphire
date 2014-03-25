@@ -38,7 +38,7 @@ data SymInfo = SymInfo
     , category    :: Category
     , value       :: Maybe Value
     , scopeNum    :: ScopeNum
-    , declPosn    :: Position
+    , defPosn     :: Position
     , initialized :: Bool
     , used        :: Bool
     }
@@ -62,7 +62,7 @@ emptySymInfo = SymInfo
     , category    = CatVariable
     , value       = Nothing
     , scopeNum    = -1
-    , declPosn    = (0, 0)
+    , defPosn     = (0, 0)
     , initialized = False
     , used        = False
     }
@@ -190,9 +190,9 @@ instance DF.Foldable Stack where
 {- |
     Shows the first element in the stack, if there are any, without popping it.
 -}
-peek :: Stack a -> Maybe a
-peek (Stack [])      = Nothing
-peek (Stack (x : _)) = Just x
+peek :: Stack a -> a
+peek (Stack [])      = error "SymbolTable.peek: Empty stack"
+peek (Stack (x : _)) = x
 
 {- |
     Pushes an element to the stack.
