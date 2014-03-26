@@ -56,6 +56,7 @@ import           Prelude       hiding (concatMap, foldr)
         "as"            { Lex TkAs          _ }
         "::"            { Lex TkSignature   _ }
         "->"            { Lex TkArrow       _ }
+        "."             { Lex TkDot         _ }
 
         -- -- In/Out
         "read"          { Lex TkRead        _ }

@@ -5,7 +5,7 @@ import           Checker            (CheckState (..), Checker, checkProgram,
 import           Parser
 
 import           Control.Monad       (guard, void)
-import           Control.Monad.Trans (liftIO)
+import           Control.Monad.Trans (lift)
 import           Control.Monad.Trans.Maybe
 import           Data.Foldable       (mapM_)
 import           Data.Sequence       as DS (null)
@@ -39,13 +39,13 @@ printProgram chk = do
             let (lexErrors,parseErrors,staticErrors,warnings) = getErrors writer
             -- Only print errors if there are no errors of more basic type
             void $ runMaybeT $ do
-                liftIO $ mapM_ print lexErrors
+                lift $ mapM_ print lexErrors
 
                 guard $ DS.null lexErrors
-                liftIO $ mapM_ print parseErrors
+                lift $ mapM_ print parseErrors
 
                 guard $ DS.null parseErrors
-                liftIO $ mapM_ print staticErrors
+                lift $ mapM_ print staticErrors
 
                 guard $ DS.null staticErrors
-                liftIO $ mapM_ print warnings
+                lift $ mapM_ print warnings

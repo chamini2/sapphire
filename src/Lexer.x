@@ -90,6 +90,7 @@ tokens :-
         "as"            { lex' TkAs             }
         "::"            { lex' TkSignature      }
         "->"            { lex' TkArrow          }
+        "."             { lex' TkDot            }
 
         -- -- In/Out
         "read"          { lex' TkRead           }
