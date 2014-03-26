@@ -40,8 +40,9 @@ type StBlock = Seq (Lexeme Statement)
 
 data DataType
     = Void | Int | Float | Bool | Char | String | Range | Type
+    | Union | Record
     | Array (Lexeme DataType)
-    | Union (Lexeme Identifier) | Record (Lexeme Identifier)
+    | User  (Lexeme Identifier)
     deriving (Show, Eq)
 
 ----------------------------------------
@@ -51,8 +52,9 @@ data Statement
     = StNoop
     | StAssign (Lexeme Identifier) (Lexeme Expression)
     -- Definitions
-    | StDeclaration     (Lexeme Declaration)
-    | StDeclarationList (Seq (Lexeme Declaration, Maybe (Lexeme Expression)))
+    | StDeclaration       (Lexeme Declaration)
+    | StDeclarationList   (DeclarationList Expression)
+    | StStructDeclaration (Lexeme Declaration) (DeclarationList Statement)
     -- Functions
     | StReturn       (Lexeme Expression)
     | StFunctionDef  (Lexeme Declaration) (Seq (Lexeme DataType))
@@ -77,6 +79,8 @@ instance Show Statement where
 
 data Declaration = Declaration (Lexeme Identifier) (Lexeme DataType) Category
     deriving (Show)
+
+type DeclarationList a = Seq (Lexeme Declaration, Maybe (Lexeme a))
 
 data Category
     = CatVariable
@@ -214,6 +218,18 @@ printStatement st = case st of
         printNonTerminal "DECLARATION"
         raiseTabs
         printNonTerminal $ show (lexInfo dt) ++ " " ++ lexInfo ld
+        lowerTabs
+
+    StStructDeclaration (Lex (Declaration sn dt _) _) dcls -> do
+        printNonTerminal $ "STUCT " ++ show (lexInfo dt) ++ " " ++ lexInfo sn
+        raiseTabs
+        forM_ dcls $ \(Lex (Declaration fn fdt _) _, maySt) -> do
+            printNonTerminal $ "- field: " ++ show (lexInfo fdt) ++ " " ++ lexInfo fn
+            raiseTabs
+            case maySt of
+                Just (Lex (StAssign _ (Lex expr _)) _) -> printExpressionWithTag "- default: " expr
+                Nothing     -> printNonTerminal "- no default"
+            lowerTabs
         lowerTabs
 
     StReturn (Lex expr _)     -> printExpressionWithTag "RETURN" expr

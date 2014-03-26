@@ -6,11 +6,11 @@ import           Lexer
 import           Language
 import           Checker
 
-import           Control.Arrow     (first)
-import qualified Data.Foldable     as DF
+import           Control.Arrow (first)
+import           Data.Foldable as DF (concatMap, foldr)
 import           Data.Functor
-import           Data.Sequence     hiding (reverse)
-import           Prelude
+import           Data.Sequence hiding (reverse)
+import           Prelude       hiding (concatMap, foldr)
 }
 
 %name parse
@@ -150,46 +150,65 @@ StatementList :: { StBlock }
     | StatementList Separator Statement     { $1 >< filterSt $3 }
 
 Statement :: { Lexeme Statement }
-    :                           { Lex StNoop (0,0) }      -- λ, no-operation
-    | varid "=" Expression      { (flip StAssign $3 . (<$ $1) . unTkVarId) `fmap` $1 }
+    :                               { Lex StNoop (0,0) }      -- λ, no-operation
+    | VariableId "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
-    | DataType DeclareVariableList  { (StDeclarationList $ fmap (first $ \lVar -> (Declaration lVar $1 CatVariable) <$ lVar) $2) <$ $1 }
-    | "return" Expression           { StReturn $2 <$ $1 }
+    | "Record" TypeId "as" MaybeNL FieldList MaybeNL "end"      { makeStStructDeclaration (Record <$ $1) CatRecordField $2 (lexPosn $1) $5 }
+    | "Union"  TypeId "as" MaybeNL FieldList MaybeNL "end"      { makeStStructDeclaration (Union  <$ $1)  CatUnionField  $2 (lexPosn $1) $5 }
+    | DataType DeclareVariableList      { (StDeclarationList $ fmap (first (\iden -> Declaration iden $1 CatVariable <$ iden)) $2) <$ $1 }
+    | "return" Expression               { StReturn $2 <$ $1 }
 
     -- Functions
-    | "def" varid "::" Signature                                      { let (dts,rt) = $4 in StFunctionDef ((Declaration (unTkVarId `fmap` $2) rt CatFunction) <$ $2) dts <$ $1 }
-    | "imp" varid "(" MaybeVariableList ")" "as" StatementList "end"  { StFunctionImp  (unTkVarId `fmap` $2) $4 $7 <$ $1 }
-    | varid "(" MaybeExpressionList ")"                               { StFunctionCall (unTkVarId `fmap` $1) $3    <$ $1 }
+    | "def" VariableId "::" Signature                                      { StFunctionDef ((Declaration $2 (snd $4) CatFunction) <$ $2) (fst $4) <$ $1 }
+    | "imp" VariableId "(" MaybeVariableList ")" "as" StatementList "end"  { StFunctionImp  $2 $4 $7 <$ $1 }
+    | VariableId "(" MaybeExpressionList ")"                               { StFunctionCall $1 $3    <$ $1 }
 
     -- Conditional
-    | "if"     Expression "then" StatementList ElIfs "end"                      { StIf $2 $4 $5 <$ $1 }
-    | "unless" Expression "then" StatementList "end"                            { StIf (negateExp $2) $4 empty <$ $1 }
-    | "unless" Expression "then" StatementList "else" StatementList "end"       { StIf (negateExp $2) $4 $6    <$ $1 }
-    | "case" Expression MaybeNewLine WhenList "end"                             { StCase $2 $4 empty <$ $1 }
-    | "case" Expression MaybeNewLine WhenList "otherwise" StatementList "end"   { StCase $2 $4 $6    <$ $1 }
+    | "if"     Expression "then" StatementList ElIfs "end"                      { StIf $2          $4 $5    <$ $1 }
+    | "unless" Expression "then" StatementList "end"                            { StIf (notExp $2) $4 empty <$ $1 }
+    | "unless" Expression "then" StatementList "else" StatementList "end"       { StIf (notExp $2) $4 $6    <$ $1 }
+    | "case" Expression MaybeNL WhenList "end"                                  { StCase $2 $4 empty <$ $1 }
+    | "case" Expression MaybeNL WhenList "otherwise" StatementList "end"        { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
     | "read" VariableList       { StRead  $2 <$ $1 }
     | "print" ExpressionList    { StPrint $2 <$ $1 }
 
     -- Loops
-    | "while" Expression "do" StatementList "end"                                              { StLoop empty $2             $4    <$ $1 }
-    | "until" Expression "do" StatementList "end"                                              { StLoop empty (negateExp $2) $4    <$ $1 }
-    | "repeat" StatementList "end" MaybeNewLine "while" Expression                             { StLoop $2 $6             empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNewLine "until" Expression                             { StLoop $2 (negateExp $6) empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNewLine "while" Expression "do" StatementList "end"    { StLoop $2 $6             $8 <$ $1 }
-    | "repeat" StatementList "end" MaybeNewLine "until" Expression "do" StatementList "end"    { StLoop $2 (negateExp $6) $8 <$ $1 }
-    | "for" varid "in" Expression "do" StatementList "end"      { StFor (unTkVarId `fmap` $2) $4 $6 <$ $1 }
+    | "while" Expression "do" StatementList "end"                                              { StLoop empty $2          $4    <$ $1 }
+    | "until" Expression "do" StatementList "end"                                              { StLoop empty (notExp $2) $4    <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "while" Expression                                  { StLoop $2    $6          empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "until" Expression                                  { StLoop $2    (notExp $6) empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"         { StLoop $2    $6          $8    <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"         { StLoop $2    (notExp $6) $8    <$ $1 }
+    | "for" VariableId "in" Expression "do" StatementList "end"                                { StFor $2 $4 $6 <$ $1 }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
 
     -- Error
     | error Separator   { Lex StNoop (0,0) }
 
-MaybeNewLine :: { () }
-    :                           { }
-    | MaybeNewLine newline      { }
+VariableId :: { Lexeme Identifier }
+    : varid         { unTkVarId `fmap` $1 }
+
+TypeId :: { Lexeme Identifier }
+    : typeid        { unTkTypeId `fmap` $1 }
+
+FieldList :: { Seq (Lexeme (Category -> Declaration), Maybe (Lexeme Statement)) }
+    : Field                                     { singleton $1 }
+    | FieldList MaybeNL "," MaybeNL Field       { $1 |> $5     }
+
+Field :: { (Lexeme (Category -> Declaration), Maybe (Lexeme Statement)) }
+    : VariableId MaybeInitialized "::" DataType     { (Declaration $1 $4 <$ $1, (fmap (\expr -> StAssign $1 expr <$ $1) $2)) }
+
+MaybeInitialized :: { Maybe (Lexeme Expression) }
+    :                       { Nothing }
+    | "=" Expression        { Just $2 }
+
+MaybeNL :: { () }
+    :                      { }
+    | MaybeNL newline      { }
 
 Separator :: { () }
     : ";"           { }
@@ -210,33 +229,30 @@ WhenList :: { Seq (Lexeme When) }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"             { Int    <$ $1 }
-    | "Float"           { Float  <$ $1 }
-    | "Bool"            { Bool   <$ $1 }
-    | "Char"            { Char   <$ $1 }
-    | "String"          { String <$ $1 }
-    | "Range"           { Range  <$ $1 }
-    | "Type"            { Type   <$ $1 }
-    | "Union"  typeid   { Union  (unTkTypeId `fmap` $2) <$ $1 }
-    | "Record" typeid   { Record (unTkTypeId `fmap` $2) <$ $1 }
+    : "Int"             { Int     <$ $1 }
+    | "Float"           { Float   <$ $1 }
+    | "Bool"            { Bool    <$ $1 }
+    | "Char"            { Char    <$ $1 }
+    | "String"          { String  <$ $1 }
+    | "Range"           { Range   <$ $1 }
+    | "Type"            { Type    <$ $1 }
+    | TypeId            { User $1 <$ $1 }
+    --| "Union"  typeid   { Union  (unTkTypeId `fmap` $2) <$ $1 }
+    --| "Record" typeid   { Record (unTkTypeId `fmap` $2) <$ $1 }
 --    | "[" DataType "]"  { Array $2 <$ $1}
 --    | "[" DataType "|" Expression "]"  { Array $2 $3 <$ $1}
 
 VariableList :: { Seq (Lexeme Identifier) }
-    : varid                         { singleton $ unTkVarId `fmap` $1  }
-    | VariableList "," varid        { $1      |> (unTkVarId `fmap` $3) }
+    : VariableId                         { singleton $1  }
+    | VariableList "," VariableId        { $1 |> $3      }
 
 MaybeVariableList :: { Seq (Lexeme Identifier) }
     :                           { empty }
     | VariableList              { $1    }
 
 DeclareVariableList :: { Seq (Lexeme Identifier, Maybe (Lexeme Expression)) }
-    : MaybeInitializeVariable                               { singleton $1 }
-    | DeclareVariableList "," MaybeInitializeVariable       { $1     |> $3 }
-
-MaybeInitializeVariable :: { (Lexeme Identifier, Maybe (Lexeme Expression)) }
-    : varid "=" Expression      { (unTkVarId `fmap` $1, Just $3) }
-    | varid                     { (unTkVarId `fmap` $1, Nothing) }
+    : VariableId MaybeInitialized                               { singleton ($1, $2) }
+    | DeclareVariableList "," VariableId MaybeInitialized       { $1     |> ($3, $4) }
 
 DataTypeList :: { Seq (Lexeme DataType) }
     : DataType                   { singleton $1 }
@@ -258,9 +274,9 @@ SignatureReturn :: { Lexeme DataType }
 
 Expression :: { Lexeme Expression }
     -- Variable
-    : varid                                 { Variable (unTkVarId `fmap` $1) <$ $1 }
+    : VariableId                                 { Variable $1 <$ $1 }
     -- Function call
-    | varid "(" MaybeExpressionList ")"     { FunctionCall (unTkVarId `fmap` $1) $3 <$ $1 }
+    | VariableId "(" MaybeExpressionList ")"     { FunctionCall $1 $3 <$ $1 }
     -- Literals
     | int                          { LitInt    (unTkInt    `fmap` $1) <$ $1 }
     | float                        { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
@@ -302,17 +318,25 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 --------------------------------------------------------------------------------
 -- Functions
 
-negateExp :: Lexeme Expression -> Lexeme Expression
-negateExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
+notExp :: Lexeme Expression -> Lexeme Expression
+notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
+
+makeStStructDeclaration :: Lexeme DataType -> Category -> Lexeme Identifier -> Position ->
+    Seq (Lexeme (Category -> Declaration) , Maybe (Lexeme Statement)) -> Lexeme Statement
+makeStStructDeclaration dt cat iden p ls = Lex (StStructDeclaration decl list) p
+    where
+        list = fmap (uncurry func) ls
+        decl = Lex (Declaration iden dt CatDataType) p
+        func (Lex toDcl posn) maySt = (Lex (toDcl cat) posn, maySt)
 
 filterSt :: Lexeme Statement -> StBlock
 filterSt st = case lexInfo st of
     StNoop                 -> empty
-    StDeclarationList dcls -> DF.foldr func empty dcls
+    StDeclarationList dcls -> fromList $ concatMap (uncurry func) dcls
         where
-            func (dcl@(Lex (Declaration var _ _) _), mayExpr) sts = flip (><) sts $ case mayExpr of
-                Just expr -> fromList [StDeclaration dcl <$ dcl, StAssign var expr <$ expr]
-                Nothing   -> singleton $ StDeclaration dcl <$ dcl
+            func dcl@(Lex (Declaration var _ _) _) mayExpr = (StDeclaration dcl <$ dcl) : case mayExpr of
+                Just expr -> [StAssign var expr <$ expr]
+                Nothing   -> []
     -- No other statement needs a filter
     _ -> singleton st
 

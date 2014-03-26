@@ -123,7 +123,7 @@ emptyTable = SymTable DM.empty
  -}
 insert :: Identifier -> SymInfo -> SymTable -> SymTable
 insert vn info (SymTable m) = SymTable $ DM.alter f vn m
-    where f Nothing  = Just $ DS.singleton info
+    where f Nothing  = Just $ singleton info
           f (Just x) = Just $ info <| x
 
 {- |
@@ -172,7 +172,7 @@ updateWithScope var sc f (SymTable m) = SymTable $ DM.alter func var m
     Returns all the variables
  -}
 accessible :: SymTable -> Seq (Identifier, Seq SymInfo)
-accessible (SymTable m) = DS.fromList $ DM.toList m
+accessible (SymTable m) = fromList $ DM.toList m
 
 --------------------------------------------------------------------------------
 

@@ -7,9 +7,10 @@ import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
 import           Data.Foldable          as DF (and, concatMap, elem, find,
-                                               foldr, forM_, mapM_, toList)
+                                               foldr, forM_, mapM_, notElem,
+                                               toList)
 import           Data.Function          (on)
-import           Data.Functor           ((<$))
+import           Data.Functor           ((<$), (<$>))
 import           Data.Maybe             (fromJust, isJust, isNothing)
 import           Data.Sequence          as DS (Seq, empty, filter, fromList,
                                                index, length, null, singleton,
@@ -17,7 +18,8 @@ import           Data.Sequence          as DS (Seq, empty, filter, fromList,
 import           Data.Traversable       as DT (forM, mapM)
 import           Prelude                as P hiding (and, concatMap, elem,
                                               filter, foldr, length, lookup,
-                                              mapM, mapM_, null, zip, zipWith)
+                                              mapM, mapM_, notElem, null, zip,
+                                              zipWith)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -229,12 +231,11 @@ checkWarnings = do
     forM_ symbols $ \(sym, symIs) ->
         forM_ symIs $ \symI -> do
             let posn = defPosn symI
-            if category symI == CatFunction then do
-                let Just (ValFunction _ body _) = value symI
-                when (isNothing body) $ do
-                    when (used symI) $ tellSError posn (UsedNotImplemented sym)
-                    tellCWarn posn (DefinedNotImplemented sym)
-            else unless (used symI) $ tellCWarn posn (DefinedNotUsed sym)
+            case (category symI, used symI, initialized symI) of
+                (CatFunction, True , False) -> tellSError posn (UsedNotImplemented sym)
+                (CatFunction, False, True ) -> tellCWarn posn (DefinedNotUsed sym)
+                (CatFunction, False, False) -> tellCWarn posn (DefinedNotImplemented sym)
+                (_          , False, _    ) -> tellCWarn posn (DefinedNotUsed sym)
 
 --------------------------------------------------------------------------------
 
@@ -347,7 +348,7 @@ checkInitialization scopes = foldr (zipWith func) (index scopes 0) scopes
 checkArguments :: Identifier -> Maybe Value -> Seq (Lexeme Expression) -> Position -> Checker ()
 checkArguments fname mayVal args posn = case mayVal of
     Just val -> do
-        let prms = fmap lexInfo $ parameters val
+        let prms = lexInfo <$> parameters val
         dts <- mapM checkExpression args
         unless (length args == length prms && and (zipWith (==) dts prms)) $
             tellSError posn (FunctionArguments fname prms dts)
@@ -408,6 +409,15 @@ checkStatement (Lex st posn) = case st of
             Nothing -> return ()
 
     StDeclaration dcl -> void $ processDeclaration dcl
+
+    StStructDeclaration structDcl dcls -> do
+        processDeclaration structDcl
+        enterScope
+        forM_ dcls $ \(field, maySt) -> do
+            processDeclaration field
+            case maySt of
+                Just assign -> checkStatement assign
+                Nothing     -> return ()
 
     StReturn ex       -> void $ checkExpression ex
 
@@ -592,7 +602,7 @@ checkExpression (Lex e posn) = case e of
         if null dts
             then do
                 -- If there's a 'Void' an error has already been raised about this.
-                when (Void `notElem` [ldt,rdt]) $ tellSError posn (BinaryTypes op (ldt,rdt))
+                when (Void `notElem` fromList [ldt,rdt]) $ tellSError posn (BinaryTypes op (ldt,rdt))
                 return . snd . flip index 0 $ binaryOperation op
             else return . snd $ index dts 0
 
