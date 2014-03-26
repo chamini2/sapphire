@@ -202,6 +202,11 @@ FieldList :: { Seq (Lexeme (Category -> Declaration), Maybe (Lexeme Statement)) 
 Field :: { (Lexeme (Category -> Declaration), Maybe (Lexeme Statement)) }
     : VariableId MaybeInitialized "::" DataType     { (Declaration $1 $4 <$ $1, (fmap (\expr -> StAssign $1 expr <$ $1) $2)) }
 
+StructAccess :: { Seq (Lexeme Identifier) }
+    -- This allows stuff like 'a . x = 10', accessing the field 'x' of variable 'a'
+    : VariableId   "." VariableId     { fromList [$1,$3] }
+    | StructAccess "." VariableId     { $1 |> $3         }
+
 MaybeInitialized :: { Maybe (Lexeme Expression) }
     :                       { Nothing }
     | "=" Expression        { Just $2 }
