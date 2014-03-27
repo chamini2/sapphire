@@ -236,6 +236,7 @@ checkWarnings = do
                 (CatFunction, False, True ) -> tellCWarn posn (DefinedNotUsed sym)
                 (CatFunction, False, False) -> tellCWarn posn (DefinedNotImplemented sym)
                 (_          , False, _    ) -> tellCWarn posn (DefinedNotUsed sym)
+                _                           -> return ()
 
 --------------------------------------------------------------------------------
 
@@ -418,6 +419,7 @@ checkStatement (Lex st posn) = case st of
             case maySt of
                 Just assign -> checkStatement assign
                 Nothing     -> return ()
+        exitScope
 
     StReturn ex       -> void $ checkExpression ex
 
@@ -487,21 +489,23 @@ checkStatement (Lex st posn) = case st of
         forM_ (checkInitialization $ fromList [varSucc,varFail]) $ \(var,info) ->
             when (initialized info) $ markInitialized (Lex var (defPosn info))
 
-    StCase ex cs els -> do
+    StCase ex cs othrw -> do
         dt <- checkExpression ex
         before <- getScopeVariables
 
         varScopes <- forM cs $ \(Lex (When wexps sts) wposn) -> do
             forM_ wexps $ checkExpression >=> \wd ->        -- forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
-                when (wd /= dt) $ tellSError wposn (CaseWhenDataType dt wd)
+                unless (wd == dt) $ tellSError wposn (CaseWhenDataType dt wd)
 
             enterScope
             checkStatements sts
             exitScope
-            getScopeVariables
+            varWhen <- getScopeVariables
+            putScopeVariables before
+            return varWhen
 
         enterScope
-        checkStatements els
+        checkStatements othrw
         exitScope
         varOtherwise <- getScopeVariables
 
