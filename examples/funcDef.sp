@@ -1,7 +1,5 @@
 def a :: Int,Int -> Int
 
-def a :: Int,Int -> Bool
-
 imp a (a,b) as
     return a + b
 end
@@ -26,7 +24,7 @@ print a
 # alerady defined
 def a :: Int,Int
 
-# def b :: Int -> Void
+# used but never implemented
 def b :: Int
 
 b (2)
@@ -40,10 +38,19 @@ print b(2)
 # is not a variable
 print b
 
+# must define before implement
+imp c () as
+  print "hello"
+end
 
 # def c :: Void -> Void
 # NOT ACCEPTED:     def c ::
 def c :: ()
+
+
+imp c () as
+  print "hello"
+end
 
 c()
 

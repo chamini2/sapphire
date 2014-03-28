@@ -2,8 +2,8 @@ def factorial :: Int -> Int
 imp factorial (a) as
     if a > 0 then
         return a * factorial (a - 1)
-    end 
+    end
     return 1
 end
 
-factorial(6)                
+print factorial(6)

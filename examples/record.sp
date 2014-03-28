@@ -1,8 +1,8 @@
-record Person { age :: Int, name :: String }
+Record Person as age :: Int, name :: String end
 
 Person a;
 
 print "Qué edad tienes y cuál es tu nombre"
-scan a.age, a.name
+read a.age, a.name
 
 print "Hola, ", a.name, ", wow, ¿", a.age, "? qué viejo"

@@ -221,7 +221,7 @@ printStatement st = case st of
         lowerTabs
 
     StStructDeclaration (Lex (Declaration sn dt _) _) dcls -> do
-        printNonTerminal $ "STUCT " ++ show (lexInfo dt) ++ " " ++ lexInfo sn
+        printNonTerminal $ "STRUCT " ++ show (lexInfo dt) ++ " " ++ lexInfo sn
         raiseTabs
         forM_ dcls $ \(Lex (Declaration fn fdt _) _, maySt) -> do
             printNonTerminal $ "- field: " ++ show (lexInfo fdt) ++ " " ++ lexInfo fn

@@ -65,7 +65,7 @@ import           Prelude       hiding (concatMap, foldr)
         -- -- Conditionals
         "if"            { Lex TkIf          _ }
         "then"          { Lex TkThen        _ }
-        "elif"          { Lex TlElif        _ }
+        "elif"          { Lex TkElif        _ }
         "else"          { Lex TkElse        _ }
         "unless"        { Lex TkUnless      _ }
         "case"          { Lex TkCase        _ }

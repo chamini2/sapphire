@@ -119,7 +119,7 @@ instance Show StaticError where
     -- General
     show (NonCategory iden e g) = "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
     show (NotDefined iden)      = "identifier '" ++ iden ++ "' has not been defined"
-    show (AlreadyDefined var p) = "identifier '" ++ var ++ "' has already been declared at " ++ show p
+    show (AlreadyDefined var p) = "identifier '" ++ var ++ "' has already been defined at " ++ show p
     show (StaticError msg)      = msg
 
 --------------------------------------------------------------------------------
@@ -303,16 +303,28 @@ putValue :: Lexeme Identifier -> Value -> Checker ()
 putValue var val = modifySymInfo var (\sym -> sym { value = Just val })
 
 {- |
-    Marks the specifued variable as initialized
+    Marks the specified variable as initialized
 -}
 markInitialized :: Lexeme Identifier -> Checker ()
 markInitialized var = modifySymInfo var (\sym -> sym { initialized = True })
+
+{- |
+    Gets a list of variables, checks which ones need initialization and intialises them.
+-}
+markAllInitializedUsed :: Seq (Identifier, SymInfo) -> Checker ()
+markAllInitializedUsed vars = forM_ vars $ \(var,info) -> do
+    let varL = Lex var (defPosn info)
+    when (initialized info) $ markInitialized varL
+    when (used info)        $ markUsed        varL
 
 {- |
     Marks the specifued variable as used
 -}
 markUsed :: Lexeme Identifier -> Checker ()
 markUsed var = modifySymInfo var (\sym -> sym { used = True })
+
+checkMark :: Seq (Seq (Identifier, SymInfo)) -> Checker ()
+checkMark = markAllInitializedUsed . checkInitialization
 
 {- |
     Returns the variables in the current scope
@@ -337,14 +349,19 @@ putScopeVariables vars = forM_ vars $ \(var, si) -> do
     let newTab = updateWithScope var (scopeNum si) (const si) tab
     modify (\s -> s { table = newTab })
 
-
+{- |
+    Checks if a variable has been initialized in all possible scopes.
+    Maintains used for variables used in at least one scope.
+-}
 checkInitialization :: Seq (Seq (Identifier, SymInfo)) -> Seq (Identifier, SymInfo)
 checkInitialization scopes = foldr (zipWith func) (index scopes 0) scopes
     where
         func :: (Identifier, SymInfo) -> (Identifier, SymInfo) -> (Identifier, SymInfo)
         func (a,sa) (b,sb) = if a /= b
-            then error "Checker.checkInitialization: zipping different variabls"
-            else (a, sa { initialized = initialized sa && initialized sb })
+            then error "Checker.checkInitialization: zipping different variables"
+            else (a, sa { initialized = initialized sa && initialized sb
+                        , used        = used        sa || used        sb
+                        })
 
 checkArguments :: Identifier -> Maybe Value -> Seq (Lexeme Expression) -> Position -> Checker ()
 checkArguments fname mayVal args posn = case mayVal of
@@ -363,7 +380,7 @@ checkArguments fname mayVal args posn = case mayVal of
 -}
 processDeclaration :: Lexeme Declaration -> Checker Bool
 processDeclaration (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
-    tab <- gets table
+    (tab,stck) <- gets (table &&& stack)
     sc  <- currentScope
     let info = emptySymInfo {
                  dataType = t,
@@ -371,11 +388,11 @@ processDeclaration (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
                  scopeNum = sc,
                  defPosn = posn
                }
-    case lookup iden tab of
+    case lookupWithScope iden stck tab of
         Nothing -> addSymbol idenL info >> return True
         Just si
             | scopeNum si == sc  -> tellSError posn (AlreadyDefined iden (defPosn si)) >> return False
-            | otherwise                 -> addSymbol idenL info >> return True
+            | otherwise          -> addSymbol idenL info >> return True
 
 ----------------------------------------
 
@@ -444,7 +461,12 @@ checkStatement (Lex st posn) = case st of
 
                 checkStatements body
                 exitScope
+                varBody <- getScopeVariables
+
                 putScopeVariables before
+                -- Only marks 'used'
+                checkMark $ fromList [varBody, before]
+
             Just (Nothing,_,cat,_,_) -> tellSError posn (NonCategory fname CatFunction cat)
             Just (Just v,_,_,True,_) -> tellSError posn (AlreadyImplemented fname (implPosn v))
             Just (_,False,_,_,defp)  -> tellSError posn (ImpInDefScope fname defp)
@@ -486,8 +508,7 @@ checkStatement (Lex st posn) = case st of
         varFail <- getScopeVariables
         putScopeVariables before
 
-        forM_ (checkInitialization $ fromList [varSucc,varFail]) $ \(var,info) ->
-            when (initialized info) $ markInitialized (Lex var (defPosn info))
+        checkMark $ fromList [varSucc,varFail]
 
     StCase ex cs othrw -> do
         dt <- checkExpression ex
@@ -502,6 +523,7 @@ checkStatement (Lex st posn) = case st of
             exitScope
             varWhen <- getScopeVariables
             putScopeVariables before
+
             return varWhen
 
         enterScope
@@ -510,8 +532,7 @@ checkStatement (Lex st posn) = case st of
         varOtherwise <- getScopeVariables
 
         putScopeVariables before
-        forM_ (checkInitialization $ varScopes |> varOtherwise) $ \(var,info) ->
-            when (initialized info) $ markInitialized (Lex var (defPosn info))
+        checkMark $ varScopes |> varOtherwise
 
     StLoop rep cnd body -> do
         enterScope >> enterLoop
@@ -525,8 +546,11 @@ checkStatement (Lex st posn) = case st of
         enterScope >> enterLoop
         checkStatements body
         exitLoop >> exitScope
+        varBody <- getScopeVariables
 
         putScopeVariables before
+        -- Only marks 'used'
+        checkMark $ fromList [varBody, before]
 
     StFor var rng body -> do
         dt <- checkExpression rng
@@ -539,8 +563,11 @@ checkStatement (Lex st posn) = case st of
         markInitialized var
         checkStatements body
         exitLoop >> exitScope
+        varBody <- getScopeVariables
 
         putScopeVariables before
+        -- Only marks 'used'
+        checkMark $ fromList [varBody, before]
 
     StBreak -> do
         loopL <- gets loop
