@@ -4,9 +4,10 @@ import           Control.Monad.Identity hiding (forM_, mapM_)
 import           Control.Monad.State    hiding (forM_, mapM_)
 import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
-import           Data.Foldable          as DF (foldr, forM_, mapM_, toList)
+import           Data.Foldable          as DF (foldr, forM_, mapM_, toList, concat)
+import           Data.List              (intersperse)
 import           Data.Sequence          as DS (Seq, singleton, fromList)
-import           Prelude                hiding (mapM_)
+import           Prelude                hiding (mapM_, concat)
 
 type Position = (Int, Int) -- (Fila, Columna)
 
@@ -23,7 +24,7 @@ data Lexeme a = Lex
 instance Show a => Show (Lexeme a) where
     show (Lex a p) = case p of
         (0,0) -> ""
-        _     -> showPosn p ++ show a
+        _     -> showPosn p ++ ": " ++ show a
 
 instance Functor Lexeme where
     fmap f (Lex a p) = Lex (f a) p
@@ -195,7 +196,7 @@ initialPState :: PrintState
 initialPState = PrintState { tabs = 0 }
 
 runPrinter :: Printer () -> String
-runPrinter = DF.foldr (++) "" . snd . runIdentity . runWriterT . flip runStateT initialPState
+runPrinter = concat . snd . runIdentity . runWriterT . flip runStateT initialPState
 
 type Printer a = StateT PrintState (WriterT (Seq String) Identity) a
 
@@ -259,7 +260,8 @@ printStatement st = case st of
 
             printNonTerminal "- signature: "
             raiseTabs
-            mapM_ (printNonTerminal . show) dts
+            let newDts = map (show . lexInfo) $ toList dts
+            printNonTerminal . concat $ intersperse ", " newDts
             lowerTabs
 
             printNonTerminal "- return type: "
@@ -341,9 +343,11 @@ printExpression e = case e of
     FunctionCall iden args -> do
         printNonTerminal "FUNCTION CALL"
         raiseTabs
-        printNonTerminal "- function name:"
-        printNonTerminal $ lexInfo iden
+        printNonTerminal $ "- function name: " ++ (show $ lexInfo iden)
+        printNonTerminal "- arguments: "
+        raiseTabs
         mapM_ (printExpression . lexInfo) args
+        lowerTabs
         lowerTabs
     LitInt    i      -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
     LitChar   c      -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)

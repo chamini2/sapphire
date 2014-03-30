@@ -29,3 +29,5 @@ end
 
 # y aquí otro por la x
 print x, w
+
+#habran warnings de definicion sin uso

@@ -16,13 +16,13 @@ Programa
 Ejemplos:
 
 ~~~ruby
-    write "hello world!\n"
+    print "hello world!\n"
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    <stats..>
+    <statements..>
 ~~~
 
 Es una lista de instrucciones a ejecutar una tras otra. Cada instrucción está terminada por punto y comas (`;`) o saltos de línea, *newlines*.  **Qué pasa si ponemos *backslash* al final de una línea?**
@@ -61,10 +61,10 @@ Las palabras reservadas son las siguientes
     def, imp, as, end, return
     true, false, or, and, not
     if, then, else, unless, case, when, otherwise
-    for, in, while, do, until, break, continue
+    for, in, repeat, while, do, until, break, continue
     print, read
     Void, Int, Bool, Float, Char
-    String, Array, Range, Union, Record
+    String, Range, Union, Record
 
     #
     ::, ->
@@ -101,7 +101,7 @@ Se dispone de los siguientes tipos de datos:
 
 **`Float`**
 
-> números flotantes de `N bits`, precisión y tal...
+> números flotantes de `N bits`, equivalente al tipo `Float` de *Haskell*.
 
 **`Char`**
 
@@ -111,9 +111,9 @@ Se dispone de los siguientes tipos de datos:
 
 > cadenas de caracteres, esencialmente `[Char]`.
 
-**`[Array]`**
+**`[<Type>]`**
 
-> arreglos, no se permiten `[Void]`. Se permiten arreglos de arreglos.
+> arreglos, se permiten arreglos de arreglos.
 
 **`Union`**
 
@@ -190,7 +190,7 @@ Ejemplos:
 
 ~~~ruby
     Bool valid
-    Int num, ind
+    Int num, ind = 0
 ~~~
 
 Sintaxis:
@@ -201,21 +201,24 @@ Sintaxis:
 
 Declara variables para el *alcance* actual.
 
-Se escribe primero el `Tipo` de las variables a declarar y luego una lista de identificadores.
+Se escribe primero el `Tipo` de las variables a declarar y luego una lista de identificadores. Se puede inicializar cada uno de estos.
 
 ### Declaración de arreglos
 
 Ejemplos:
 
 ~~~ruby
-    [[Int]] array <- [10]*[10], veinte <- [20]*[2];
+    [[Int]] array = [10]*[10], veinte = [20]*[2];
 ~~~
+
+***prototipo***
 
 Sintaxis:
 
 ~~~ruby
-    [<Type>] <id> <- [<expr Int>] [, <id> <- [<expre Int>]..]
+    [<Type>] <id> = [<expr Int>] [, <id> = [<expre Int>]..]
 ~~~
+
 
 Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`). Notar que el `[, <ids..>]` es opcional.
 
@@ -224,13 +227,16 @@ Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`
 Ejemplos:
 
 ~~~ruby
-    Record Coordenada = { x :: Int, y :: String }
+    Record Coordenada as
+        x :: Int,
+        y :: String
+    end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    Record <Id> = { <id> :: <Type> [, <id> <Type>..] }
+    Record <Id> as <id> :: <Type> [, <id> <Type>..] end
 ~~~
 
 Estructuras como `struct` del lenguaje `C`.
@@ -240,13 +246,16 @@ Estructuras como `struct` del lenguaje `C`.
 Ejemplos:
 
 ~~~ruby
-    Union MaybeInt = { just :: Int, nothing :: Void }
+    Union MaybeInt as
+          just    :: Int
+        , nothing :: Void
+    end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    Union <id> = { <id> :: <Type> [, <id> :: <Type>..] }
+    Union <Id> as <id> :: <Type> [, <id> :: <Type>..] end
 ~~~
 
 Uniones como `union` del lenguaje `C`.
@@ -282,7 +291,7 @@ Sintaxis:
     def <id> :: <firma>
 
     imp <id>(<ids..>) as
-        <stats..>
+        <statements..>
     end
 ~~~
 
@@ -324,7 +333,7 @@ Sintaxis:
     read <id> [, <ids..>]
 ~~~
 
-Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range????`).
+Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range`).
 
 ### Salida
 
@@ -360,9 +369,9 @@ Sintaxis:
 
 ~~~ruby
     if <expr Bool> then
-        <stats..>
+        <statements..>
     [else
-        <stats..>]
+        <statements..>]
     end
 ~~~
 
@@ -382,9 +391,9 @@ Sintaxis:
 
 ~~~ruby
     unless <expr Bool> then
-        <stats..>
+        <statements..>
     [else
-        <stats..>]
+        <statements..>]
     end
 ~~~
 
@@ -393,9 +402,9 @@ Es opuesto a un condicional `if`. Es equivalente a:
 
 ~~~ruby
     if not (<expr Bool>) then
-        <stats..>
+        <statements..>
     [else
-        <stats..>]
+        <statements..>]
     end
 ~~~
 
@@ -405,15 +414,15 @@ Ejemplos:
 
 ~~~ruby
     case age
-    when 0,1,2,3 do
-        print "bebé"
-    when 4,5,6,7,8,9,10,11,12 do
-        print "niño"
-    when 10,11,12,13,14,15,16,17 do
-        # notar que el 10,11 y 12 están en "niño" y "joven"
-        print "joven"
-    otherwise
-        print "adulto"
+        when 0,1,2,3 do
+            print "bebé"
+        when 4,5,6,7,8,9,10,11,12 do
+            print "niño"
+        when 10,11,12,13,14,15,16,17 do
+            # notar que el 10,11 y 12 están en "niño" y "joven"
+            print "joven"
+        otherwise
+            print "adulto"
     end
 ~~~
 
@@ -421,9 +430,9 @@ Sintaxis:
 
 ~~~ruby
     case <expr>
-    when <expr> do <stats..>
-    [when <expr> do <stats..>..]
-    [otherwise <stats..>]
+        when <expr> do <statements..>
+        [when <expr> do <statements..>..]
+        [otherwise <statements..>]
     end
 ~~~
 
@@ -443,12 +452,12 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    for <id> in <rango> do
-        <stats..>
+    for <id> in <range> do
+        <statements..>
     end
 ~~~
 
-El campo para `<rango>` debe ser del estilo `Int..Int`, puede ser con identificadores o expresiones. El `<id>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración éste deja de existir.
+El campo para `<range>` debe ser del estilo `Int..Int`, puede ser con identificadores o expresiones. El `<id>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración éste deja de existir.
 
 ### Iteración indeterminada
 
@@ -460,19 +469,34 @@ Ejemplos:
     end while money > 0 do
         spend(money)
     end
+
+    while money > 0 do
+        print money
+        spend(money)
+    end
+
+    repeat
+        print money
+        spend(money)
+    end while money > 0
 ~~~
 
 Sintaxis:
 
 ~~~ruby
     repeat
-        <stats..>
+        <statements..>
     end while <expr Bool> do
-        <stats..>
+        <statements..>
     end
 ~~~
 
-Mientras la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`.
+La instruccion `repeat` le da flexibilidad al programador al momento de definir
+las iteraciones determinadas. El bloque `repeat` no necesariamente estara definido, de
+igual manera el bloque `do` no es obligatorio. Sin embargo, es necesario que al menos uno
+de los dos esté presente.
+
+Mientras la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<statements..>`.
 
 ### Iteración indeterminada invertida
 
@@ -488,17 +512,17 @@ Sintaxis:
 
 ~~~ruby
     repeat
-        <stats..>
+        <statements..>
     end until <expr Bool> do
-        <stats..>
+        <statements..>
     end
 ~~~
 
-Hasta que la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<stats..>`. Es equivalente a:
+Hasta que la `<expr Bool>` evalue a `true`, ejecutar el cuerpo `<statements..>`. Es equivalente a:
 
 ~~~ruby
     while not (<expr Bool>) do
-        <stats..>
+        <statements..>
     end
 ~~~
 

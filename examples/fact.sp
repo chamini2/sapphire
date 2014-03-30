@@ -1,3 +1,5 @@
+#funciona
+
 def factorial :: Int -> Int
 imp factorial (a) as
     if a > 0 then
@@ -6,4 +8,10 @@ imp factorial (a) as
     return 1
 end
 
-print factorial(6)
+Int a
+
+print "¿A qué número quieres calculcarle el factorial?\n"
+
+read a
+
+print factorial(a)

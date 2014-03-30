@@ -28,7 +28,7 @@ if x%2 == 0 then
     print "par"
 # ejemplo de "el 'then' es opcional"
 # iguales está definida abajo
-else if iguales x%3, 0 then
+elif iguales x%3, 0 then
     print "trar"     # trar es un invento de Matteo®
 else
     print "imtrar"   # impar e intrar al mismo tiempo

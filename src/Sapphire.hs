@@ -31,7 +31,7 @@ printProgram chk = do
     mapM_ print parseE
     mapM_ print staticE
     mapM_ print afterW
-    putStrLn "#################################################################\n"
+    {-putStrLn "#################################################################\n"
     -- /TEMPORAL
     if DS.null writer
         then print stAst
@@ -48,4 +48,4 @@ printProgram chk = do
                 lift $ mapM_ print staticErrors
 
                 guard $ DS.null staticErrors
-                lift $ mapM_ print warnings
+                lift $ mapM_ print warnings-}

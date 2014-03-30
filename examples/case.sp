@@ -9,6 +9,7 @@ case a
         b = 2
         c = 1
     otherwise
+        Int c = 10
         b = 1
 end
 
