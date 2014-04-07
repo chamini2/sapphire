@@ -309,7 +309,7 @@ Expression :: { Lexeme Expression }
     | Expression "@"   Expression  { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
     | "-"   Expression             { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" Expression             { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
-    | "(" Expression ")"           { let (Lex expr p) = $2 in expr <$ $1 }
+    | "(" Expression ")"           { lexInfo $2 <$ $1 }
 
 ExpressionList :: { Seq (Lexeme Expression) }
     : Expression                          { singleton $1 }
