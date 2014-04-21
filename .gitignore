@@ -9,11 +9,6 @@ src/Lexer.hs
 src/Parser.hs
 src/Sapphire
 
-#Floobits
-.floo
-.flooignore
-
 # Vim
 *.swp
 *~
-
