@@ -153,11 +153,13 @@ instance Show StaticError where
 data CheckWarning
     = DefinedNotUsed        Identifier
     | DefinedNotImplemented Identifier
+    | Warning               String
 
 instance Show CheckWarning where
     show cWarn = case cWarn of
         DefinedNotUsed iden         -> "identifier '" ++ iden ++ "' is defined but never used"
         DefinedNotImplemented fname -> "function '" ++ fname ++ "' is defined but never implemented"
+        Warning msg                 -> msg
 
 --------------------------------------------------------------------------------
 
@@ -270,7 +272,28 @@ checkWarnings = do
                         (False, _    , True ) -> tellSError iPosn (NoReturn sym)
                         (_    , False, True ) -> tellCWarn  dPosn (DefinedNotUsed sym)
                         (_    , False, False) -> tellCWarn  dPosn (DefinedNotImplemented sym)
+                        _                     -> return ()
+
                 _ -> unless (used symI) $ tellCWarn  dPosn (DefinedNotUsed sym)
+
+--checkWarnings :: Checker ()
+--checkWarnings = do
+--    symbols <- gets $ accessible . table
+--    forM_ symbols $ \(sym, symIs) ->
+--        forM_ symIs $ \symI -> do
+--            let dPosn = defPosn symI
+--            case (category symI, used symI, initialized symI, value symI) of
+--                (CatFunction, True , _, Just (ValFunction _ Nothing _)) -> tellSError dPosn (UsedNotImplemented sym)
+
+--                (CatFunction, _, False, Just (ValFunction _ _ iPosn)) -> tellSError iPosn (NoReturn sym)
+
+--                (CatFunction, False, _, Just _ ) -> tellCWarn  dPosn (DefinedNotUsed sym)
+
+--                (CatFunction, False, _, Nothing) -> tellCWarn  dPosn (DefinedNotImplemented sym)
+
+--                (_, False, _, _) -> tellCWarn  dPosn (DefinedNotUsed sym)
+
+--                _ -> return ()
 
 --------------------------------------------------------------------------------
 

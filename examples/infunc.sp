@@ -2,7 +2,7 @@ Int x
 
 def func :: Int -> Bool
 
-print func(2)
+print func(2), x(2)
 
 ################################################################################
 
@@ -16,8 +16,3 @@ imp func(y) as
     func(x)
     return true
 end
-
-
-
-
-
