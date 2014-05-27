@@ -261,18 +261,16 @@ checkWarnings = do
     forM_ symbols $ \(sym, symIs) ->
         forM_ symIs $ \symI -> do
             let dPosn = defPosn symI
-            case (category symI, used symI, initialized symI, value symI) of
-                (CatFunction, True , _, Just (ValFunction _ Nothing _)) -> tellSError dPosn (UsedNotImplemented sym)
-
-                (CatFunction, _, False, Just (ValFunction _ _ iPosn)) -> tellSError iPosn (NoReturn sym)
-
-                (CatFunction, False, _, Just _ ) -> tellCWarn  dPosn (DefinedNotUsed sym)
-
-                (CatFunction, False, _, Nothing) -> tellCWarn  dPosn (DefinedNotImplemented sym)
-
-                (_, False, _, _) -> tellCWarn  dPosn (DefinedNotUsed sym)
-
-                _ -> return ()
+            case category symI of
+                CatFunction -> do
+                    let Just (ValFunction _ body iPosn) = value symI
+                        implemented                     = isJust body
+                    case (initialized symI, used symI, implemented) of
+                        (_    , True , False) -> tellSError dPosn (UsedNotImplemented sym)
+                        (False, _    , True ) -> tellSError iPosn (NoReturn sym)
+                        (_    , False, True ) -> tellCWarn  dPosn (DefinedNotUsed sym)
+                        (_    , False, False) -> tellCWarn  dPosn (DefinedNotImplemented sym)
+                _ -> unless (used symI) $ tellCWarn  dPosn (DefinedNotUsed sym)
 
 --------------------------------------------------------------------------------
 

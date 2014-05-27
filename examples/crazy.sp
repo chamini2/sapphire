@@ -18,6 +18,16 @@ if d(3) then
   print a - k
 end
 
+# defined, never implemented
+def k :: ()
+
+# h is defined, never used
+def h :: Int -> Int
+# a is defined, never used
+imp h (a) as
+  # does not have a return statement
+end
+
 # used, never implemented
 def e :: (Int,Int) -> Bool
 
