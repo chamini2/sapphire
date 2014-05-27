@@ -181,7 +181,6 @@ updateWithScope var sc f (SymTable m) = SymTable $ DM.alter func var m
 
 {- |
     Returns all the variables
-    TODO: Only the active scope
  -}
 accessible :: SymTable -> Seq (Identifier, Seq SymInfo)
 accessible (SymTable m) = fromList $ DM.toList m

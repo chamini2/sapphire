@@ -4,5 +4,5 @@ print func(a)
 
 imp func(a) as
     print a
-    return true
+    return c
 end

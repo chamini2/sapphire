@@ -151,9 +151,9 @@ StatementList :: { StBlock }
     | StatementList Separator Statement     { $1 >< filterSt $3 }
 
 Statement :: { Lexeme Statement }
-    :                               { Lex StNoop (0,0) }      -- λ, no-operation
-    | VariableId   "=" Expression   { StAssign (singleton $1) $3 <$ $1           }
-    | StructAccess "=" Expression   { StAssign $1             $3 <$ (index $1 0) }
+    : {- λ, no-operation -}     { Lex StNoop (0,0) }
+    | Access "=" Expression     { StAssign $1 $3 <$ $1 }
+    --| VariableId   "=" Expression   { StAssign (singleton $1) $3 <$ $1           }
 
     -- Definitions
     | "Record" TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Record $2 $5 <$ $1) <$ $1 }
@@ -174,7 +174,7 @@ Statement :: { Lexeme Statement }
     | "case" Expression MaybeNL WhenList "otherwise" StatementList "end"        { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
-    | "read" VariableList       { StRead  $2 <$ $1 }
+    | "read" AccessList       { StRead  $2 <$ $1 }
     | "print" ExpressionList    { StPrint $2 <$ $1 }
 
     -- Loops
@@ -204,17 +204,12 @@ FieldList :: { Seq (Lexeme Identifier, Lexeme DataType) }
 Field :: { (Lexeme Identifier, Lexeme DataType) }
     : VariableId "::" DataType     { ($1, $3) }
 
-StructAccess :: { Seq (Lexeme Identifier) }
+Access :: { Lexeme Access }
+    -- this parses 'array[3].coord[0]' as '(((array)[3]).coord)[0]'
+    : VariableId                    { VariableAccess $1    <$ $1 }
+    | Access "[" Expression "]"     { ArrayAccess    $1 $3 <$ $1 }
     -- This allows stuff like 'a  . x = 0', accessing the field 'x' of variable 'a'
-    : VariableId   "." VariableId     { fromList [$1, $3] }
-    | StructAccess "." VariableId     { $1 |> $3         }
-
---ArrayAccess :: { Seq (Lexeme Identifier) }
---    : VariableId ArrayIndex     {  }
-
---ArrayIndex -- ::
---    : ArrayIndex "[" Expression "]" {  }
---    | "[" Expression "]"            {  }
+    | Access "." VariableId         { StructAccess   $1 $3 <$ $1 }
 
 MaybeInitialized :: { Maybe (Lexeme Expression) }
     :                       { Nothing }
@@ -243,26 +238,27 @@ WhenList :: { Seq (Lexeme When) }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"             { Int        <$ $1 }
-    | "Float"           { Float      <$ $1 }
-    | "Bool"            { Bool       <$ $1 }
-    | "Char"            { Char       <$ $1 }
-    | "String"          { String     <$ $1 }
-    | "Range"           { Range      <$ $1 }
-    | "Type"            { Type       <$ $1 }
-    | TypeId            { UserDef $1 <$ $1 }
---    | "Union"  typeid   { Union  (unTkTypeId `fmap` $2) <$ $1 }
---    | "Record" typeid   { Record (unTkTypeId `fmap` $2) <$ $1 }
---    | "[" DataType "]"  { Array $2 <$ $1}
---    | "[" DataType "|" Expression "]"  { Array $2 $3 <$ $1}
+    : "Int"                         { Int         <$ $1 }
+    | "Float"                       { Float       <$ $1 }
+    | "Bool"                        { Bool        <$ $1 }
+    | "Char"                        { Char        <$ $1 }
+    | "String"                      { String      <$ $1 }
+    | "Range"                       { Range       <$ $1 }
+    | "Type"                        { Type        <$ $1 }
+    | TypeId                        { UserDef $1  <$ $1 }
+    | DataType "[" Expression "]"   { Array $1 $3 <$ $1 }
 
 VariableList :: { Seq (Lexeme Identifier) }
-    : VariableId                         { singleton $1  }
-    | VariableList "," VariableId        { $1 |> $3      }
+    : VariableId                         { singleton $1 }
+    | VariableList "," VariableId        { $1 |> $3     }
+
+AccessList :: { Seq (Lexeme Access) }
+    : Access                    { singleton $1 }
+    | AccessList "," Access     { $1 |> $3     }
 
 MaybeVariableList :: { Seq (Lexeme Identifier) }
-    :                           { empty }
-    | VariableList              { $1    }
+    :                       { empty }
+    | VariableList          { $1    }
 
 DeclareVariableList :: { Seq (Lexeme Identifier, Maybe (Lexeme Expression)) }
     : VariableId MaybeInitialized                           { singleton ($1, $2) }
@@ -285,9 +281,7 @@ SignatureReturn :: { Lexeme DataType }
 
 Expression :: { Lexeme Expression }
     -- Variable
-    : VariableId                    { Variable (singleton $1) <$ $1           }
-    | StructAccess                  { Variable $1             <$ (index $1 0) }
-    --| ArrayAccess                   { Variable }
+    : Access                        { Variable $1 <$ $1 }
     -- Function call
     | VariableId "(" MaybeExpressionList ")"     { FunctionCall $1 $3 <$ $1 }
     -- Literals
@@ -339,12 +333,11 @@ filterSt st = case lexInfo st of
     StNoop                 -> empty
     StDeclarationList dcls -> fromList $ concatMap (uncurry func) dcls
         where
-            func dcl@(Lex (Declaration var _ _) _) mayExpr = (StDeclaration dcl <$ dcl) : case mayExpr of
-                Just expr -> [StAssign (singleton var) expr <$ expr]
+            func dcl@(Lex (Declaration varL _ _) _) mayExpr = (StDeclaration dcl <$ dcl) : case mayExpr of
+                Just expr -> [StAssign (VariableAccess varL <$ varL) expr <$ expr]
                 Nothing   -> []
     -- No other statement needs a filter
     _ -> singleton st
-
 
 --parseError :: Lexeme Token -> Checker ()
 --parseError (Lex tk posn) = do

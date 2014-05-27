@@ -31,3 +31,7 @@ end
 print x, w
 
 #habran warnings de definicion sin uso
+
+if v == 2 then
+  print v
+end

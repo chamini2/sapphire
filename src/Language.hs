@@ -40,38 +40,55 @@ instance Show Program where
 type Identifier = String
 type StBlock = Seq (Lexeme Statement)
 
+data Access = VariableAccess (Lexeme Identifier)
+            | ArrayAccess    (Lexeme Access)     (Lexeme Expression)
+            | StructAccess   (Lexeme Access)     (Lexeme Identifier)
+            deriving (Eq)
+
+getVariableAccess :: Lexeme Access -> Lexeme Identifier
+getVariableAccess (Lex acc _) = case acc of
+    VariableAccess idenL -> idenL
+    ArrayAccess  accL _  -> getVariableAccess accL
+    StructAccess accL _  -> getVariableAccess accL
+
+instance Show Access where
+    show acc = case acc of
+        VariableAccess idenL       -> show (lexInfo idenL)
+        ArrayAccess    accL  exprL -> show (lexInfo accL) ++ "[" ++ show (lexInfo exprL) ++ "]"
+        StructAccess   accL  idenL -> show (lexInfo accL) ++ "." ++ show (lexInfo idenL)
+
 data DataType
     = Int | Float | Bool | Char | String | Range | Type
     | Union  (Lexeme Identifier) (Seq (Lexeme Identifier, Lexeme DataType))
     | Record (Lexeme Identifier) (Seq (Lexeme Identifier, Lexeme DataType))
-    | Array   (Lexeme DataType)
+    | Array   (Lexeme DataType) (Lexeme Expression)
     | UserDef (Lexeme Identifier)
     | Void | Undef | TypeError  -- For compiler use
     deriving (Eq)
 
 instance Show DataType where
     show dt = case dt of
-        Int                  -> "Int"
-        Float                -> "Float"
-        Bool                 -> "Bool"
-        Char                 -> "Char"
-        String               -> "String"
-        Range                -> "Range"
-        Type                 -> "Type"
-        (Union  iden fields) -> "Union "  ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fields
-        (Record iden fields) -> "Record " ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fields
-        (Array aDt)          -> "[ " ++ show (lexInfo aDt) ++ " ]"
-        (UserDef iden)       -> show $ lexInfo iden
-        Void                 -> "()"
-        Undef                -> error "DataType Undef should never be 'shown'"
-        TypeError            -> error "DataType TypeError should never be 'shown'"
+        Int              -> "Int"
+        Float            -> "Float"
+        Bool             -> "Bool"
+        Char             -> "Char"
+        String           -> "String"
+        Range            -> "Range"
+        Type             -> "Type"
+        (Union  iden fs) -> "Union "  ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fs
+        (Record iden fs) -> "Record " ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fs
+        (Array aDt _)    -> "[" ++ show (lexInfo aDt) ++ "]"
+        (UserDef iden)   -> show $ lexInfo iden
+        Void             -> "()"
+        Undef            -> error "DataType Undef should never be 'shown'"
+        TypeError        -> error "DataType TypeError should never be 'shown'"
 
 ----------------------------------------
 
 data Statement
     -- Language
     = StNoop
-    | StAssign (Seq (Lexeme Identifier)) (Lexeme Expression)
+    | StAssign (Lexeme Access) (Lexeme Expression)
     -- Definitions
     | StDeclaration      (Lexeme Declaration)
     | StDeclarationList  (DeclarationList Expression)
@@ -82,7 +99,7 @@ data Statement
     | StFunctionImp  (Lexeme Identifier)  (Seq (Lexeme Identifier)) StBlock
     | StFunctionCall (Lexeme Identifier)  (Seq (Lexeme Expression))
     -- I/O
-    | StRead  (Seq (Lexeme Identifier))
+    | StRead  (Seq (Lexeme Access))
     | StPrint (Seq (Lexeme Expression))
     -- Conditional
     | StIf   (Lexeme Expression) StBlock StBlock
@@ -113,12 +130,12 @@ data Category
     deriving (Eq)
 
 instance Show Category where
-    show CatVariable    = "Variable"
-    show CatFunction    = "Function"
-    show CatParameter   = "Parameter"
-    show CatRecordField = "Record Field"
-    show CatUnionField  = "Union Field"
-    show CatUserDef     = "Data Type"
+    show CatVariable    = "variable"
+    show CatFunction    = "function"
+    show CatParameter   = "parameter"
+    show CatRecordField = "record field"
+    show CatUnionField  = "union field"
+    show CatUserDef     = "data type"
 
 data When = When (Seq (Lexeme Expression)) StBlock
     deriving (Show)
@@ -127,7 +144,7 @@ data When = When (Seq (Lexeme Expression)) StBlock
 
 data Expression
     -- Variable
-    = Variable (Seq (Lexeme Identifier))
+    = Variable (Lexeme Access)
     -- Function call
     | FunctionCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- Literals
@@ -141,6 +158,7 @@ data Expression
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression) {-DataType-}
 --    | ExpArray  ExpressionArray
+    deriving (Eq)
 
 instance Show Expression where
     show = runPrinter . printExpression
@@ -152,6 +170,7 @@ data Binary
     = OpPlus  | OpMinus   | OpTimes | OpDivide | OpModulo | OpPower   | OpFromTo
     | OpEqual | OpUnequal | OpLess  | OpLessEq | OpGreat  | OpGreatEq | OpBelongs
     | OpOr    | OpAnd
+    deriving (Eq)
 
 instance Show Binary where
     show op = case op of
@@ -194,6 +213,7 @@ binaryOperation op = fromList $ case op of
         numbers = [(Int,Int), (Float,Float)]
 
 data Unary = OpNegate | OpNot
+    deriving (Eq)
 
 instance Show Unary where
     show op = case op of
@@ -227,10 +247,10 @@ printStatement :: Statement -> Printer ()
 printStatement st = case st of
     StNoop         -> return ()
 
-    StAssign vars (Lex expr _) -> do
+    StAssign var (Lex expr _) -> do
         printNonTerminal "ASSIGNMENT"
         raiseTabs
-        printNonTerminal $ "- variable: " ++ concat (intersperse "." $ map lexInfo (toList vars))
+        printNonTerminal $ "- variable: " ++ show var
         printExpressionWithTag "- value: " expr
         lowerTabs
 
@@ -300,7 +320,7 @@ printStatement st = case st of
     StRead vars -> do
         printNonTerminal "READ"
         raiseTabs
-        mapM_ (printExpression . Variable . singleton) vars
+        mapM_ (printExpression . Variable) vars
         lowerTabs
 
     StPrint exprs -> do
@@ -356,7 +376,7 @@ printStatement st = case st of
 ----
 printExpression :: Expression -> Printer ()
 printExpression e = case e of
-    Variable vars -> printNonTerminal $ "VARIABLE: " ++ concat (intersperse "." $ map lexInfo (toList vars))
+    Variable var -> printNonTerminal $ "VARIABLE: " ++ show var
     FunctionCall iden args -> do
         printNonTerminal "FUNCTION CALL"
         raiseTabs

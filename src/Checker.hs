@@ -103,7 +103,7 @@ data StaticError
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
-    | NonCategory     Identifier Category Category
+    | WrongCategory   Identifier Category Category
     | NotDefined      Identifier
     | AlreadyDeclared Identifier Position
     | StaticError     String
@@ -140,13 +140,13 @@ instance Show StaticError where
         ReturnProcedure g fname -> "cannot return '" ++ show g ++ "' in procedure '" ++ fname ++ "'"
         ReturnType e g fname    -> "expected return type '" ++ show e ++ "' for function '" ++ fname ++ "', but got type '" ++ show g ++ "'"
         -- Operators
-        UnaryTypes  op dt      -> "operator '" ++ show op ++ "' does not work with argument (" ++ show dt ++ ")"
-        BinaryTypes op (dl,dr) -> "operator '" ++ show op ++ "' does not work with arguments (" ++ show dl ++ ", " ++ show dr ++ ")"
+        UnaryTypes  op dt      -> "operator '" ++ show op ++ "' does not work with operand (" ++ show dt ++ ")"
+        BinaryTypes op (dl,dr) -> "operator '" ++ show op ++ "' does not work with operands (" ++ show dl ++ ", " ++ show dr ++ ")"
         -- General
-        NonCategory iden e g  -> "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
-        NotDefined  iden      -> "identifier '" ++ iden ++ "' has not been defined"
-        AlreadyDeclared var p -> "identifier '" ++ var ++ "' has already been declared at " ++ show p
-        StaticError msg       -> msg
+        WrongCategory iden e g -> "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
+        NotDefined  iden       -> "identifier '" ++ iden ++ "' has not been defined"
+        AlreadyDeclared var p  -> "identifier '" ++ var ++ "' has already been declared at " ++ show p
+        StaticError msg        -> msg
 
 --------------------------------------------------------------------------------
 
@@ -218,7 +218,7 @@ initialState = CheckState
     , scopeId   = 0
     , ast       = Program DS.empty
     , loopLvl   = 0
-    , funcStack = singletonStack (Void, Lex "sapphire" (0,0)) -- mark initialized if Void
+    , funcStack = singletonStack (Void, Lex "sapphire" (0,0))
     }
 
 ----------------------------------------
@@ -318,38 +318,6 @@ enterFunction dt fnameL = modify (\s -> s { funcStack = push (dt, fnameL) (funcS
 -}
 exitFunction :: Checker ()
 exitFunction = modify (\s -> s { funcStack = snd . pop $ funcStack s })
-
-----------------------------------------
-
---{- |
---    Enters a new topLevel scope
----}
---enterTopLevel :: Checker ()
---enterTopLevel = modify (\s -> s { topLevel = push 0 (topLevel s) })
-
---{- |
---    Exits the current topLevel scope
----}
---exitTopLevel :: Checker ()
---exitTopLevel = modify (\s -> s { topLevel = snd . pop $ topLevel s })
-
---{- |
---    Increment the topLevel indicator
----}
---incrementTopLevel :: Checker ()
---incrementTopLevel = do
---    (top, stck) <- liftM pop $ gets topLevel
---    let newStck = push (top + 1) stck
---    modify (\s -> s {topLevel = newStck})
-
---{- |
---    Decrease the topLevel indicator
----}
---decreaseTopLevel :: Checker ()
---decreaseTopLevel = do
---    (top, stck) <- liftM pop $ gets topLevel
---    let newStck = push (top - 1) stck
---    modify (\s -> s {topLevel = newStck})
 
 --------------------------------------------------------------------------------
 
@@ -455,7 +423,7 @@ checkArguments fname mayVal args posn = maybe failure success mayVal
         success val = do
             let prms = lexInfo <$> parameters val
             dts <- mapM checkExpression args
-            unless (length args == length prms && and (zipWith (==) dts prms)) $
+            unless (length args == length prms && and (zipWith (==) dts prms) || TypeError `elem` dts) $
                 tellSError posn (FunctionArguments fname prms dts)
 
 ----------------------------------------
@@ -571,17 +539,16 @@ checkStatement :: Lexeme Statement -> Checker () -- Capaz debería devolver otra
 checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
-    StAssign varSeq ex -> case viewl varSeq of
-            varL@(Lex var _) :< vars -> do
-                mayVarDt <- getsSymInfo varL dataType
-                expDt    <- checkExpression ex
-                case mayVarDt of
-                    Just varDt -> do
-                        markInitialized varL
-                        unless (varDt == expDt) $
-                            tellSError posn (InvalidAssignType var varDt expDt)
-                    Nothing -> return ()
-            EmptyL -> return ()
+    StAssign accL ex -> do
+        let idenL@(Lex iden _) = getVariableAccess accL
+        mayDt  <- getsSymInfo idenL dataType
+        exprDt <- checkExpression ex
+        case mayDt of
+            Just idenDt -> do
+                markInitialized idenL
+                when (idenDt /= exprDt && exprDt /= TypeError) $
+                    tellSError posn (InvalidAssignType iden idenDt exprDt)
+            Nothing -> return ()
 
     StDeclaration dcl -> void $ processVariable dcl
 
@@ -593,13 +560,12 @@ checkStatement (Lex st posn) = case st of
         when defined $ markInitialized idenL
 
     StReturn ex -> do
-        -- TODO: check topLevel to see if it sets the function to 'returned'
-        dt         <- checkExpression ex
+        dt <- checkExpression ex
         (st,fnameL@(Lex fname _)) <- liftM peek $ gets funcStack
         if st == Void
             then tellSError posn (ReturnProcedure dt fname)
             else do
-                when (st /= dt) $ tellSError posn (ReturnType st dt fname)
+                when (st /= dt && dt /= TypeError) $ tellSError posn (ReturnType st dt fname)
                 markInitialized fnameL
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
@@ -608,8 +574,8 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
         currSc <- currentScope
-        mayInf <- getsSymInfo fnameL id
-        case mayInf of
+        maySi <- getsSymInfo fnameL id
+        case maySi of
             Just si -> do
                 let val    = value si
                     sameSc = currSc == scopeNum si
@@ -645,34 +611,35 @@ checkStatement (Lex st posn) = case st of
                             when (initialized si) $ markInitialized $ Lex iden (defPosn si)
 
                     -- If value is Nothing it means that it is not a function
-                    (Nothing,_,cat,_) -> tellSError posn (NonCategory fname CatFunction cat)
+                    (Nothing,_,cat,_) -> tellSError posn (WrongCategory fname CatFunction cat)
                     (Just v,_,_,True) -> tellSError posn (AlreadyImplemented fname (implPosn v))
                     -- Must implement functions in the same scope in which they are defined
                     (_,False,_,_)     -> tellSError posn (ImpInDefScope fname dPosn)
             Nothing -> tellSError posn (FunctionNotDefined fname)
 
     StFunctionCall fnameL@(Lex fname _) args -> do
-        mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
-        case mayInf of
-            Just inf -> do
+        maySi <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
+        case maySi of
+            Just si -> do
                 markUsed fnameL
-                case inf of
+                case si of
                     (CatFunction,mayVal,Void) -> checkArguments fname mayVal args posn
                     (CatFunction,_,_)         -> tellSError posn (FunctionAsStatement fname)
-                    (ct,_,_)                  -> tellSError posn (NonCategory fname CatFunction ct)
+                    (ct,_,_)                  -> tellSError posn (WrongCategory fname CatFunction ct)
             Nothing -> return ()
 
-    StRead vars -> forM_ vars $ \varL -> do
-        mayInf <- getsSymInfo varL dataType
-        case mayInf of
-            Just _  -> markInitialized varL
+    StRead vars -> forM_ vars $ \accL -> do
+        let idenL = getVariableAccess accL
+        maySi <- getsSymInfo idenL dataType
+        case maySi of
+            Just _  -> markInitialized idenL
             Nothing -> return ()
 
     StPrint exs -> mapM_ checkExpression exs
 
     StIf cnd success failure -> do
         dt <- checkExpression cnd
-        unless (dt == Bool || dt == Void) $ tellSError posn (ConditionDataType dt)
+        unless (dt == Bool || dt == TypeError) $ tellSError posn (ConditionDataType dt)
         before <- getScopeVariables
 
         enterScope
@@ -690,12 +657,13 @@ checkStatement (Lex st posn) = case st of
         checkMark $ fromList [varSucc,varFail]
 
     StCase ex cs othrw -> do
-        dt <- checkExpression ex
+        dt     <- checkExpression ex
         before <- getScopeVariables
 
         varScopes <- forM cs $ \(Lex (When wexps sts) wposn) -> do
             forM_ wexps $ checkExpression >=> \wd ->        -- forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
-                unless (wd == dt) $ tellSError wposn (CaseWhenDataType dt wd)
+                unless (wd == dt || dt == TypeError || wd == TypeError) $
+                    tellSError wposn (CaseWhenDataType dt wd)
 
             enterScope
             checkStatements sts
@@ -716,15 +684,16 @@ checkStatement (Lex st posn) = case st of
     StLoop rep cnd body -> do
         enterScope >> enterLoop
         checkStatements rep
-        exitLoop >> exitScope
+        exitLoop   >> exitScope
 
-        checkExpression cnd >>= \dt -> unless (dt == Bool) $ tellSError posn (ConditionDataType dt)
+        checkExpression cnd >>= \dt ->
+            unless (dt == Bool || dt == TypeError) $ tellSError posn (ConditionDataType dt)
 
         before <- getScopeVariables
 
         enterScope >> enterLoop
         checkStatements body
-        exitLoop >> exitScope
+        exitLoop   >> exitScope
         varBody <- getScopeVariables
 
         putScopeVariables before
@@ -733,7 +702,7 @@ checkStatement (Lex st posn) = case st of
 
     StFor var rng body -> do
         dt <- checkExpression rng
-        unless (dt == Range) $ tellSError posn (ForInDataType dt)
+        unless (dt == Range || dt == TypeError) $ tellSError posn (ForInDataType dt)
 
         before <- getScopeVariables
 
@@ -761,41 +730,42 @@ checkStatement (Lex st posn) = case st of
 -}
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
-    Variable varSeq -> case viewl varSeq of
-        varL@(Lex var _) :< vars -> do
-            mayInf <- getsSymInfo varL (\si -> (category si, initialized si, dataType si))
-            case mayInf of
-                Just inf -> do
-                    markUsed varL
-                    case inf of
-                        (CatVariable,ini,dt)  -> do
-                            unless ini $ tellSError posn (VariableNotInitialized var)
-                            return dt
-                        (CatParameter,ini,dt) -> do
-                            unless ini $ tellSError posn (VariableNotInitialized var)
-                            return dt
-                        (ct,_,_)              -> do
-                            tellSError posn (NonCategory var CatVariable ct)
-                            return Void
-                Nothing -> return Void
-        EmptyL -> return Void
+    Variable accL -> do
+        let idenL@(Lex iden _) = getVariableAccess accL
+        maySi <- getsSymInfo idenL id
+        case maySi of
+            Just si -> do
+                markUsed idenL
+                let ini = initialized si
+                    dt  = dataType si
+                case category si of
+                    CatVariable -> do
+                        unless ini $ tellSError posn (VariableNotInitialized iden)
+                        return dt
+                    CatParameter -> do
+                        unless ini $ tellSError posn (VariableNotInitialized iden)
+                        return dt
+                    ct -> do
+                        tellSError posn (WrongCategory iden CatVariable ct)
+                        return TypeError
+            Nothing -> return TypeError
 
     FunctionCall fnameL@(Lex fname _) args -> do
-        mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
-        case mayInf of
-            Just inf -> do
+        maySi <- getsSymInfo fnameL id
+        case maySi of
+            Just si -> do
                 markUsed fnameL
-                case inf of
-                    (CatFunction,_,Void)    -> do
+                case (category si, dataType si) of
+                    (CatFunction, Void) -> do
                         tellSError posn (ProcedureInExpression fname)
-                        return Void
-                    (CatFunction,mayVal,dt) -> do
-                        checkArguments fname mayVal args posn
+                        return TypeError
+                    (CatFunction, dt) -> do
+                        checkArguments fname (value si) args posn
                         return dt
-                    (ct,_,_)                -> do
-                        tellSError posn (NonCategory fname CatFunction ct)
-                        return Void
-            Nothing -> return Void
+                    (ct,_) -> do
+                        tellSError posn (WrongCategory fname CatFunction ct)
+                        return TypeError
+            Nothing -> return TypeError
 
     LitInt _    -> return Int
 
@@ -814,8 +784,9 @@ checkExpression (Lex e posn) = case e of
         if null dts
             then do
                 -- If there's a 'Void' an error has already been raised about this.
-                when (Void `notElem` fromList [ldt,rdt]) $ tellSError posn (BinaryTypes op (ldt,rdt))
-                return . snd . flip index 0 $ binaryOperation op
+                unless (TypeError == ldt || TypeError == rdt) $
+                    tellSError posn (BinaryTypes op (ldt,rdt))
+                return TypeError
             else return . snd $ index dts 0
 
     ExpUnary (Lex op _) expr  -> do
@@ -824,5 +795,5 @@ checkExpression (Lex e posn) = case e of
         if null dts
             then do
                 tellSError posn (UnaryTypes op dt)
-                return . snd . flip index 0 $ unaryOperation op
+                return TypeError
             else return . snd $ index dts 0

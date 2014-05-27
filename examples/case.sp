@@ -16,8 +16,15 @@ end
 # c is not initialized
 print b,c
 
-case a
+case d
     when 2 do
+        c = 10
+    when 4 do
+        c = 2
+end
+
+case b
+    when d do
         c = 10
     when 4 do
         c = 2
