@@ -169,7 +169,7 @@ data CheckState = CheckState
     , scopeId   :: ScopeNum
     , ast       :: Program
     , loopLvl   :: NestedLevel
-    , funcStack :: Stack (DataType, Lexeme Identifier)
+    , funcStack :: Stack (DataType, Lexeme Identifier, ScopeNum)
     }
 
 instance Show CheckState where
@@ -220,7 +220,7 @@ initialState = CheckState
     , scopeId   = 0
     , ast       = Program DS.empty
     , loopLvl   = 0
-    , funcStack = singletonStack (Void, Lex "sapphire" (0,0))
+    , funcStack = singletonStack (Void, Lex "sapphire" (0,0), -1)
     }
 
 ----------------------------------------
@@ -332,7 +332,9 @@ exitLoop = modify (\s -> s { loopLvl = loopLvl s - 1 })
     Entering a function
 -}
 enterFunction :: DataType -> Lexeme Identifier -> Checker()
-enterFunction dt fnameL = modify (\s -> s { funcStack = push (dt, fnameL) (funcStack s) })
+enterFunction dt fnameL =  do
+    currSc <- currentScope
+    modify (\s -> s { funcStack = push (dt, fnameL, currSc) (funcStack s) })
 
 {- |
     Exiting a function
@@ -363,11 +365,19 @@ getsSymInfo (Lex iden posn) f = do
     Modifies a symbol if said symbol exists in the table
 -}
 modifySymInfo :: Lexeme Identifier -> (SymInfo -> SymInfo) -> Checker ()
-modifySymInfo var@(Lex iden _) f = do
+modifySymInfo var f = do
+    maySc <- getsSymInfo var scopeNum
+    maybe (return ()) (modifySymInfoWithScope var f) maySc
+
+{- |
+    Modifies a symbol in a specific scope if said symbol exists in the table
+-}
+modifySymInfoWithScope :: Lexeme Identifier -> (SymInfo -> SymInfo) -> ScopeNum -> Checker ()
+modifySymInfoWithScope var@(Lex iden _) f sc = do
     tab <- gets table
     maySi <- getsSymInfo var id
     case maySi of
-        Just si -> modify (\s -> s { table = updateWithScope iden (scopeNum si) f tab })
+        Just si -> modify (\s -> s { table = updateWithScope iden sc f tab })
         Nothing -> return ()
 
 {- |
@@ -561,14 +571,16 @@ checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
     StAssign accL ex -> do
-        let idenL@(Lex iden _) = getVariableAccess accL
+        let zipper               = focusAccess accL
+            (topL, ths)          = deepAccess zipper
+            VariableAccess idenL = lexInfo topL
         mayDt  <- getsSymInfo idenL dataType
         exprDt <- checkExpression ex
         case mayDt of
             Just idenDt -> do
                 markInitialized idenL
                 when (idenDt /= exprDt && exprDt /= TypeError) $
-                    tellSError posn (InvalidAssignType iden idenDt exprDt)
+                    tellSError posn (InvalidAssignType (lexInfo idenL) idenDt exprDt)
             Nothing -> return ()
 
     StDeclaration dcl -> void $ processVariable dcl
@@ -582,12 +594,13 @@ checkStatement (Lex st posn) = case st of
 
     StReturn ex -> do
         dt <- checkExpression ex
-        (st,fnameL@(Lex fname _)) <- liftM peek $ gets funcStack
+        (st, fnameL@(Lex fname _), sc) <- liftM peek $ gets funcStack
         if st == Void
             then tellSError posn (ReturnProcedure dt fname)
             else do
                 when (st /= dt && dt /= TypeError) $ tellSError posn (ReturnType st dt fname)
-                markInitialized fnameL
+                -- Marks the function intialized, in the correct scope
+                modifySymInfoWithScope fnameL (\sym -> sym { initialized = True }) sc
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
         defined <- processFunction decl
@@ -623,6 +636,9 @@ checkStatement (Lex st posn) = case st of
                         exitScope
                         varBody <- getScopeVariables
 
+                        tellSError posn $ StaticError $ "before: \n\t\t" ++ (intercalate "\n\t\t" $ toList $ fmap show before)
+                        tellSError posn $ StaticError $ "varBod: \n\t\t" ++ (intercalate "\n\t\t" $ toList $ fmap show varBody)
+
                         putScopeVariables before
                         -- Only marks 'used'
                         checkMark $ fromList [varBody, before]
@@ -650,7 +666,9 @@ checkStatement (Lex st posn) = case st of
             Nothing -> return ()
 
     StRead vars -> forM_ vars $ \accL -> do
-        let idenL = getVariableAccess accL
+        let zipper               = focusAccess accL
+            (topL, ths)          = deepAccess zipper
+            VariableAccess idenL = lexInfo topL
         maySi <- getsSymInfo idenL dataType
         case maySi of
             Just _  -> markInitialized idenL
@@ -752,7 +770,9 @@ checkStatement (Lex st posn) = case st of
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable accL -> do
-        let idenL@(Lex iden _) = getVariableAccess accL
+        let zipper               = focusAccess accL
+            (topL, ths)          = deepAccess zipper
+            VariableAccess idenL = lexInfo topL
         maySi <- getsSymInfo idenL id
         case maySi of
             Just si -> do
@@ -761,13 +781,13 @@ checkExpression (Lex e posn) = case e of
                     dt  = dataType si
                 case category si of
                     CatVariable -> do
-                        unless ini $ tellSError posn (VariableNotInitialized iden)
+                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo idenL)
                         return dt
                     CatParameter -> do
-                        unless ini $ tellSError posn (VariableNotInitialized iden)
+                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo idenL)
                         return dt
                     ct -> do
-                        tellSError posn (WrongCategory iden CatVariable ct)
+                        tellSError posn (WrongCategory (lexInfo idenL) CatVariable ct)
                         return TypeError
             Nothing -> return TypeError
 

@@ -46,15 +46,14 @@ data SymInfo = SymInfo
     }
 
 instance Show SymInfo where
-    show (SymInfo dt ct v sn dp i u) = showSN ++ showCT ++ showDT ++ showV ++ showDP ++ showU
+    show (SymInfo dt ct v sn dp i u) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU
         where
             showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
-            showDT = show dt
-            showV  = case v of
-                Just val -> " (" ++ show val ++ ") "
-                Nothing  -> " (" ++ showI ++ ") "
-            showI  = if i then "init" else "NOT init"
+            showDT = show dt ++ " "
+            showV  = showI ++ maybe "" show v ++ " "
+                where
+                    showI  = "[" ++ (if i then "init" else "NOT init") ++ "]"
             showDP = show dp
             showU  = " " ++ if u then "used" else "NOT used"
 
@@ -98,7 +97,7 @@ instance Show Value where
     show (ValBool v)         = show v
     show (ValChar v)         = show v
     show (ValFloat v)        = show v
-    show (ValFunction p i _) = showP ++ ": " ++ showI
+    show (ValFunction p i _) = "[" ++ showI ++ "] (" ++ showP ++ ") ->"
         where
             showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
             showI = case i of

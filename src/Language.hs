@@ -6,6 +6,8 @@ import           Control.Monad.State    hiding (forM_, mapM_)
 import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
 import           Data.Foldable          as DF (foldr, forM_, mapM_, toList, concat, concatMap)
+import           Data.Functor           ((<$))
+import           Data.Maybe             (fromJust)
 import           Data.List              (intersperse)
 import           Data.Sequence          as DS (Seq, singleton, fromList)
 import           Prelude                hiding (mapM_, concat, concatMap)
@@ -40,22 +42,82 @@ instance Show Program where
 type Identifier = String
 type StBlock = Seq (Lexeme Statement)
 
+----------------------------------------
+
 data Access = VariableAccess (Lexeme Identifier)
             | ArrayAccess    (Lexeme Access)     (Lexeme Expression)
             | StructAccess   (Lexeme Access)     (Lexeme Identifier)
             deriving (Eq)
-
-getVariableAccess :: Lexeme Access -> Lexeme Identifier
-getVariableAccess (Lex acc _) = case acc of
-    VariableAccess idenL -> idenL
-    ArrayAccess  accL _  -> getVariableAccess accL
-    StructAccess accL _  -> getVariableAccess accL
 
 instance Show Access where
     show acc = case acc of
         VariableAccess idenL       -> show (lexInfo idenL)
         ArrayAccess    accL  exprL -> show (lexInfo accL) ++ "[" ++ show (lexInfo exprL) ++ "]"
         StructAccess   accL  idenL -> show (lexInfo accL) ++ "." ++ show (lexInfo idenL)
+
+{-
+ - deriving the AccessHistory type
+ -
+ - acc = (var x iden) + (arr x acc x expr) + (str x acc x iden)
+ - expr = A
+ - iden = B
+ -
+ - acc = (1 x B) + (1 x acc x A) + (1 x acc x B)
+ - acc = (1 x B) + (acc x A)     + (acc x B)
+ -
+ - acc' = A + B
+ -}
+
+data AccessHistory = HistoryArray  (Lexeme Expression)
+                   | HistoryStruct (Lexeme Identifier)
+                   deriving (Show)
+
+type Thread = [Lexeme AccessHistory]
+
+type Zipper = (Lexeme Access, Thread)
+
+----------------------------------------
+
+focusAccess :: Lexeme Access -> Zipper
+focusAccess accL = (accL, [])
+
+defocusAccess :: Zipper -> Lexeme Access
+defocusAccess (accL, _) = accL
+
+inArrayAccess :: Zipper -> Maybe Zipper
+inArrayAccess (histL@(Lex acc _), ths) = case acc of
+    ArrayAccess accL indexL -> Just (accL, (HistoryArray indexL <$ histL) : ths)
+    _                       -> Nothing
+
+inStructAccess :: Zipper -> Maybe Zipper
+inStructAccess (histL@(Lex acc _), ths) = case acc of
+    StructAccess accL fieldL -> Just (accL, (HistoryStruct fieldL <$ histL) : ths)
+    _                        -> Nothing
+
+inAccess :: Zipper -> Maybe Zipper
+inAccess z@(Lex acc _, ths) = case acc of
+    VariableAccess idenL       -> Nothing
+    ArrayAccess    accL indexL -> inArrayAccess z
+    StructAccess   accL fieldL -> inStructAccess z
+
+backAccess :: Zipper -> Maybe Zipper
+backAccess (accL, ths) = case ths of
+    []                      -> Nothing
+    histL@(Lex hist _) : ts -> case hist of
+        HistoryArray  indexL -> Just (ArrayAccess  accL indexL <$ histL, ts)
+        HistoryStruct fieldL -> Just (StructAccess accL fieldL <$ histL, ts)
+
+topAccess :: Zipper -> Zipper
+topAccess z@(accL, ths) = case ths of
+    []     -> z
+    t : ts -> topAccess $ fromJust $ backAccess z
+
+deepAccess :: Zipper -> Zipper
+deepAccess z@(Lex acc _, ths) = case acc of
+    VariableAccess _ -> z
+    _                -> deepAccess $ fromJust $ inAccess z
+
+----------------------------------------
 
 data DataType
     = Int | Float | Bool | Char | String | Range | Type
