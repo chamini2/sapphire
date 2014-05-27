@@ -241,9 +241,9 @@ getState :: Checker a -> CheckState
 getState = (\(_,s,_) -> s) . runChecker
 
 getErrors :: CheckWriter -> (Seq CheckError, Seq CheckError, Seq CheckError, Seq CheckError)
-getErrors errors = (only lexical, only parsing, only static, only warning)
+getErrors errors = (sorted lexical, sorted parsing, sorted static, sorted warning)
     where
-        only f = sortBy compare $ filter f errors
+        sorted f = sortBy compare $ filter f errors
         lexical e = case e of
             (LError _ _) -> True
             _            -> False
@@ -273,27 +273,7 @@ checkWarnings = do
                         (_    , False, True ) -> tellCWarn  dPosn (DefinedNotUsed sym)
                         (_    , False, False) -> tellCWarn  dPosn (DefinedNotImplemented sym)
                         _                     -> return ()
-
                 _ -> unless (used symI) $ tellCWarn  dPosn (DefinedNotUsed sym)
-
---checkWarnings :: Checker ()
---checkWarnings = do
---    symbols <- gets $ accessible . table
---    forM_ symbols $ \(sym, symIs) ->
---        forM_ symIs $ \symI -> do
---            let dPosn = defPosn symI
---            case (category symI, used symI, initialized symI, value symI) of
---                (CatFunction, True , _, Just (ValFunction _ Nothing _)) -> tellSError dPosn (UsedNotImplemented sym)
-
---                (CatFunction, _, False, Just (ValFunction _ _ iPosn)) -> tellSError iPosn (NoReturn sym)
-
---                (CatFunction, False, _, Just _ ) -> tellCWarn  dPosn (DefinedNotUsed sym)
-
---                (CatFunction, False, _, Nothing) -> tellCWarn  dPosn (DefinedNotImplemented sym)
-
---                (_, False, _, _) -> tellCWarn  dPosn (DefinedNotUsed sym)
-
---                _ -> return ()
 
 --------------------------------------------------------------------------------
 
@@ -402,7 +382,7 @@ markAllInitializedUsed vars = forM_ vars $ \(var,info) -> do
     when (used info)        $ markUsed        varL
 
 {- |
-    Marks the specifued variable as used
+    Marks the specified variable as used
 -}
 markUsed :: Lexeme Identifier -> Checker ()
 markUsed var = modifySymInfo var (\sym -> sym { used = True })
@@ -466,7 +446,7 @@ checkArguments fname mayVal args posn = maybe failure success mayVal
 processVariable :: Lexeme Declaration -> Checker Bool
 processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
     (tab,stck) <- gets (table &&& stack)
-    sc  <- currentScope
+    sc         <- currentScope
     let info = emptySymInfo {
                 dataType = t,
                 category = c,
@@ -474,20 +454,18 @@ processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = d
                 defPosn  = posn
             }
     case lookupWithScope iden stck tab of
-        Nothing -> addSymbolCheckingUserDef info
+        Nothing -> addSymbolCheckingUserDef tab stck info
         Just si
             | scopeNum si == sc -> tellSError posn (AlreadyDeclared iden (defPosn si)) >> return False
-            | otherwise         -> addSymbolCheckingUserDef info
+            | otherwise         -> addSymbolCheckingUserDef tab stck info
         where
-            addSymbolCheckingUserDef info = case t of
-                UserDef (Lex udIden _) -> do
-                    (tab,stck) <- gets (table &&& stack)
-                    case lookupWithScope udIden stck tab of
-                        Nothing -> tellSError posn (UndefinedType udIden) >> return False
-                        Just si -> do
-                            let info = info { dataType = dataType si }
-                            addSymbol idenL info >> return True
-                            -- TODO crear fields en tabla de simbolos para esta variable
+            addSymbolCheckingUserDef tab stck info = case t of
+                UserDef (Lex udIden _) -> case lookupWithScope udIden stck tab of
+                    Nothing -> tellSError posn (UndefinedType udIden) >> return False
+                    Just si -> do
+                        let newInfo = info { dataType = dataType si }
+                        addSymbol idenL newInfo >> return True
+                        -- TODO crear fields en tabla de simbolos para esta variable, o algo así
                 _ -> addSymbol idenL info >> return True
 
 processType :: Lexeme Declaration -> Checker Bool
@@ -541,7 +519,7 @@ processGeneric (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) success =
 --    --            success rSc = do
 --    --                tab <- gets table
 --    --                let fields = toListFilter tab rSc
---    --                -- We have to concat the name and a dot: "iden . fIden" before sending it
+--    --                -- We have to 'concat' the name and a dot: "iden . fIden" before sending it
 --    --                blocks <- mapM (\(fIden, fInfo) -> defaultValue (Lex (dataType fInfo) (defPosn fInfo)) (Lex fIden (defPosn fInfo))) fields
 --    --                return $ foldr (><) empty blocks
 --    where
@@ -566,7 +544,7 @@ checkStatements = mapM_ checkStatement
 {- |
     Checks the validity of a statement, modifying the state.
 -}
-checkStatement :: Lexeme Statement -> Checker () -- Capaz debería devolver otra cosa?
+checkStatement :: Lexeme Statement -> Checker () -- Maybe it should return something else?
 checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
@@ -599,7 +577,7 @@ checkStatement (Lex st posn) = case st of
             then tellSError posn (ReturnProcedure dt fname)
             else do
                 when (st /= dt && dt /= TypeError) $ tellSError posn (ReturnType st dt fname)
-                -- Marks the function intialized, in the correct scope
+                -- Marks the function initialized, in the correct scope
                 modifySymInfoWithScope fnameL (\sym -> sym { initialized = True }) sc
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
@@ -635,9 +613,6 @@ checkStatement (Lex st posn) = case st of
                         exitFunction
                         exitScope
                         varBody <- getScopeVariables
-
-                        tellSError posn $ StaticError $ "before: \n\t\t" ++ (intercalate "\n\t\t" $ toList $ fmap show before)
-                        tellSError posn $ StaticError $ "varBod: \n\t\t" ++ (intercalate "\n\t\t" $ toList $ fmap show varBody)
 
                         putScopeVariables before
                         -- Only marks 'used'
