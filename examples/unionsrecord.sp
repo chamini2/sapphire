@@ -1,13 +1,45 @@
+
 Union Precision as
-    integer = 0 :: Int ,
-    floating = 0.0 :: Float
+    integer  :: Int ,
+    floating :: Float
 end
 
-Union Maybe as
-      just    :: Int
-    , nothing :: Char
+def odd :: Int -> Bool
+imp odd(a) as
+  Union Precision as
+      integer  :: Int ,
+      floating :: Float
+  end
+
+  return (a % 2 == 1)
 end
 
-Record Point as x :: Int, y :: Int end
+def even :: Int -> Bool
+imp even(a) as
 
-Point p
+  Record Precision as
+    x :: Char,
+    y :: Float,
+    z :: Bool
+  end
+
+  return (a % 2 == 0)
+end
+
+Union Cosa as
+      pupu :: Int
+    , prec :: Precision
+end
+
+X x, y; Cosa c
+
+Precision r
+
+# Tipo a
+
+# x . x = 1
+# x . y = 2
+
+# c . prec . integer = 1
+
+# print c.pupu, x . x, r.integer

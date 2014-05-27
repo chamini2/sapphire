@@ -7,6 +7,7 @@ module SymbolTable
     , insert
     , lookup
     , lookupWithScope
+    , toListFilter
     , update
     , updateWithScope
     , accessible
@@ -21,6 +22,7 @@ module SymbolTable
 
     , Stack
     , initialStack
+    , singletonStack
     , peek
     , pop
     , push
@@ -71,6 +73,9 @@ emptySymInfo = SymInfo
 
 data Scope = Scope { serial :: ScopeNum } deriving (Show)
 
+{- |
+    The outermost scope has a default value of 0
+-}
 initialScope :: Scope
 initialScope = Scope { serial = 0 }
 
@@ -136,6 +141,12 @@ lookup var (SymTable m) = do
         EmptyL    -> Nothing
         info :< _ -> Just info
 
+toListFilter :: SymTable -> ScopeNum -> Seq (Identifier, SymInfo)
+toListFilter st@(SymTable m) sc = fromList $ foldl' hack [] $ DM.keys m
+    where
+        hack ls iden = maybe ls (\j -> (iden, j) : ls) $ maySI iden
+        maySI iden   = lookupWithScope iden (singletonStack (Scope sc)) st
+
 {- |
     Looks up the symbol identifier in the specified scope in the symbol table
  -}
@@ -170,6 +181,7 @@ updateWithScope var sc f (SymTable m) = SymTable $ DM.alter func var m
 
 {- |
     Returns all the variables
+    TODO: Only the active scope
  -}
 accessible :: SymTable -> Seq (Identifier, Seq SymInfo)
 accessible (SymTable m) = fromList $ DM.toList m
@@ -211,4 +223,7 @@ pop (Stack (x : s)) = (x, Stack s)
     The scope stack has the inital scope by default.
 -}
 initialStack :: Stack Scope
-initialStack = Stack [initialScope]
+initialStack = Stack [ initialScope ]
+
+singletonStack :: a -> Stack a
+singletonStack n = Stack [ n ]

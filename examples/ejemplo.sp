@@ -18,7 +18,7 @@ end
 print "\nahora until\n"
 until x^2 > 200 do
     print x
-    x *= 3
+    x = x * 3
 end
 
 ##############################################################
@@ -28,7 +28,7 @@ if x%2 == 0 then
     print "par"
 # ejemplo de "el 'then' es opcional"
 # iguales está definida abajo
-elif iguales x%3, 0 then
+elif iguales (x%3, 0) then
     print "trar"     # trar es un invento de Matteo®
 else
     print "imtrar"   # impar e intrar al mismo tiempo
@@ -54,7 +54,7 @@ when 0..500 do
     print "de cero a quinientos"
 when 200..800 do
     print "de doscientos a ochocientos"
-else
+otherwise
     print "mucho o muy poco"
 end
 

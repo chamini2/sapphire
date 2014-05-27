@@ -1,13 +1,14 @@
 module Language where
 
+import           Control.Arrow          ((***))
 import           Control.Monad.Identity hiding (forM_, mapM_)
 import           Control.Monad.State    hiding (forM_, mapM_)
 import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
-import           Data.Foldable          as DF (foldr, forM_, mapM_, toList, concat)
+import           Data.Foldable          as DF (foldr, forM_, mapM_, toList, concat, concatMap)
 import           Data.List              (intersperse)
 import           Data.Sequence          as DS (Seq, singleton, fromList)
-import           Prelude                hiding (mapM_, concat)
+import           Prelude                hiding (mapM_, concat, concatMap)
 
 type Position = (Int, Int) -- (Fila, Columna)
 
@@ -40,22 +41,41 @@ type Identifier = String
 type StBlock = Seq (Lexeme Statement)
 
 data DataType
-    = Void | Int | Float | Bool | Char | String | Range | Type
-    | Union | Record
-    | Array (Lexeme DataType)
-    | User  (Lexeme Identifier)
-    deriving (Show, Eq)
+    = Int | Float | Bool | Char | String | Range | Type
+    | Union  (Lexeme Identifier) (Seq (Lexeme Identifier, Lexeme DataType))
+    | Record (Lexeme Identifier) (Seq (Lexeme Identifier, Lexeme DataType))
+    | Array   (Lexeme DataType)
+    | UserDef (Lexeme Identifier)
+    | Void | Undef | TypeError  -- For compiler use
+    deriving (Eq)
+
+instance Show DataType where
+    show dt = case dt of
+        Int                  -> "Int"
+        Float                -> "Float"
+        Bool                 -> "Bool"
+        Char                 -> "Char"
+        String               -> "String"
+        Range                -> "Range"
+        Type                 -> "Type"
+        (Union  iden fields) -> "Union "  ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fields
+        (Record iden fields) -> "Record " ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fields
+        (Array aDt)          -> "[ " ++ show (lexInfo aDt) ++ " ]"
+        (UserDef iden)       -> show $ lexInfo iden
+        Void                 -> "()"
+        Undef                -> error "DataType Undef should never be 'shown'"
+        TypeError            -> error "DataType TypeError should never be 'shown'"
 
 ----------------------------------------
 
 data Statement
     -- Language
     = StNoop
-    | StAssign (Lexeme Identifier) (Lexeme Expression)
+    | StAssign (Seq (Lexeme Identifier)) (Lexeme Expression)
     -- Definitions
-    | StDeclaration       (Lexeme Declaration)
-    | StDeclarationList   (DeclarationList Expression)
-    | StStructDeclaration (Lexeme Declaration) (DeclarationList Statement)
+    | StDeclaration      (Lexeme Declaration)
+    | StDeclarationList  (DeclarationList Expression)
+    | StStructDefinition (Lexeme DataType)
     -- Functions
     | StReturn       (Lexeme Expression)
     | StFunctionDef  (Lexeme Declaration) (Seq (Lexeme DataType))
@@ -89,7 +109,7 @@ data Category
     | CatParameter
     | CatRecordField
     | CatUnionField
-    | CatDataType
+    | CatUserDef
     deriving (Eq)
 
 instance Show Category where
@@ -98,7 +118,7 @@ instance Show Category where
     show CatParameter   = "Parameter"
     show CatRecordField = "Record Field"
     show CatUnionField  = "Union Field"
-    show CatDataType    = "Data Type"
+    show CatUserDef     = "Data Type"
 
 data When = When (Seq (Lexeme Expression)) StBlock
     deriving (Show)
@@ -107,7 +127,7 @@ data When = When (Seq (Lexeme Expression)) StBlock
 
 data Expression
     -- Variable
-    = Variable (Lexeme Identifier)
+    = Variable (Seq (Lexeme Identifier))
     -- Function call
     | FunctionCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- Literals
@@ -135,22 +155,22 @@ data Binary
 
 instance Show Binary where
     show op = case op of
-        OpPlus    -> "Arithmetic addition"
-        OpMinus   -> "Arithmetic substraction"
-        OpTimes   -> "Arithmetic multiplication"
-        OpDivide  -> "Arithmetic division"
-        OpModulo  -> "Arithmetic Modulo"
-        OpPower   -> "Arithmetic power"
-        OpFromTo  -> "Range construction operator"
-        OpOr      -> "Logical disjunction"
-        OpAnd     -> "Logical conjunction"
-        OpEqual   -> "Equal to"
-        OpUnequal -> "Not equal to"
-        OpLess    -> "Less than"
-        OpLessEq  -> "Less than or equal to"
-        OpGreat   -> "Greater than"
-        OpGreatEq -> "Greater than or equal to"
-        OpBelongs -> "Belongs to Range"
+        OpPlus    -> "arithmetic addition"
+        OpMinus   -> "arithmetic substraction"
+        OpTimes   -> "arithmetic multiplication"
+        OpDivide  -> "arithmetic division"
+        OpModulo  -> "arithmetic Modulo"
+        OpPower   -> "arithmetic power"
+        OpFromTo  -> "range construction operator"
+        OpOr      -> "logical disjunction"
+        OpAnd     -> "logical conjunction"
+        OpEqual   -> "equal to"
+        OpUnequal -> "not equal to"
+        OpLess    -> "less than"
+        OpLessEq  -> "less than or equal to"
+        OpGreat   -> "greater than"
+        OpGreatEq -> "greater than or equal to"
+        OpBelongs -> "belongs to Range"
 
 binaryOperation :: Binary -> Seq ((DataType, DataType), DataType)
 binaryOperation op = fromList $ case op of
@@ -205,13 +225,12 @@ type Printer a = StateT PrintState (WriterT (Seq String) Identity) a
 ----
 printStatement :: Statement -> Printer ()
 printStatement st = case st of
-
     StNoop         -> return ()
 
-    StAssign (Lex var _) (Lex expr _) -> do
+    StAssign vars (Lex expr _) -> do
         printNonTerminal "ASSIGNMENT"
         raiseTabs
-        printNonTerminal $ "- variable: " ++ var
+        printNonTerminal $ "- variable: " ++ concat (intersperse "." $ map lexInfo (toList vars))
         printExpressionWithTag "- value: " expr
         lowerTabs
 
@@ -221,16 +240,14 @@ printStatement st = case st of
         printNonTerminal $ show (lexInfo dt) ++ " " ++ lexInfo ld
         lowerTabs
 
-    StStructDeclaration (Lex (Declaration sn dt _) _) dcls -> do
-        printNonTerminal $ "STRUCT " ++ show (lexInfo dt) ++ " " ++ lexInfo sn
+    StStructDefinition (Lex dt _) -> do
+        let (typeStr, fields, iden) = case dt  of
+                Record iden fields -> ("Record", fields, iden)
+                Union  iden fields -> ("Union" , fields, iden)
+        printNonTerminal (typeStr ++ show dt ++ " " ++ lexInfo iden)
         raiseTabs
-        forM_ dcls $ \(Lex (Declaration fn fdt _) _, maySt) -> do
-            printNonTerminal $ "- field: " ++ show (lexInfo fdt) ++ " " ++ lexInfo fn
-            raiseTabs
-            case maySt of
-                Just (Lex (StAssign _ (Lex expr _)) _) -> printExpressionWithTag "- default: " expr
-                Nothing     -> printNonTerminal "- no default"
-            lowerTabs
+        forM_ fields $ \(Lex fIden _, Lex fDt _) ->
+            printNonTerminal $ "- field: " ++ fIden ++ " :: " ++ show fDt
         lowerTabs
 
     StReturn (Lex expr _)     -> printExpressionWithTag "RETURN" expr
@@ -283,7 +300,7 @@ printStatement st = case st of
     StRead vars -> do
         printNonTerminal "READ"
         raiseTabs
-        mapM_ (printExpression . Variable) vars
+        mapM_ (printExpression . Variable . singleton) vars
         lowerTabs
 
     StPrint exprs -> do
@@ -339,21 +356,21 @@ printStatement st = case st of
 ----
 printExpression :: Expression -> Printer ()
 printExpression e = case e of
-    Variable  v      -> printNonTerminal $ "VARIABLE: "        ++ show (lexInfo v)
+    Variable vars -> printNonTerminal $ "VARIABLE: " ++ concat (intersperse "." $ map lexInfo (toList vars))
     FunctionCall iden args -> do
         printNonTerminal "FUNCTION CALL"
         raiseTabs
-        printNonTerminal $ "- function name: " ++ (show $ lexInfo iden)
+        printNonTerminal $ "- function name: " ++ show (lexInfo iden)
         printNonTerminal "- arguments: "
         raiseTabs
         mapM_ (printExpression . lexInfo) args
         lowerTabs
         lowerTabs
-    LitInt    i      -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
-    LitChar   c      -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)
-    LitBool   b      -> printNonTerminal $ "BOOLEAN LITERAL: "   ++ map toLower (show (lexInfo b))
-    LitFloat  f      -> printNonTerminal $ "FLOAT LITERAL: "     ++ show (lexInfo f)
-    LitString s      -> printNonTerminal $ "STRING LITERAL: "    ++ show (lexInfo s)
+    LitInt    i -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
+    LitChar   c -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)
+    LitBool   b -> printNonTerminal $ "BOOLEAN LITERAL: "   ++ map toLower (show (lexInfo b))
+    LitFloat  f -> printNonTerminal $ "FLOAT LITERAL: "     ++ show (lexInfo f)
+    LitString s -> printNonTerminal $ "STRING LITERAL: "    ++ show (lexInfo s)
     ExpBinary op l r -> do
         printNonTerminal "BINARY OPERATION"
         raiseTabs

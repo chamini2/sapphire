@@ -6,7 +6,6 @@ import           Parser
 
 import           Control.Monad       (guard, void)
 import           Control.Monad.Trans (lift)
-import           Control.Monad.Trans.Maybe
 import           Data.Foldable       (mapM_)
 import           Data.Sequence       as DS (null)
 import           Prelude             as P hiding (mapM_)
@@ -22,11 +21,11 @@ main = do
 
 printProgram :: Checker () -> IO ()
 printProgram chk = do
-    let (state,writer) = runProgramChecker chk
-        CheckState stTable _ _ stAst _ = state
+    let (state, writer) = runProgramChecker chk
+        CheckState stTable _ _ stAst _ _ = state
     -- TEMPORAL
     print state
-    let (lexE,parseE,staticE,afterW) = getErrors writer
+    let (lexE, parseE, staticE, afterW) = getErrors writer
     mapM_ print lexE
     mapM_ print parseE
     mapM_ print staticE

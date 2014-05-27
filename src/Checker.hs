@@ -8,18 +8,20 @@ import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
 import           Data.Foldable          as DF (and, concatMap, elem, find,
                                                foldr, forM_, mapM_, notElem,
-                                               toList)
+                                               toList, foldr1)
 import           Data.Function          (on)
 import           Data.Functor           ((<$), (<$>))
+import           Data.List              (intercalate)
 import           Data.Maybe             (fromJust, isJust, isNothing)
 import           Data.Sequence          as DS (Seq, empty, filter, fromList,
                                                index, length, null, singleton,
-                                               sortBy, zip, zipWith, (<|), (|>))
+                                               sortBy, zip, zipWith, (<|), (|>),
+                                               (><), ViewL((:<),EmptyL), viewl)
 import           Data.Traversable       as DT (forM, mapM)
 import           Prelude                as P hiding (and, concatMap, elem,
                                               filter, foldr, length, lookup,
                                               mapM, mapM_, notElem, null, zip,
-                                              zipWith)
+                                              zipWith, foldr1)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -37,10 +39,11 @@ data CheckError
     | CWarn  Position CheckWarning
 
 instance Show CheckError where
-    show (LError p e) = "Lexer error on "   ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
-    show (PError p e) = "Parsing error on " ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
-    show (SError p e) = "Static error on "  ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
-    show (CWarn  p w) = "Warning on "       ++ showPosn p ++ ": \n\t" ++ show w ++ "\n"
+    show cError = case cError of
+        LError p e -> "Lexer error on "   ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
+        PError p e -> "Parsing error on " ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
+        SError p e -> "Static error on "  ++ showPosn p ++ ": \n\t" ++ show e ++ "\n"
+        CWarn  p w -> "Warning on "       ++ showPosn p ++ ": \n\t" ++ show w ++ "\n"
 
 instance Eq CheckError where
     (==) = (==) `on` errorPos
@@ -54,73 +57,96 @@ data LexerError
     | LexerError     String
 
 instance Show LexerError where
-    show (UnexpectedChar c) = "unexpected character '" ++ [c] ++ "'"
-    show (StringError str)  = "missing matching \" for string " ++ show str
-    show (LexerError  msg)  = msg
+    show lError = case lError of
+        UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
+        StringError str  -> "missing matching \" for string " ++ show str
+        LexerError  msg  -> msg
 
 data ParseError
     = UnexpectedToken String -- show Token
     | ParseError      String
 
 instance Show ParseError where
-    show (UnexpectedToken tok) = "unexpected token: '" ++ show tok ++ "'"
-    show (ParseError msg)      = msg
+    show pError = case pError of
+        UnexpectedToken tok -> "unexpected token: '" ++ show tok ++ "'"
+        ParseError msg      -> msg
 
 data StaticError
     -- Variables
     = VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
+    -- Types
+    | TypeAlreadyDefined   Identifier Position
+    | LanguageTypeRedefine Identifier
+    | UndefinedType        Identifier
     -- Functions
-    | FunctionNotDefined    Identifier
-    | ProcedureInExpression Identifier
-    | FunctionAsStatement   Identifier
-    | UsedNotImplemented    Identifier
-    | ImpInDefScope         Identifier Position
-    | AlreadyImplemented    Identifier Position
-    | FunctionArguments     Identifier (Seq DataType) (Seq DataType)
+    | FunctionNotDefined       Identifier
+    | ProcedureInExpression    Identifier
+    | FunctionAsStatement      Identifier
+    | UsedNotImplemented       Identifier
+    | ImpInDefScope            Identifier Position
+    | AlreadyImplemented       Identifier Position
+    | LanguageImplemented      Identifier
+    | FunctionArguments        Identifier (Seq DataType) (Seq DataType)
+    | FunctionAlreadyDefined   Identifier Position
+    | LanguageFunctionRedefine Identifier
+    | NoReturn                 Identifier
     -- Statements
     | ConditionDataType DataType
     | CaseWhenDataType  DataType DataType
     | ForInDataType     DataType
     | BreakOutsideLoop
     | ContinueOutsideLoop
+    | ReturnProcedure            DataType Identifier
+    | ReturnType        DataType DataType Identifier
     -- Operators
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
     | NonCategory     Identifier Category Category
     | NotDefined      Identifier
-    | AlreadyDefined  Identifier Position
+    | AlreadyDeclared Identifier Position
     | StaticError     String
 
 instance Show StaticError where
-    -- Variables
-    show (VariableNotInitialized var)  = "variable '" ++ var ++ "' has not been initialized"
-    show (InvalidAssignType var vt et) = "cannot assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
-    -- Functions
-    show (FunctionNotDefined fname)    = "must define function '" ++ fname ++ "' before implementing it"
-    show (ProcedureInExpression fname) = "cannot use procedure '" ++ fname ++ "' inside an expression"
-    show (FunctionAsStatement fname)   = "cannot use function '" ++ fname ++ "' as a statement"
-    show (UsedNotImplemented fname)    = "function '" ++ fname ++ "' is used but never implemented"
-    show (ImpInDefScope fname p)       = "must implement function '" ++ fname ++ "' in same scope that it is defined, at " ++ showPosn p
-    show (AlreadyImplemented fname p)  = "function '" ++ fname ++ "' has already been implemented at " ++ showPosn p
-    show (FunctionArguments fname e g) = "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
-        where
-            showSign = drop 2 . concatMap (\dt -> ", " ++ show dt)
-    -- Statements
-    show (ConditionDataType dt)   = "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
-    show (CaseWhenDataType dt wd) = "case has expression of type '" ++ show dt ++ "' but when has expression of type '" ++ show wd ++ "'"
-    show (ForInDataType dt)       = "for statement must iterate over expression of type 'Range', but it is of type '" ++ show dt ++ "'"
-    show BreakOutsideLoop         = "break statement not within loop"
-    show ContinueOutsideLoop      = "continue statement not within loop"
-    -- Operators
-    show (UnaryTypes op dt)       = "operator '" ++ show op ++ "' does not work with argument (" ++ show dt ++ ")"
-    show (BinaryTypes op (dl,dr)) = "operator '" ++ show op ++ "' does not work with arguments (" ++ show dl ++ ", " ++ show dr ++ ")"
-    -- General
-    show (NonCategory iden e g) = "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
-    show (NotDefined iden)      = "identifier '" ++ iden ++ "' has not been defined"
-    show (AlreadyDefined var p) = "identifier '" ++ var ++ "' has already been defined at " ++ show p
-    show (StaticError msg)      = msg
+    show sError = case sError of
+        -- Variables
+        VariableNotInitialized var       -> "variable '" ++ var ++ "' may not have been initialized"
+        InvalidAssignType      var vt et -> "cannot assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
+        -- Types
+        TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
+        LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
+        UndefinedType        tname   -> "type '" ++ tname ++ "' has not been defined"
+        -- Functions
+        FunctionNotDefined    fname     -> "must define function '" ++ fname ++ "' before implementing it"
+        ProcedureInExpression fname     -> "cannot use procedure '" ++ fname ++ "' inside an expression"
+        FunctionAsStatement   fname     -> "cannot use function '" ++ fname ++ "' as a statement"
+        UsedNotImplemented    fname     -> "function '" ++ fname ++ "' is used but never implemented"
+        ImpInDefScope         fname p   -> "must implement function '" ++ fname ++ "' in same scope that it is defined, at " ++ showPosn p
+        AlreadyImplemented    fname p   -> "function '" ++ fname ++ "' has already been implemented at " ++ showPosn p
+        LanguageImplemented   fname     -> "cannot reimplement language implemented function '"++ fname ++ "'"
+        FunctionArguments     fname e g -> "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
+            where
+                showSign = intercalate ", " . map show . toList
+        FunctionAlreadyDefined   fname p -> "function '" ++ fname ++ "' has already been defined at " ++ show p
+        LanguageFunctionRedefine fname   -> "cannot redefine a language defined function '" ++ fname ++ "'"
+        NoReturn                 fname   -> "function '" ++ fname ++ "' does not have a return statement"
+        -- Statements
+        ConditionDataType dt    -> "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
+        CaseWhenDataType e g    -> "case has expression of type '" ++ show e ++ "' but when has expression of type '" ++ show g ++ "'"
+        ForInDataType dt        -> "for statement must iterate over expression of type 'Range', but it is of type '" ++ show dt ++ "'"
+        BreakOutsideLoop        -> "break statement not within loop"
+        ContinueOutsideLoop     -> "continue statement not within loop"
+        ReturnProcedure g fname -> "cannot return '" ++ show g ++ "' in procedure '" ++ fname ++ "'"
+        ReturnType e g fname    -> "expected return type '" ++ show e ++ "' for function '" ++ fname ++ "', but got type '" ++ show g ++ "'"
+        -- Operators
+        UnaryTypes  op dt      -> "operator '" ++ show op ++ "' does not work with argument (" ++ show dt ++ ")"
+        BinaryTypes op (dl,dr) -> "operator '" ++ show op ++ "' does not work with arguments (" ++ show dl ++ ", " ++ show dr ++ ")"
+        -- General
+        NonCategory iden e g  -> "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
+        NotDefined  iden      -> "identifier '" ++ iden ++ "' has not been defined"
+        AlreadyDeclared var p -> "identifier '" ++ var ++ "' has already been declared at " ++ show p
+        StaticError msg       -> msg
 
 --------------------------------------------------------------------------------
 
@@ -129,36 +155,39 @@ data CheckWarning
     | DefinedNotImplemented Identifier
 
 instance Show CheckWarning where
-    show (DefinedNotUsed iden)         = "identifier '" ++ iden ++ "' is defined but never used"
-    show (DefinedNotImplemented fname) = "function '" ++ fname ++ "' is defined but never implemented"
+    show cWarn = case cWarn of
+        DefinedNotUsed iden         -> "identifier '" ++ iden ++ "' is defined but never used"
+        DefinedNotImplemented fname -> "function '" ++ fname ++ "' is defined but never implemented"
 
 --------------------------------------------------------------------------------
 
 data CheckState = CheckState
-    { table   :: SymTable
-    , stack   :: Stack Scope
-    , scopeId :: ScopeNum
-    , ast     :: Program
-    , loop    :: LoopLevel
+    { table     :: SymTable
+    , stack     :: Stack Scope
+    , scopeId   :: ScopeNum
+    , ast       :: Program
+    , loopLvl   :: NestedLevel
+    , funcStack :: Stack (DataType, Lexeme Identifier)
     }
 
 instance Show CheckState where
-    show (CheckState t s c a _) = showT ++ showS ++ showC ++ showA
+    show (CheckState t s c a _ _) = showT ++ showS ++ showC ++ showA
         where
             showT = "Symbol Table:\n" ++ show t ++ "\n"
             showS = "Scope Stack:\n"  ++ show s ++ "\n"
             showC = "Scope Number:\t" ++ show c ++ "\n"
             showA = "Program:\n"      ++ show a ++ "\n"
 
-type LoopLevel = Int
+type NestedLevel = Int
 
 --------------------------------------------------------------------------------
 
 errorPos :: CheckError -> Position
-errorPos (LError p _) = p
-errorPos (PError p _) = p
-errorPos (SError p _) = p
-errorPos (CWarn  p _) = p
+errorPos err = case err of
+    LError p _ -> p
+    PError p _ -> p
+    SError p _ -> p
+    CWarn  p _ -> p
 
 currentScope :: Checker ScopeNum
 currentScope = gets (serial . peek . stack)
@@ -184,11 +213,12 @@ flags = empty
 
 initialState :: CheckState
 initialState = CheckState
-    { table    = emptyTable
-    , stack    = initialStack
-    , scopeId  = 0
-    , ast      = Program DS.empty
-    , loop     = 0
+    { table     = emptyTable
+    , stack     = initialStack
+    , scopeId   = 0
+    , ast       = Program DS.empty
+    , loopLvl   = 0
+    , funcStack = singletonStack (Void, Lex "sapphire" (0,0)) -- mark initialized if Void
     }
 
 ----------------------------------------
@@ -230,13 +260,19 @@ checkWarnings = do
     symbols <- gets $ accessible . table
     forM_ symbols $ \(sym, symIs) ->
         forM_ symIs $ \symI -> do
-            let posn = defPosn symI
-            case (category symI, used symI, initialized symI) of
-                (CatFunction, True , False) -> tellSError posn (UsedNotImplemented sym)
-                (CatFunction, False, True ) -> tellCWarn posn (DefinedNotUsed sym)
-                (CatFunction, False, False) -> tellCWarn posn (DefinedNotImplemented sym)
-                (_          , False, _    ) -> tellCWarn posn (DefinedNotUsed sym)
-                _                           -> return ()
+            let dPosn = defPosn symI
+            case (category symI, used symI, initialized symI, value symI) of
+                (CatFunction, True , _, Just (ValFunction _ Nothing _)) -> tellSError dPosn (UsedNotImplemented sym)
+
+                (CatFunction, _, False, Just (ValFunction _ _ iPosn)) -> tellSError iPosn (NoReturn sym)
+
+                (CatFunction, False, _, Just _ ) -> tellCWarn  dPosn (DefinedNotUsed sym)
+
+                (CatFunction, False, _, Nothing) -> tellCWarn  dPosn (DefinedNotImplemented sym)
+
+                (_, False, _, _) -> tellCWarn  dPosn (DefinedNotUsed sym)
+
+                _ -> return ()
 
 --------------------------------------------------------------------------------
 
@@ -255,18 +291,67 @@ enterScope = do
 exitScope :: Checker ()
 exitScope = modify (\s -> s { stack = snd . pop $ stack s })
 
+----------------------------------------
+
 {- |
     Entering a loop
 -}
 enterLoop :: Checker ()
-enterLoop = modify (\s -> s { loop = loop s + 1 })
+enterLoop = modify (\s -> s { loopLvl = loopLvl s + 1 })
 
 {- |
     Exiting a loop
 -}
 exitLoop :: Checker ()
-exitLoop = modify (\s -> s { loop = loop s - 1 })
+exitLoop = modify (\s -> s { loopLvl = loopLvl s - 1 })
 
+----------------------------------------
+
+{- |
+    Entering a function
+-}
+enterFunction :: DataType -> Lexeme Identifier -> Checker()
+enterFunction dt fnameL = modify (\s -> s { funcStack = push (dt, fnameL) (funcStack s) })
+
+{- |
+    Exiting a function
+-}
+exitFunction :: Checker ()
+exitFunction = modify (\s -> s { funcStack = snd . pop $ funcStack s })
+
+----------------------------------------
+
+--{- |
+--    Enters a new topLevel scope
+---}
+--enterTopLevel :: Checker ()
+--enterTopLevel = modify (\s -> s { topLevel = push 0 (topLevel s) })
+
+--{- |
+--    Exits the current topLevel scope
+---}
+--exitTopLevel :: Checker ()
+--exitTopLevel = modify (\s -> s { topLevel = snd . pop $ topLevel s })
+
+--{- |
+--    Increment the topLevel indicator
+---}
+--incrementTopLevel :: Checker ()
+--incrementTopLevel = do
+--    (top, stck) <- liftM pop $ gets topLevel
+--    let newStck = push (top + 1) stck
+--    modify (\s -> s {topLevel = newStck})
+
+--{- |
+--    Decrease the topLevel indicator
+---}
+--decreaseTopLevel :: Checker ()
+--decreaseTopLevel = do
+--    (top, stck) <- liftM pop $ gets topLevel
+--    let newStck = push (top - 1) stck
+--    modify (\s -> s {topLevel = newStck})
+
+--------------------------------------------------------------------------------
 
 {- |
     Adds a symbol to the Checker's symbol table
@@ -354,7 +439,7 @@ putScopeVariables vars = forM_ vars $ \(var, si) -> do
     Maintains used for variables used in at least one scope.
 -}
 checkInitialization :: Seq (Seq (Identifier, SymInfo)) -> Seq (Identifier, SymInfo)
-checkInitialization scopes = foldr (zipWith func) (index scopes 0) scopes
+checkInitialization = foldr1 (zipWith func)
     where
         func :: (Identifier, SymInfo) -> (Identifier, SymInfo) -> (Identifier, SymInfo)
         func (a,sa) (b,sb) = if a /= b
@@ -364,13 +449,14 @@ checkInitialization scopes = foldr (zipWith func) (index scopes 0) scopes
                         })
 
 checkArguments :: Identifier -> Maybe Value -> Seq (Lexeme Expression) -> Position -> Checker ()
-checkArguments fname mayVal args posn = case mayVal of
-    Just val -> do
-        let prms = lexInfo <$> parameters val
-        dts <- mapM checkExpression args
-        unless (length args == length prms && and (zipWith (==) dts prms)) $
-            tellSError posn (FunctionArguments fname prms dts)
-    Nothing -> error "Checker.checkArguments: function with no SymInfo value"
+checkArguments fname mayVal args posn = maybe failure success mayVal
+    where
+        failure = error "Checker.checkArguments: function with no SymInfo value"
+        success val = do
+            let prms = lexInfo <$> parameters val
+            dts <- mapM checkExpression args
+            unless (length args == length prms && and (zipWith (==) dts prms)) $
+                tellSError posn (FunctionArguments fname prms dts)
 
 ----------------------------------------
 
@@ -378,21 +464,90 @@ checkArguments fname mayVal args posn = case mayVal of
     Adds a declaration to the symbol table.
     Returns a Bool indicating if it was added successfully.
 -}
-processDeclaration :: Lexeme Declaration -> Checker Bool
-processDeclaration (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
+processVariable :: Lexeme Declaration -> Checker Bool
+processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
     (tab,stck) <- gets (table &&& stack)
     sc  <- currentScope
     let info = emptySymInfo {
-                 dataType = t,
-                 category = c,
-                 scopeNum = sc,
-                 defPosn = posn
-               }
+                dataType = t,
+                category = c,
+                scopeNum = sc,
+                defPosn  = posn
+            }
+    case lookupWithScope iden stck tab of
+        Nothing -> addSymbolCheckingUserDef info
+        Just si
+            | scopeNum si == sc -> tellSError posn (AlreadyDeclared iden (defPosn si)) >> return False
+            | otherwise         -> addSymbolCheckingUserDef info
+        where
+            addSymbolCheckingUserDef info = case t of
+                UserDef (Lex udIden _) -> do
+                    (tab,stck) <- gets (table &&& stack)
+                    case lookupWithScope udIden stck tab of
+                        Nothing -> tellSError posn (UndefinedType udIden) >> return False
+                        Just si -> do
+                            let info = info { dataType = dataType si }
+                            addSymbol idenL info >> return True
+                            -- TODO crear fields en tabla de simbolos para esta variable
+                _ -> addSymbol idenL info >> return True
+
+processType :: Lexeme Declaration -> Checker Bool
+processType decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success
+    where
+        success info si
+            | scopeNum si == scopeNum info = tellSError posn (TypeAlreadyDefined iden (defPosn si)) >> return False
+            | scopeNum si == -1            = tellSError posn (LanguageTypeRedefine iden) >> return False
+            | otherwise                    = addSymbol idenL info >> return True
+
+processFunction :: Lexeme Declaration -> Checker Bool
+processFunction decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success
+    where
+        success info si
+            | scopeNum si == scopeNum info = tellSError posn (FunctionAlreadyDefined iden (defPosn si)) >> return False
+            | scopeNum si == -1            = tellSError posn (LanguageFunctionRedefine iden) >> return False
+            | otherwise                    = addSymbol idenL info >> return True
+
+processGeneric :: Lexeme Declaration -> (SymInfo -> SymInfo -> Checker Bool) -> Checker Bool
+processGeneric (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) success = do
+    (tab,stck) <- gets (table &&& stack)
+    sc  <- currentScope
+    let info = emptySymInfo {
+                dataType = t,
+                category = c,
+                scopeNum = sc,
+                defPosn  = posn
+            }
     case lookupWithScope iden stck tab of
         Nothing -> addSymbol idenL info >> return True
-        Just si
-            | scopeNum si == sc  -> tellSError posn (AlreadyDefined iden (defPosn si)) >> return False
-            | otherwise          -> addSymbol idenL info >> return True
+        Just si -> success info si
+
+--defaultValue :: Lexeme DataType -> Lexeme Identifier -> Checker StBlock
+--defaultValue (Lex dt _) iden = case dt of
+--    Void       -> return empty
+--    Int        -> assign $ LitInt    (Lex 0 posn)
+--    Float      -> assign $ LitFloat  (Lex 0.0 posn)
+--    Bool       -> assign $ LitBool   (Lex False posn)
+--    Char       -> assign $ LitChar   (Lex '\0' posn)
+--    String     -> assign $ LitString (Lex [] posn)
+--    --Range      -> assign $ LitRange
+--    --Type       -> assign $ LitInt (Lex 0 posn)
+--    --Union      ->
+--    --Record     ->
+--    --Array aDT  ->
+--    --User udt -> do
+--    --    mayRSc <- getsSymInfo udt scopeNum
+--    --    maybe failure success mayRSc
+--    --        where
+--    --            failure = return empty
+--    --            success rSc = do
+--    --                tab <- gets table
+--    --                let fields = toListFilter tab rSc
+--    --                -- We have to concat the name and a dot: "iden . fIden" before sending it
+--    --                blocks <- mapM (\(fIden, fInfo) -> defaultValue (Lex (dataType fInfo) (defPosn fInfo)) (Lex fIden (defPosn fInfo))) fields
+--    --                return $ foldr (><) empty blocks
+--    where
+--        assign exp = return . singleton $ Lex (StAssign (singleton iden) (Lex exp posn)) posn
+--        posn = lexPosn iden
 
 ----------------------------------------
 
@@ -416,61 +571,85 @@ checkStatement :: Lexeme Statement -> Checker () -- Capaz debería devolver otra
 checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
-    StAssign varL@(Lex var _) ex -> do
-        mayVarDt <- getsSymInfo varL dataType
-        expDt    <- checkExpression ex
-        case mayVarDt of
-            Just varDt -> do
-                markInitialized varL
-                unless (varDt == expDt) $
-                    tellSError posn (InvalidAssignType var varDt expDt)
-            Nothing -> return ()
+    StAssign varSeq ex -> case viewl varSeq of
+            varL@(Lex var _) :< vars -> do
+                mayVarDt <- getsSymInfo varL dataType
+                expDt    <- checkExpression ex
+                case mayVarDt of
+                    Just varDt -> do
+                        markInitialized varL
+                        unless (varDt == expDt) $
+                            tellSError posn (InvalidAssignType var varDt expDt)
+                    Nothing -> return ()
+            EmptyL -> return ()
 
-    StDeclaration dcl -> void $ processDeclaration dcl
+    StDeclaration dcl -> void $ processVariable dcl
 
-    StStructDeclaration structDcl dcls -> do
-        processDeclaration structDcl
-        enterScope
-        forM_ dcls $ \(field, maySt) -> do
-            processDeclaration field
-            case maySt of
-                Just assign -> checkStatement assign
-                Nothing     -> return ()
-        exitScope
+    StStructDefinition dtL@(Lex dt posn) -> do
+        let idenL = case dt  of
+                Record idenL _ -> idenL
+                Union  idenL _ -> idenL
+        defined <- processType $ Lex (Declaration idenL dtL CatUserDef) posn
+        when defined $ markInitialized idenL
 
-    StReturn ex       -> void $ checkExpression ex
+    StReturn ex -> do
+        -- TODO: check topLevel to see if it sets the function to 'returned'
+        dt         <- checkExpression ex
+        (st,fnameL@(Lex fname _)) <- liftM peek $ gets funcStack
+        if st == Void
+            then tellSError posn (ReturnProcedure dt fname)
+            else do
+                when (st /= dt) $ tellSError posn (ReturnType st dt fname)
+                markInitialized fnameL
 
     StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
-        defined <- processDeclaration decl
+        defined <- processFunction decl
         when defined $ putValue iden $ ValFunction dts Nothing (0,0)
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
         currSc <- currentScope
-        mayInf <- getsSymInfo fnameL $ \s -> (value s, currSc == scopeNum s, category s, initialized s, defPosn s)
+        mayInf <- getsSymInfo fnameL id
         case mayInf of
-            Just (Just val,True,CatFunction,False,_) -> do
-                markInitialized fnameL
-                putValue fnameL $ val { impl = Just body, implPosn = posn }
+            Just si -> do
+                let val    = value si
+                    sameSc = currSc == scopeNum si
+                    catSi  = category si
+                    initSi = initialized si
+                    dPosn  = defPosn si
+                    dt     = dataType si
+                case (val, sameSc, catSi, initSi) of
+                    (Just v, True, CatFunction, False) -> do
+                        putValue fnameL $ v { impl = Just body, implPosn = posn }
 
-                before <- getScopeVariables
-                enterScope
+                        before <- getScopeVariables
+                        enterScope
+                        enterFunction dt fnameL
+                        -- For procedures
+                        when (dt == Void) $ markInitialized fnameL
 
-                forM_ (zip params (parameters val)) $ \(varL,dt) -> do
-                    processDeclaration $ Declaration varL dt CatParameter <$ varL
-                    markInitialized varL
+                        forM_ (zip params (parameters v)) $ \(varL,dt) -> do
+                            processVariable $ Declaration varL dt CatParameter <$ varL
+                            markInitialized varL
 
-                checkStatements body
-                exitScope
-                varBody <- getScopeVariables
+                        checkStatements body
+                        exitFunction
+                        exitScope
+                        varBody <- getScopeVariables
 
-                putScopeVariables before
-                -- Only marks 'used'
-                checkMark $ fromList [varBody, before]
+                        putScopeVariables before
+                        -- Only marks 'used'
+                        checkMark $ fromList [varBody, before]
+                        let functions   = filter func varBody
+                            func (_,si) = category si == CatFunction && scopeNum si == currSc
+                        forM_ functions $ \(iden,si) ->
+                            when (initialized si) $ markInitialized $ Lex iden (defPosn si)
 
-            Just (Nothing,_,cat,_,_) -> tellSError posn (NonCategory fname CatFunction cat)
-            Just (Just v,_,_,True,_) -> tellSError posn (AlreadyImplemented fname (implPosn v))
-            Just (_,False,_,_,defp)  -> tellSError posn (ImpInDefScope fname defp)
-            Nothing                  -> tellSError posn (FunctionNotDefined fname)
+                    -- If value is Nothing it means that it is not a function
+                    (Nothing,_,cat,_) -> tellSError posn (NonCategory fname CatFunction cat)
+                    (Just v,_,_,True) -> tellSError posn (AlreadyImplemented fname (implPosn v))
+                    -- Must implement functions in the same scope in which they are defined
+                    (_,False,_,_)     -> tellSError posn (ImpInDefScope fname dPosn)
+            Nothing -> tellSError posn (FunctionNotDefined fname)
 
     StFunctionCall fnameL@(Lex fname _) args -> do
         mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
@@ -559,7 +738,7 @@ checkStatement (Lex st posn) = case st of
         before <- getScopeVariables
 
         enterScope >> enterLoop
-        processDeclaration $ Declaration var (Int <$ var) CatVariable <$ var
+        processVariable $ Declaration var (Int <$ var) CatVariable <$ var
         markInitialized var
         checkStatements body
         exitLoop >> exitScope
@@ -570,11 +749,11 @@ checkStatement (Lex st posn) = case st of
         checkMark $ fromList [varBody, before]
 
     StBreak -> do
-        loopL <- gets loop
+        loopL <- gets loopLvl
         unless (loopL > 0) $ tellSError posn BreakOutsideLoop
 
     StContinue -> do
-        loopL <- gets loop
+        loopL <- gets loopLvl
         unless (loopL > 0) $ tellSError posn ContinueOutsideLoop
 
 {- |
@@ -582,22 +761,24 @@ checkStatement (Lex st posn) = case st of
 -}
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
-    Variable varL@(Lex var _) -> do
-        mayInf <- getsSymInfo varL (\si -> (category si, initialized si, dataType si))
-        case mayInf of
-            Just inf -> do
-                markUsed varL
-                case inf of
-                    (CatVariable,ini,dt)  -> do
-                        unless ini $ tellSError posn (VariableNotInitialized var)
-                        return dt
-                    (CatParameter,ini,dt) -> do
-                        unless ini $ tellSError posn (VariableNotInitialized var)
-                        return dt
-                    (ct,_,_)              -> do
-                        tellSError posn (NonCategory var CatVariable ct)
-                        return Void
-            Nothing -> return Void
+    Variable varSeq -> case viewl varSeq of
+        varL@(Lex var _) :< vars -> do
+            mayInf <- getsSymInfo varL (\si -> (category si, initialized si, dataType si))
+            case mayInf of
+                Just inf -> do
+                    markUsed varL
+                    case inf of
+                        (CatVariable,ini,dt)  -> do
+                            unless ini $ tellSError posn (VariableNotInitialized var)
+                            return dt
+                        (CatParameter,ini,dt) -> do
+                            unless ini $ tellSError posn (VariableNotInitialized var)
+                            return dt
+                        (ct,_,_)              -> do
+                            tellSError posn (NonCategory var CatVariable ct)
+                            return Void
+                Nothing -> return Void
+        EmptyL -> return Void
 
     FunctionCall fnameL@(Lex fname _) args -> do
         mayInf <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))

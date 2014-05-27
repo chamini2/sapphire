@@ -152,18 +152,19 @@ StatementList :: { StBlock }
 
 Statement :: { Lexeme Statement }
     :                               { Lex StNoop (0,0) }      -- λ, no-operation
-    | VariableId "=" Expression     { StAssign $1 $3 <$ $1 }
+    | VariableId   "=" Expression   { StAssign (singleton $1) $3 <$ $1           }
+    | StructAccess "=" Expression   { StAssign $1             $3 <$ (index $1 0) }
 
     -- Definitions
-    | "Record" TypeId "as" MaybeNL FieldList MaybeNL "end"      { makeStStructDeclaration (Record <$ $1) CatRecordField $2 (lexPosn $1) $5 }
-    | "Union"  TypeId "as" MaybeNL FieldList MaybeNL "end"      { makeStStructDeclaration (Union  <$ $1)  CatUnionField  $2 (lexPosn $1) $5 }
-    | DataType DeclareVariableList      { (StDeclarationList $ fmap (first (\iden -> Declaration iden $1 CatVariable <$ iden)) $2) <$ $1 }
-    | "return" Expression               { StReturn $2 <$ $1 }
+    | "Record" TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Record $2 $5 <$ $1) <$ $1 }
+    | "Union"  TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Union  $2 $5 <$ $1) <$ $1 }
+    | DataType DeclareVariableList       { (StDeclarationList $ fmap (first (\iden -> Declaration iden $1 CatVariable <$ iden)) $2) <$ $1 }
 
     -- Functions
     | "def" VariableId "::" Signature                                      { StFunctionDef ((Declaration $2 (snd $4) CatFunction) <$ $2) (fst $4) <$ $1 }
     | "imp" VariableId "(" MaybeVariableList ")" "as" StatementList "end"  { StFunctionImp  $2 $4 $7 <$ $1 }
     | VariableId "(" MaybeExpressionList ")"                               { StFunctionCall $1 $3    <$ $1 }
+    | "return" Expression                                                  { StReturn $2 <$ $1 }
 
     -- Conditional
     | "if"     Expression "then" StatementList ElIfs "end"                      { StIf $2          $4 $5    <$ $1 }
@@ -196,17 +197,24 @@ VariableId :: { Lexeme Identifier }
 TypeId :: { Lexeme Identifier }
     : typeid        { unTkTypeId `fmap` $1 }
 
-FieldList :: { Seq (Lexeme (Category -> Declaration), Maybe (Lexeme Statement)) }
+FieldList :: { Seq (Lexeme Identifier, Lexeme DataType) }
     : Field                                     { singleton $1 }
     | FieldList MaybeNL "," MaybeNL Field       { $1 |> $5     }
 
-Field :: { (Lexeme (Category -> Declaration), Maybe (Lexeme Statement)) }
-    : VariableId MaybeInitialized "::" DataType     { (Declaration $1 $4 <$ $1, (fmap (\expr -> StAssign $1 expr <$ $1) $2)) }
+Field :: { (Lexeme Identifier, Lexeme DataType) }
+    : VariableId "::" DataType     { ($1, $3) }
 
 StructAccess :: { Seq (Lexeme Identifier) }
-    -- This allows stuff like 'a . x = 10', accessing the field 'x' of variable 'a'
-    : VariableId   "." VariableId     { fromList [$1,$3] }
+    -- This allows stuff like 'a  . x = 0', accessing the field 'x' of variable 'a'
+    : VariableId   "." VariableId     { fromList [$1, $3] }
     | StructAccess "." VariableId     { $1 |> $3         }
+
+--ArrayAccess :: { Seq (Lexeme Identifier) }
+--    : VariableId ArrayIndex     {  }
+
+--ArrayIndex -- ::
+--    : ArrayIndex "[" Expression "]" {  }
+--    | "[" Expression "]"            {  }
 
 MaybeInitialized :: { Maybe (Lexeme Expression) }
     :                       { Nothing }
@@ -223,7 +231,7 @@ Separator :: { () }
 ElIfs :: { StBlock }
     :                           { empty }
     | "else" StatementList      { $2    }
-    | "elif" Expression "then" StatementList ElIfs { singleton $ StIf $2 $4 $5 <$ $1 }
+    | "elif" Expression "then" StatementList ElIfs  { singleton $ StIf $2 $4 $5 <$ $1 }
 
 When :: { Lexeme When }
     : "when" ExpressionList "do" StatementList      { When $2 $4 <$ $1 }
@@ -235,16 +243,16 @@ WhenList :: { Seq (Lexeme When) }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"             { Int     <$ $1 }
-    | "Float"           { Float   <$ $1 }
-    | "Bool"            { Bool    <$ $1 }
-    | "Char"            { Char    <$ $1 }
-    | "String"          { String  <$ $1 }
-    | "Range"           { Range   <$ $1 }
-    | "Type"            { Type    <$ $1 }
-    | TypeId            { User $1 <$ $1 }
-    --| "Union"  typeid   { Union  (unTkTypeId `fmap` $2) <$ $1 }
-    --| "Record" typeid   { Record (unTkTypeId `fmap` $2) <$ $1 }
+    : "Int"             { Int        <$ $1 }
+    | "Float"           { Float      <$ $1 }
+    | "Bool"            { Bool       <$ $1 }
+    | "Char"            { Char       <$ $1 }
+    | "String"          { String     <$ $1 }
+    | "Range"           { Range      <$ $1 }
+    | "Type"            { Type       <$ $1 }
+    | TypeId            { UserDef $1 <$ $1 }
+--    | "Union"  typeid   { Union  (unTkTypeId `fmap` $2) <$ $1 }
+--    | "Record" typeid   { Record (unTkTypeId `fmap` $2) <$ $1 }
 --    | "[" DataType "]"  { Array $2 <$ $1}
 --    | "[" DataType "|" Expression "]"  { Array $2 $3 <$ $1}
 
@@ -257,63 +265,62 @@ MaybeVariableList :: { Seq (Lexeme Identifier) }
     | VariableList              { $1    }
 
 DeclareVariableList :: { Seq (Lexeme Identifier, Maybe (Lexeme Expression)) }
-    : VariableId MaybeInitialized                               { singleton ($1, $2) }
-    | DeclareVariableList "," VariableId MaybeInitialized       { $1     |> ($3, $4) }
+    : VariableId MaybeInitialized                           { singleton ($1, $2) }
+    | DeclareVariableList "," VariableId MaybeInitialized   { $1     |> ($3, $4) }
 
 DataTypeList :: { Seq (Lexeme DataType) }
     : DataType                   { singleton $1 }
     | DataTypeList "," DataType  { $1 |> $3     }
 
-MaybeDataTypeList :: { Seq (Lexeme DataType) }
-    :                   { empty }
-    | DataTypeList      { $1    }
-
 Signature :: { (Seq (Lexeme DataType), Lexeme DataType) }
-    : "(" MaybeDataTypeList ")" SignatureReturn { ($2,$4) }
-    | DataTypeList              SignatureReturn { ($1,$2) }
+    : "(" DataTypeList ")" "->" SignatureReturn    { ($2   , $5) }
+    | DataTypeList         "->" SignatureReturn    { ($1   , $3) }
+    | SignatureReturn                              { (empty, $1) }
 
 SignatureReturn :: { Lexeme DataType }
-    : "->" DataType         { $2 }
-    |                       { Lex Void (0,0) }
+    : DataType     { $1 }
+    | "(" ")"      { Lex Void (0,0) }
 
 ---------------------------------------
 
 Expression :: { Lexeme Expression }
     -- Variable
-    : VariableId                                 { Variable $1 <$ $1 }
+    : VariableId                    { Variable (singleton $1) <$ $1           }
+    | StructAccess                  { Variable $1             <$ (index $1 0) }
+    --| ArrayAccess                   { Variable }
     -- Function call
     | VariableId "(" MaybeExpressionList ")"     { FunctionCall $1 $3 <$ $1 }
     -- Literals
-    | int                          { LitInt    (unTkInt    `fmap` $1) <$ $1 }
-    | float                        { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
-    | string                       { LitString (unTkString `fmap` $1) <$ $1 }
-    | char                         { LitChar   (unTkChar   `fmap` $1) <$ $1 }
-    | "true"                       { LitBool   (unTkBool   `fmap` $1) <$ $1 }
-    | "false"                      { LitBool   (unTkBool   `fmap` $1) <$ $1 }
+    | int                           { LitInt    (unTkInt    `fmap` $1) <$ $1 }
+    | float                         { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
+    | string                        { LitString (unTkString `fmap` $1) <$ $1 }
+    | char                          { LitChar   (unTkChar   `fmap` $1) <$ $1 }
+    | "true"                        { LitBool   (unTkBool   `fmap` $1) <$ $1 }
+    | "false"                       { LitBool   (unTkBool   `fmap` $1) <$ $1 }
     -- Operators
-    | Expression "+"   Expression  { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
-    | Expression "-"   Expression  { ExpBinary (OpMinus   <$ $2) $1 $3 <$ $1 }
-    | Expression "*"   Expression  { ExpBinary (OpTimes   <$ $2) $1 $3 <$ $1 }
-    | Expression "/"   Expression  { ExpBinary (OpDivide  <$ $2) $1 $3 <$ $1 }
-    | Expression "%"   Expression  { ExpBinary (OpModulo  <$ $2) $1 $3 <$ $1 }
-    | Expression "^"   Expression  { ExpBinary (OpPower   <$ $2) $1 $3 <$ $1 }
-    | Expression ".."  Expression  { ExpBinary (OpFromTo  <$ $2) $1 $3 <$ $1 }
-    | Expression "or"  Expression  { ExpBinary (OpOr      <$ $2) $1 $3 <$ $1 }
-    | Expression "and" Expression  { ExpBinary (OpAnd     <$ $2) $1 $3 <$ $1 }
-    | Expression "=="  Expression  { ExpBinary (OpEqual   <$ $2) $1 $3 <$ $1 }
-    | Expression "/="  Expression  { ExpBinary (OpUnequal <$ $2) $1 $3 <$ $1 }
-    | Expression "<"   Expression  { ExpBinary (OpLess    <$ $2) $1 $3 <$ $1 }
-    | Expression "<="  Expression  { ExpBinary (OpLessEq  <$ $2) $1 $3 <$ $1 }
-    | Expression ">"   Expression  { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
-    | Expression ">="  Expression  { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
-    | Expression "@"   Expression  { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
-    | "-"   Expression             { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
-    | "not" Expression             { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
-    | "(" Expression ")"           { lexInfo $2 <$ $1 }
+    | Expression "+"   Expression   { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
+    | Expression "-"   Expression   { ExpBinary (OpMinus   <$ $2) $1 $3 <$ $1 }
+    | Expression "*"   Expression   { ExpBinary (OpTimes   <$ $2) $1 $3 <$ $1 }
+    | Expression "/"   Expression   { ExpBinary (OpDivide  <$ $2) $1 $3 <$ $1 }
+    | Expression "%"   Expression   { ExpBinary (OpModulo  <$ $2) $1 $3 <$ $1 }
+    | Expression "^"   Expression   { ExpBinary (OpPower   <$ $2) $1 $3 <$ $1 }
+    | Expression ".."  Expression   { ExpBinary (OpFromTo  <$ $2) $1 $3 <$ $1 }
+    | Expression "or"  Expression   { ExpBinary (OpOr      <$ $2) $1 $3 <$ $1 }
+    | Expression "and" Expression   { ExpBinary (OpAnd     <$ $2) $1 $3 <$ $1 }
+    | Expression "=="  Expression   { ExpBinary (OpEqual   <$ $2) $1 $3 <$ $1 }
+    | Expression "/="  Expression   { ExpBinary (OpUnequal <$ $2) $1 $3 <$ $1 }
+    | Expression "<"   Expression   { ExpBinary (OpLess    <$ $2) $1 $3 <$ $1 }
+    | Expression "<="  Expression   { ExpBinary (OpLessEq  <$ $2) $1 $3 <$ $1 }
+    | Expression ">"   Expression   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
+    | Expression ">="  Expression   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
+    | Expression "@"   Expression   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
+    | "-"   Expression              { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
+    | "not" Expression              { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
+    | "(" Expression ")"            { lexInfo $2 <$ $1 }
 
 ExpressionList :: { Seq (Lexeme Expression) }
-    : Expression                          { singleton $1 }
-    | ExpressionList "," Expression       { $1 |> $3     }
+    : Expression                        { singleton $1 }
+    | ExpressionList "," Expression     { $1 |> $3     }
 
 MaybeExpressionList :: { Seq (Lexeme Expression) }
     :                       { empty }
@@ -327,21 +334,13 @@ MaybeExpressionList :: { Seq (Lexeme Expression) }
 notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
-makeStStructDeclaration :: Lexeme DataType -> Category -> Lexeme Identifier -> Position ->
-    Seq (Lexeme (Category -> Declaration) , Maybe (Lexeme Statement)) -> Lexeme Statement
-makeStStructDeclaration dt cat iden p ls = Lex (StStructDeclaration decl list) p
-    where
-        list = fmap (uncurry func) ls
-        decl = Lex (Declaration iden dt CatDataType) p
-        func (Lex toDcl posn) maySt = (Lex (toDcl cat) posn, maySt)
-
 filterSt :: Lexeme Statement -> StBlock
 filterSt st = case lexInfo st of
     StNoop                 -> empty
     StDeclarationList dcls -> fromList $ concatMap (uncurry func) dcls
         where
             func dcl@(Lex (Declaration var _ _) _) mayExpr = (StDeclaration dcl <$ dcl) : case mayExpr of
-                Just expr -> [StAssign var expr <$ expr]
+                Just expr -> [StAssign (singleton var) expr <$ expr]
                 Nothing   -> []
     -- No other statement needs a filter
     _ -> singleton st

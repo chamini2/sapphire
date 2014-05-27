@@ -227,16 +227,17 @@ Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`
 Ejemplos:
 
 ~~~ruby
-    Record Coordenada as
-        x :: Int,
-        y :: String
+    Record Automovil as
+        placa            :: String,
+        ano              :: Int,
+        marca = "Toyota" :: String
     end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    Record <Id> as <id> :: <Type> [, <id> <Type>..] end
+    Record <Id> as <id> [= <expr Int>] :: <Type> [, <id> [= <expr Int>] :: <Type>..] end
 ~~~
 
 Estructuras como `struct` del lenguaje `C`.
@@ -246,9 +247,9 @@ Estructuras como `struct` del lenguaje `C`.
 Ejemplos:
 
 ~~~ruby
-    Union MaybeInt as
-          just    :: Int
-        , nothing :: Void
+    Union Precision as
+        integer = 0 :: Int ,
+        floating = 0.0 :: Float
     end
 ~~~
 

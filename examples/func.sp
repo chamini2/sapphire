@@ -1,16 +1,8 @@
-def func :: Int, Bool, Char -> Bool
+def func :: (Int) -> Bool
 
-imp func (i, valid, char) as
-  if i % 3 == 0 then
-    print char
-    print valid
+print func(a)
+
+imp func(a) as
+    print a
     return true
-  else
-    print valid
-    print "didn't happen"
-    return false
-  end
 end
-
-
-print func(2,true,'c')
