@@ -10,7 +10,7 @@ import           Data.List              (intersperse)
 import           Data.Sequence          as DS (Seq, singleton, fromList)
 import           Prelude                hiding (mapM_, concat, concatMap)
 
-type Position = (Int, Int) -- (Fila, Columna)
+type Position = (Int, Int) -- (Row, Column)
 
 showPosn :: Position -> String
 showPosn (line, col) = show line ++ "," ++ show col
