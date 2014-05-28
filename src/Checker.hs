@@ -559,34 +559,6 @@ processGeneric (Lex (Declaration idenL (Lex t _) c) posn) success = do
         Nothing -> addSymbol idenL info >> return True
         Just si -> success info si
 
---defaultValue :: Lexeme DataType -> Lexeme Identifier -> Checker StBlock
---defaultValue (Lex dt _) iden = case dt of
---    Void       -> return empty
---    Int        -> assign $ LitInt    (Lex 0 posn)
---    Float      -> assign $ LitFloat  (Lex 0.0 posn)
---    Bool       -> assign $ LitBool   (Lex False posn)
---    Char       -> assign $ LitChar   (Lex '\0' posn)
---    String     -> assign $ LitString (Lex [] posn)
---    --Range      -> assign $ LitRange
---    --Type       -> assign $ LitInt (Lex 0 posn)
---    --Union      ->
---    --Record     ->
---    --Array aDT  ->
---    --User udt -> do
---    --    mayRSc <- getsSymInfo udt scopeNum
---    --    maybe failure success mayRSc
---    --        where
---    --            failure = return empty
---    --            success rSc = do
---    --                tab <- gets table
---    --                let fields = toListFilter tab rSc
---    --                -- We have to 'concat' the name and a dot: "iden . fIden" before sending it
---    --                blocks <- mapM (\(fIden, fInfo) -> defaultValue (Lex (dataType fInfo) (defPosn fInfo)) (Lex fIden (defPosn fInfo))) fields
---    --                return $ foldr (><) empty blocks
---    where
---        assign exp = return . singleton $ Lex (StAssign (singleton iden) (Lex exp posn)) posn
---        posn = lexPosn iden
-
 ----------------------------------------
 
 {- |
@@ -695,8 +667,7 @@ checkStatement (Lex st posn) = case st of
                             putValue fnameL $ val { impl = Just body, implPosn = posn }
 
                             before <- getScopeVariables
-                            enterFunction dt fnameL
-                            enterScope
+                            enterFunction dt fnameL >> enterScope   -- Order is important here (enterFunction uses the currentScope)
                             -- For procedures
                             when (dt == Void) $ markInitialized fnameL
 
@@ -705,8 +676,8 @@ checkStatement (Lex st posn) = case st of
                                 markInitialized varL
 
                             checkStatements body
-                            exitScope
-                            exitFunction
+
+                            exitScope >> exitFunction
                             varBody <- getScopeVariables
 
                             putScopeVariables before
