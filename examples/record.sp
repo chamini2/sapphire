@@ -6,10 +6,19 @@ end
 Record Cosa as
       pupu :: Int
     , prec :: Precision
+    , noexs :: NoExiste
+end
+
+Union Mas as
+    c :: Cosa
+  , p :: Precision
+  # , p :: Float
+  # , p :: Int
 end
 
 Cosa c
 Precision r1, r2
+Mas m
 
 Int[10] array
 
@@ -22,9 +31,6 @@ c.prec.ppp = 3
 
 r1 = r2
 
-# x . x = 1
-# x . y = 2
+m.c.prec.integer = 2.2
 
-# c . prec . integer = 1
-
-# print c.pupu, x . x, r.integer
+print c, r1, r2, m, array

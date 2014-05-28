@@ -343,15 +343,23 @@ addSymbol :: Lexeme Identifier -> SymInfo -> Checker ()
 addSymbol (Lex var _) info = modify $ \s -> s { table = insert var info (table s)}
 
 {- |
-    Gets a symbol's attribute if said symbol exists in the table, otherwise Nothing
+    Gets a symbol's attribute if said symbol exists in the table,
+    otherwise reports an error and returns Nothing
 -}
 getsSymInfo :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
-getsSymInfo (Lex iden posn) f = do
-    (tab, stck) <- gets (table &&& stack)
-    maybe failure success $ lookupWithScope iden stck tab
+getsSymInfo idenL@(Lex iden posn) f = do
+    maySi <- getsSymInfoWithoutError idenL f
+    maybe failure (return . Just) maySi
     where
-        success = return . Just . f
         failure = tellSError posn (NotDefined iden) >> return Nothing
+
+{- |
+    Gets a symbol's attribute if said symbol exists in the table, otherwise Nothing
+-}
+getsSymInfoWithoutError :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
+getsSymInfoWithoutError (Lex iden _) f = do
+    (tab, stck) <- gets (table &&& stack)
+    return $ fmap f $ lookupWithScope iden stck tab -- fmap f == maybe Nothing (Just . f)
 
 {- |
     Modifies a symbol if said symbol exists in the table
@@ -456,32 +464,33 @@ checkArguments fname mayVal args posn = maybe failure success mayVal
     Returns a Bool indicating if it was added successfully.
 -}
 processVariable :: Lexeme Declaration -> Checker Bool
-processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = do
-    (tab,stck) <- gets (table &&& stack)
-    sc         <- currentScope
+processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
+    sc <- currentScope
     let info = emptySymInfo {
-                dataType = t,
+                dataType = dt,
                 category = c,
                 scopeNum = sc,
                 defPosn  = posn
             }
-    case lookupWithScope iden stck tab of
-        Nothing -> addSymbolCheckingUserDef tab stck info
+    maySi <- getsSymInfoWithoutError idenL id
+    case maySi of
+        Nothing -> addSymbolCheckingUserDef info
         Just si
-            | scopeNum si == sc -> tellSError posn (AlreadyDeclared iden (defPosn si)) >> return False
-            | otherwise         -> addSymbolCheckingUserDef tab stck info
+            | scopeNum si == sc -> tellSError posn (AlreadyDeclared (lexInfo idenL) (defPosn si)) >> return False
+            | otherwise         -> addSymbolCheckingUserDef info
         where
-            addSymbolCheckingUserDef :: SymTable -> Stack Scope -> SymInfo -> Checker Bool
-            addSymbolCheckingUserDef tab stck info = case t of
-                UserDef (Lex udIden _) -> case lookupWithScope udIden stck tab of
-                    Nothing -> tellSError posn (UndefinedType udIden) >> return False
-                    Just si -> do
-                        --let newInfo = info { dataType = dataType si }
-                        let fields = getFields $ dataType si
-                        addSymbol idenL info
-                        let newSymTable = foldl addField emptyTable fields
-                        putValue idenL (ValStruct newSymTable)
-                        return True
+            addSymbolCheckingUserDef :: SymInfo -> Checker Bool
+            addSymbolCheckingUserDef info = case dt of
+                UserDef udIdenL -> do
+                    mayUDefSi <- getsSymInfoWithoutError udIdenL id
+                    case mayUDefSi of
+                        Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return False
+                        Just si -> do
+                            markUsed udIdenL
+                            addSymbol idenL info
+                            --val <- liftM ValStruct $ foldlM addField emptyTable (getFields $ dataType si)
+                            --putValue idenL val
+                            return True
                 Array aDtL indexL -> do
                     indexDt <- checkExpression indexL
                     if indexDt == Int
@@ -490,35 +499,43 @@ processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = d
                             unless (indexDt == TypeError) $ tellSError posn (ArraySizeDataType (lexInfo indexL) indexDt)
                             return False
                 _ -> addSymbol idenL info >> return True
-            addField :: SymTable -> Field -> SymTable
-            addField tab (fIdenL, dtL) =
-                let fInfo = emptySymInfo {
-                        dataType = lexInfo dtL,
-                        category = CatField,
-                        scopeNum = 0,
-                        defPosn  = posn
-                    }
-                    in insert (lexInfo fIdenL) fInfo tab
+            --addField :: SymTable -> Field -> Checker SymTable
+            --addField tab (fIdenL, dtL) = do
+            --    let fInfo = emptySymInfo {
+            --            dataType = lexInfo dtL,
+            --            category = CatField,
+            --            scopeNum = 0,
+            --            defPosn  = posn
+            --        }
+            --    return $ insert (lexInfo fIdenL) fInfo tab
 
 processType :: Lexeme Declaration -> Checker Bool
-processType decl@(Lex (Declaration idenL@(Lex iden _) dtL _) posn) = do
-    valid <- liftM snd $ foldlM validateFields (DM.empty, True) (getFields $ lexInfo dtL)
+processType declL@(Lex (Declaration idenL@(Lex iden _) dtL _) posn) = do
+    valid <- liftM fst $ foldlM validateFields (True, DM.empty) (getFields $ lexInfo dtL)
     if valid
-        then processGeneric decl success
+        then processGeneric declL success
         else return False
     where
         success info si
             | scopeNum si == scopeNum info = tellSError posn (TypeAlreadyDefined iden (defPosn si)) >> return False
             | scopeNum si == -1            = tellSError posn (LanguageTypeRedefine iden) >> return False
             | otherwise                    = addSymbol idenL info >> return True
-        validateFields :: (DM.Map Identifier Position, Bool) -> Field -> Checker (DM.Map Identifier Position, Bool)
-        validateFields (fieldMap, bool) (Lex fIden fPosn, _) = do
+        validateFields :: (Bool, DM.Map Identifier Position) -> Field -> Checker (Bool, DM.Map Identifier Position)
+        validateFields (valid, fieldMap) (Lex fIden fPosn, dtL) = do
             let (mayPosn, newfMap) = DM.insertLookupWithKey (\_ _ a -> a) fIden fPosn fieldMap
             case mayPosn of
                 Just posn -> do
                     tellSError fPosn (AlreadyDeclared fIden posn)
-                    return (newfMap, False)
-                Nothing   -> return (newfMap, bool)
+                    return (False, newfMap)
+                Nothing   -> case lexInfo dtL of
+                    UserDef udIdenL -> do
+                        maySi <- getsSymInfoWithoutError udIdenL id
+                        case maySi of
+                            Just _ -> return (valid, newfMap)
+                            Nothing -> do
+                                tellSError fPosn (UndefinedType (lexInfo udIdenL))
+                                return (False, newfMap)
+                    _ -> return (valid, newfMap)
 
 processFunction :: Lexeme Declaration -> Checker Bool
 processFunction decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success
@@ -529,8 +546,7 @@ processFunction decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGe
             | otherwise                    = addSymbol idenL info >> return True
 
 processGeneric :: Lexeme Declaration -> (SymInfo -> SymInfo -> Checker Bool) -> Checker Bool
-processGeneric (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) success = do
-    (tab,stck) <- gets (table &&& stack)
+processGeneric (Lex (Declaration idenL (Lex t _) c) posn) success = do
     sc  <- currentScope
     let info = emptySymInfo {
                 dataType = t,
@@ -538,7 +554,8 @@ processGeneric (Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) success =
                 scopeNum = sc,
                 defPosn  = posn
             }
-    case lookupWithScope iden stck tab of
+    maySi <- getsSymInfoWithoutError idenL id
+    case maySi of
         Nothing -> addSymbol idenL info >> return True
         Just si -> success info si
 
@@ -612,9 +629,8 @@ getsSymInfoAccess accL@(Lex acc posn) f = do
                             dt            -> tellSError posn (VariableNonArray str dt) >> return (Nothing, str)
                     HistoryStruct fieldNameL -> case dataType si of
                         UserDef dtIdenL -> do
-                            uDefDt <- liftM fromJust $ getsSymInfo dtIdenL dataType
-                            let fields = getFields uDefDt
-                            case find ((lexInfo fieldNameL==) . lexInfo . fst) fields of
+                            uDefDt <- liftM fromJust $ getsSymInfoWithoutError dtIdenL dataType
+                            case find ((lexInfo fieldNameL==) . lexInfo . fst) (getFields uDefDt) of
                                 Just fieldL -> do
                                     let newSi  = si { dataType = lexInfo (snd fieldL) }
                                         newStr = str ++ "." ++ lexInfo fieldNameL
@@ -665,47 +681,45 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
         currSc <- currentScope
-        maySi <- getsSymInfo fnameL id
+        maySi <- getsSymInfoWithoutError fnameL id
         case maySi of
             Just si -> do
-                let val    = value si
-                    sameSc = currSc == scopeNum si
-                    catSi  = category si
-                    initSi = initialized si
+                let sameSc = currSc == scopeNum si
                     dPosn  = defPosn si
                     dt     = dataType si
-                case (val, sameSc, catSi, initSi) of
-                    (Just v, True, CatFunction, False) -> do
-                        putValue fnameL $ v { impl = Just body, implPosn = posn }
+                case (value si, sameSc, category si) of
+                    (Just val, True, CatFunction) -> case val of
+                        -- Has already been implemented
+                        ValFunction _ (Just _) iPosn -> tellSError posn (AlreadyImplemented fname iPosn)
+                        ValFunction vParams Nothing _ -> do
+                            putValue fnameL $ val { impl = Just body, implPosn = posn }
 
-                        before <- getScopeVariables
-                        enterFunction dt fnameL
-                        enterScope
-                        -- For procedures
-                        when (dt == Void) $ markInitialized fnameL
+                            before <- getScopeVariables
+                            enterFunction dt fnameL
+                            enterScope
+                            -- For procedures
+                            when (dt == Void) $ markInitialized fnameL
 
-                        forM_ (zip params (parameters v)) $ \(varL,dt) -> do
-                            processVariable $ Declaration varL dt CatParameter <$ varL
-                            markInitialized varL
+                            forM_ (zip params vParams) $ \(varL, dt) -> do
+                                processVariable $ Declaration varL dt CatParameter <$ varL
+                                markInitialized varL
 
-                        checkStatements body
-                        exitScope
-                        exitFunction
-                        varBody <- getScopeVariables
+                            checkStatements body
+                            exitScope
+                            exitFunction
+                            varBody <- getScopeVariables
 
-                        putScopeVariables before
-                        -- Only marks 'used'
-                        checkMark $ fromList [varBody, before]
-                        let functions   = filter func varBody
-                            func (_,si) = category si == CatFunction && scopeNum si == currSc
-                        forM_ functions $ \(iden,si) ->
-                            when (initialized si) $ markInitialized $ Lex iden (defPosn si)
-
-                    -- If value is Nothing it means that it is not a function
-                    (Nothing,_,cat,_) -> tellSError posn (WrongCategory fname CatFunction cat)
-                    (Just v,_,_,True) -> tellSError posn (AlreadyImplemented fname (implPosn v))
+                            putScopeVariables before
+                            -- Only marks 'used'
+                            checkMark $ fromList [varBody, before]
+                            let functions   = filter func varBody
+                                func (_,si) = category si == CatFunction && scopeNum si == currSc
+                            forM_ functions $ \(iden,si) ->
+                                when (initialized si) $ markInitialized $ Lex iden (defPosn si)
                     -- Must implement functions in the same scope in which they are defined
-                    (_,False,_,_)     -> tellSError posn (ImpInDefScope fname dPosn)
+                    (_, False, CatFunction) -> tellSError posn (ImpInDefScope fname dPosn)
+                    -- It is not a function
+                    (_, _    , cat        ) -> tellSError posn (WrongCategory fname CatFunction cat)
             Nothing -> tellSError posn (FunctionNotDefined fname)
 
     StFunctionCall fnameL@(Lex fname _) args -> do
