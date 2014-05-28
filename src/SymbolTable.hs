@@ -54,9 +54,9 @@ instance Show SymInfo where
             showDT = show dt ++ " "
             showV  = showI ++ maybe "" show v ++ " "
                 where
-                    showI  = "[" ++ (if i then "init" else "NOT init") ++ "]"
+                    showI  = "(" ++ (if i then "init" else "NOT init") ++ ")"
             showDP = show dp
-            showU  = " " ++ if u then "used" else "NOT used"
+            showU  = " (" ++ (if u then "used" else "NOT used") ++ ")"
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo

@@ -80,6 +80,8 @@ data StaticError
     | VariableNonArray       Identifier DataType
     | VariableNonStruct      Identifier DataType
     | StructNoField          Identifier Identifier
+    | IndexDataType          Expression DataType
+    | ArraySizeDataType      Expression DataType
     -- Types
     | TypeAlreadyDefined   Identifier Position
     | LanguageTypeRedefine Identifier
@@ -121,6 +123,8 @@ instance Show StaticError where
         VariableNonArray       var dt    -> "variable '" ++ var ++ "' of type '" ++ show dt ++ "' is being used as an array"
         VariableNonStruct      var dt    -> "variable '" ++ var ++ "' of type '" ++ show dt ++ "' is being used as a structure"
         StructNoField          str fn    -> "structure '" ++ str ++ "' has no field named '" ++ fn ++ "'"
+        IndexDataType          expr dt   -> "index expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
+        ArraySizeDataType      expr dt   -> "array size expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
         -- Types
         TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
         LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
@@ -467,6 +471,7 @@ processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = d
             | scopeNum si == sc -> tellSError posn (AlreadyDeclared iden (defPosn si)) >> return False
             | otherwise         -> addSymbolCheckingUserDef tab stck info
         where
+            addSymbolCheckingUserDef :: SymTable -> Stack Scope -> SymInfo -> Checker Bool
             addSymbolCheckingUserDef tab stck info = case t of
                 UserDef (Lex udIden _) -> case lookupWithScope udIden stck tab of
                     Nothing -> tellSError posn (UndefinedType udIden) >> return False
@@ -477,6 +482,13 @@ processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = d
                         let newSymTable = foldl addField emptyTable fields
                         putValue idenL (ValStruct newSymTable)
                         return True
+                Array aDtL indexL -> do
+                    indexDt <- checkExpression indexL
+                    if indexDt == Int
+                        then addSymbol idenL info >> return True
+                        else do
+                            unless (indexDt == TypeError) $ tellSError posn (ArraySizeDataType (lexInfo indexL) indexDt)
+                            return False
                 _ -> addSymbol idenL info >> return True
             addField :: SymTable -> Field -> SymTable
             addField tab (fIdenL, dtL) =
@@ -573,41 +585,42 @@ checkProgram lexErrors pr@(Program sts) = do
 checkStatements :: StBlock -> Checker ()
 checkStatements = mapM_ checkStatement
 
-getsSymInfoAccess :: forall a . Lexeme Access -> (SymInfo -> a) -> Checker (Maybe a, Identifier)
+getsSymInfoAccess :: forall a . Lexeme Access -> (SymInfo -> a) -> Checker (Maybe a, Identifier, Lexeme Identifier)
 getsSymInfoAccess accL@(Lex acc posn) f = do
     let zipper@(topL, ths)   = deepAccess $ focusAccess accL
         VariableAccess idenL = lexInfo topL
     maySi <- getsSymInfo idenL id
-    maybe (return (Nothing, lexInfo idenL)) (func zipper (lexInfo idenL)) maySi
+    case maySi of
+        Just si -> matchType zipper (lexInfo idenL) si >>= return . (\(a,b) -> (a, b, idenL))
+        Nothing -> return (Nothing, lexInfo idenL, idenL)
     where
-        func ::  Zipper -> Identifier -> SymInfo -> Checker (Maybe a, Identifier)
-        func zipper str si = case zipper of
-                (_   , [] ) -> return (Just (f si), str)
-                (accL, ths) -> case lexInfo (head ths) of
-                    HistoryArray  _ -> case dataType si of
+        matchType ::  Zipper -> Identifier -> SymInfo -> Checker (Maybe a, Identifier)
+        matchType zipper str si = case zipper of
+                (_, [] ) -> return (Just (f si), str)
+                (_, ths) -> case lexInfo (head ths) of
+                    HistoryArray  indexL -> case dataType si of
                             Array inDtL _ -> do
-                                let newSi = si { dataType = lexInfo inDtL }
-                                func (fromJust $ backAccess zipper) (str ++ "[]") newSi
+                                indexDt <- checkExpression indexL
+                                if indexDt == Int
+                                    then do
+                                        let newSi  = si { dataType = lexInfo inDtL }
+                                            newStr = str ++ "[" ++ showIndex (lexInfo indexL) ++ "]"
+                                        matchType (fromJust $ backAccess zipper) newStr newSi
+                                    else do
+                                        unless (indexDt == TypeError) $ tellSError posn (IndexDataType (lexInfo indexL) indexDt)
+                                        return (Nothing, str)
                             dt            -> tellSError posn (VariableNonArray str dt) >> return (Nothing, str)
-
                     HistoryStruct fieldNameL -> case dataType si of
                         UserDef dtIdenL -> do
-                            mayUDt <- getsSymInfo dtIdenL dataType
-                            case mayUDt of
-                                Just (Record dtIdenL fields) -> case find ((lexInfo fieldNameL==) . lexInfo . fst) fields of
-                                    Just fieldL -> do
-                                        let newSi  = si { dataType = lexInfo (snd fieldL) }
-                                            newStr = str ++ "." ++ lexInfo fieldNameL
-                                        func (fromJust $ backAccess zipper) newStr newSi
-                                    Nothing -> tellSError posn (StructNoField (lexInfo dtIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
-                                Just (Union dtIdenL fields) -> case find ((lexInfo fieldNameL==) . lexInfo . fst) fields of
-                                    Just fieldL -> do
-                                        let newSi  = si { dataType = lexInfo (snd fieldL) }
-                                            newStr = str ++ "." ++ lexInfo fieldNameL
-                                        func (fromJust $ backAccess zipper) newStr newSi
-                                    Nothing -> tellSError posn (StructNoField (lexInfo dtIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
-                                Nothing -> error "Checker.getsSymInfoAccess: lookup DataType that was in a 'UserDef' returned Nothing"
-                        dt                    -> tellSError posn (VariableNonStruct str dt) >> return (Nothing, str)
+                            uDefDt <- liftM fromJust $ getsSymInfo dtIdenL dataType
+                            let fields = getFields uDefDt
+                            case find ((lexInfo fieldNameL==) . lexInfo . fst) fields of
+                                Just fieldL -> do
+                                    let newSi  = si { dataType = lexInfo (snd fieldL) }
+                                        newStr = str ++ "." ++ lexInfo fieldNameL
+                                    matchType (fromJust $ backAccess zipper) newStr newSi
+                                Nothing -> tellSError posn (StructNoField (lexInfo dtIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
+                        dt -> tellSError posn (VariableNonStruct str dt) >> return (Nothing, str)
 
 {- |
     Checks the validity of a statement, modifying the state.
@@ -616,16 +629,14 @@ checkStatement :: Lexeme Statement -> Checker () -- Maybe it should return somet
 checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
-    StAssign accL ex -> do
-        (accDt,iden) <- getsSymInfoAccess accL dataType
-        exprDt        <- checkExpression ex
-        case accDt of
+    StAssign accL exprL -> do
+        (mayDt, accStr, topL) <- getsSymInfoAccess accL dataType
+        exprDt        <- checkExpression exprL
+        case mayDt of
             Just idenDt -> do
-                case lexInfo accL of
-                    VariableAccess idenL -> markInitialized idenL
-                    _                    -> return ()
+                markInitialized topL
                 when (idenDt /= exprDt && exprDt /= TypeError) $
-                    tellSError posn (InvalidAssignType iden idenDt exprDt)
+                    tellSError posn (InvalidAssignType accStr idenDt exprDt)
             -- The error has already been reported
             Nothing -> return ()
 
@@ -668,8 +679,8 @@ checkStatement (Lex st posn) = case st of
                         putValue fnameL $ v { impl = Just body, implPosn = posn }
 
                         before <- getScopeVariables
-                        enterScope
                         enterFunction dt fnameL
+                        enterScope
                         -- For procedures
                         when (dt == Void) $ markInitialized fnameL
 
@@ -678,8 +689,8 @@ checkStatement (Lex st posn) = case st of
                             markInitialized varL
 
                         checkStatements body
-                        exitFunction
                         exitScope
+                        exitFunction
                         varBody <- getScopeVariables
 
                         putScopeVariables before
@@ -709,12 +720,9 @@ checkStatement (Lex st posn) = case st of
             Nothing -> return ()
 
     StRead vars -> forM_ vars $ \accL -> do
-        let zipper               = focusAccess accL
-            (topL, ths)          = deepAccess zipper
-            VariableAccess idenL = lexInfo topL
-        maySi <- getsSymInfo idenL dataType
+        (maySi, _, topL) <- getsSymInfoAccess accL id
         case maySi of
-            Just _  -> markInitialized idenL
+            Just _  -> markInitialized topL
             Nothing -> return ()
 
     StPrint exs -> mapM_ checkExpression exs
@@ -813,24 +821,21 @@ checkStatement (Lex st posn) = case st of
 checkExpression :: Lexeme Expression -> Checker DataType
 checkExpression (Lex e posn) = case e of
     Variable accL -> do
-        let zipper               = focusAccess accL
-            (topL, ths)          = deepAccess zipper
-            VariableAccess idenL = lexInfo topL
-        maySi <- getsSymInfo idenL id
+        (maySi, _, topL) <- getsSymInfoAccess accL id
         case maySi of
             Just si -> do
-                markUsed idenL
+                markUsed topL
                 let ini = initialized si
                     dt  = dataType si
                 case category si of
                     CatVariable -> do
-                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo idenL)
+                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo topL)
                         return dt
                     CatParameter -> do
-                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo idenL)
+                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo topL)
                         return dt
                     ct -> do
-                        tellSError posn (WrongCategory (lexInfo idenL) CatVariable ct)
+                        tellSError posn (WrongCategory (lexInfo topL) CatVariable ct)
                         return TypeError
             Nothing -> return TypeError
 
