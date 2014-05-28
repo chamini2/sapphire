@@ -121,8 +121,8 @@ deepAccess z@(Lex acc _, ths) = case acc of
 
 data DataType
     = Int | Float | Bool | Char | String | Range | Type
-    | Union  (Lexeme Identifier) (Seq (Lexeme Identifier, Lexeme DataType))
-    | Record (Lexeme Identifier) (Seq (Lexeme Identifier, Lexeme DataType))
+    | Union  (Lexeme Identifier) (Seq Field)
+    | Record (Lexeme Identifier) (Seq Field)
     | Array   (Lexeme DataType) (Lexeme Expression)
     | UserDef (Lexeme Identifier)
     | Void | Undef | TypeError  -- For compiler use
@@ -140,10 +140,18 @@ instance Show DataType where
         (Union  iden fs) -> "Union "  ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fs
         (Record iden fs) -> "Record " ++ show (lexInfo iden) ++ " " ++ concatMap (show . (lexInfo *** lexInfo)) fs
         (Array aDt _)    -> "[" ++ show (lexInfo aDt) ++ "]"
-        (UserDef iden)   -> show $ lexInfo iden
+        (UserDef idenL)  -> lexInfo idenL
         Void             -> "()"
         Undef            -> error "DataType Undef should never be 'shown'"
         TypeError        -> error "DataType TypeError should never be 'shown'"
+
+type Field = (Lexeme Identifier, Lexeme DataType)
+
+getFields :: DataType -> Seq Field
+getFields dt = case dt of
+    Record _ fields -> fields
+    Union  _ fields -> fields
+    _               -> error "Language.getFields: should not attempt to get fields from non user-defined DataType"
 
 ----------------------------------------
 
@@ -186,18 +194,16 @@ data Category
     = CatVariable
     | CatFunction
     | CatParameter
-    | CatRecordField
-    | CatUnionField
+    | CatField
     | CatUserDef
     deriving (Eq)
 
 instance Show Category where
-    show CatVariable    = "variable"
-    show CatFunction    = "function"
-    show CatParameter   = "parameter"
-    show CatRecordField = "record field"
-    show CatUnionField  = "union field"
-    show CatUserDef     = "data type"
+    show CatVariable  = "variable"
+    show CatFunction  = "function"
+    show CatParameter = "parameter"
+    show CatField     = "field"
+    show CatUserDef   = "data type"
 
 data When = When (Seq (Lexeme Expression)) StBlock
     deriving (Show)
@@ -219,7 +225,6 @@ data Expression
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression) {-DataType-}
---    | ExpArray  ExpressionArray
     deriving (Eq)
 
 instance Show Expression where

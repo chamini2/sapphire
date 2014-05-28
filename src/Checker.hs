@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Checker where
 
 import           Language
@@ -8,10 +9,11 @@ import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
 import           Data.Foldable          as DF (and, concatMap, elem, find,
                                                foldr, forM_, mapM_, notElem,
-                                               toList, foldr1)
+                                               toList, foldr1, foldlM, foldl)
 import           Data.Function          (on)
 import           Data.Functor           ((<$), (<$>))
 import           Data.List              (intercalate)
+import qualified Data.Map               as DM (empty, insertLookupWithKey, Map)
 import           Data.Maybe             (fromJust, isJust, isNothing)
 import           Data.Sequence          as DS (Seq, empty, filter, fromList,
                                                index, length, null, singleton,
@@ -21,7 +23,7 @@ import           Data.Traversable       as DT (forM, mapM)
 import           Prelude                as P hiding (and, concatMap, elem,
                                               filter, foldr, length, lookup,
                                               mapM, mapM_, notElem, null, zip,
-                                              zipWith, foldr1)
+                                              zipWith, foldr1, foldl)
 
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
@@ -75,6 +77,9 @@ data StaticError
     -- Variables
     = VariableNotInitialized Identifier
     | InvalidAssignType      Identifier DataType DataType
+    | VariableNonArray       Identifier DataType
+    | VariableNonStruct      Identifier DataType
+    | StructNoField          Identifier Identifier
     -- Types
     | TypeAlreadyDefined   Identifier Position
     | LanguageTypeRedefine Identifier
@@ -113,6 +118,9 @@ instance Show StaticError where
         -- Variables
         VariableNotInitialized var       -> "variable '" ++ var ++ "' may not have been initialized"
         InvalidAssignType      var vt et -> "cannot assign expression of type '" ++ show et ++ "' to variable '" ++ var ++ "' of type '" ++ show vt ++ "'"
+        VariableNonArray       var dt    -> "variable '" ++ var ++ "' of type '" ++ show dt ++ "' is being used as an array"
+        VariableNonStruct      var dt    -> "variable '" ++ var ++ "' of type '" ++ show dt ++ "' is being used as a structure"
+        StructNoField          str fn    -> "structure '" ++ str ++ "' has no field named '" ++ fn ++ "'"
         -- Types
         TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
         LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
@@ -463,18 +471,42 @@ processVariable decl@(Lex (Declaration idenL@(Lex iden _) (Lex t _) c) posn) = d
                 UserDef (Lex udIden _) -> case lookupWithScope udIden stck tab of
                     Nothing -> tellSError posn (UndefinedType udIden) >> return False
                     Just si -> do
-                        let newInfo = info { dataType = dataType si }
-                        addSymbol idenL newInfo >> return True
-                        -- TODO crear fields en tabla de simbolos para esta variable, o algo así
+                        --let newInfo = info { dataType = dataType si }
+                        let fields = getFields $ dataType si
+                        addSymbol idenL info
+                        let newSymTable = foldl addField emptyTable fields
+                        putValue idenL (ValStruct newSymTable)
+                        return True
                 _ -> addSymbol idenL info >> return True
+            addField :: SymTable -> Field -> SymTable
+            addField tab (fIdenL, dtL) =
+                let fInfo = emptySymInfo {
+                        dataType = lexInfo dtL,
+                        category = CatField,
+                        scopeNum = 0,
+                        defPosn  = posn
+                    }
+                    in insert (lexInfo fIdenL) fInfo tab
 
 processType :: Lexeme Declaration -> Checker Bool
-processType decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success
+processType decl@(Lex (Declaration idenL@(Lex iden _) dtL _) posn) = do
+    valid <- liftM snd $ foldlM validateFields (DM.empty, True) (getFields $ lexInfo dtL)
+    if valid
+        then processGeneric decl success
+        else return False
     where
         success info si
             | scopeNum si == scopeNum info = tellSError posn (TypeAlreadyDefined iden (defPosn si)) >> return False
             | scopeNum si == -1            = tellSError posn (LanguageTypeRedefine iden) >> return False
             | otherwise                    = addSymbol idenL info >> return True
+        validateFields :: (DM.Map Identifier Position, Bool) -> Field -> Checker (DM.Map Identifier Position, Bool)
+        validateFields (fieldMap, bool) (Lex fIden fPosn, _) = do
+            let (mayPosn, newfMap) = DM.insertLookupWithKey (\_ _ a -> a) fIden fPosn fieldMap
+            case mayPosn of
+                Just posn -> do
+                    tellSError fPosn (AlreadyDeclared fIden posn)
+                    return (newfMap, False)
+                Nothing   -> return (newfMap, bool)
 
 processFunction :: Lexeme Declaration -> Checker Bool
 processFunction decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success
@@ -541,6 +573,42 @@ checkProgram lexErrors pr@(Program sts) = do
 checkStatements :: StBlock -> Checker ()
 checkStatements = mapM_ checkStatement
 
+getsSymInfoAccess :: forall a . Lexeme Access -> (SymInfo -> a) -> Checker (Maybe a, Identifier)
+getsSymInfoAccess accL@(Lex acc posn) f = do
+    let zipper@(topL, ths)   = deepAccess $ focusAccess accL
+        VariableAccess idenL = lexInfo topL
+    maySi <- getsSymInfo idenL id
+    maybe (return (Nothing, lexInfo idenL)) (func zipper (lexInfo idenL)) maySi
+    where
+        func ::  Zipper -> Identifier -> SymInfo -> Checker (Maybe a, Identifier)
+        func zipper str si = case zipper of
+                (_   , [] ) -> return (Just (f si), str)
+                (accL, ths) -> case lexInfo (head ths) of
+                    HistoryArray  _ -> case dataType si of
+                            Array inDtL _ -> do
+                                let newSi = si { dataType = lexInfo inDtL }
+                                func (fromJust $ backAccess zipper) (str ++ "[]") newSi
+                            dt            -> tellSError posn (VariableNonArray str dt) >> return (Nothing, str)
+
+                    HistoryStruct fieldNameL -> case dataType si of
+                        UserDef dtIdenL -> do
+                            mayUDt <- getsSymInfo dtIdenL dataType
+                            case mayUDt of
+                                Just (Record dtIdenL fields) -> case find ((lexInfo fieldNameL==) . lexInfo . fst) fields of
+                                    Just fieldL -> do
+                                        let newSi  = si { dataType = lexInfo (snd fieldL) }
+                                            newStr = str ++ "." ++ lexInfo fieldNameL
+                                        func (fromJust $ backAccess zipper) newStr newSi
+                                    Nothing -> tellSError posn (StructNoField (lexInfo dtIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
+                                Just (Union dtIdenL fields) -> case find ((lexInfo fieldNameL==) . lexInfo . fst) fields of
+                                    Just fieldL -> do
+                                        let newSi  = si { dataType = lexInfo (snd fieldL) }
+                                            newStr = str ++ "." ++ lexInfo fieldNameL
+                                        func (fromJust $ backAccess zipper) newStr newSi
+                                    Nothing -> tellSError posn (StructNoField (lexInfo dtIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
+                                Nothing -> error "Checker.getsSymInfoAccess: lookup DataType that was in a 'UserDef' returned Nothing"
+                        dt                    -> tellSError posn (VariableNonStruct str dt) >> return (Nothing, str)
+
 {- |
     Checks the validity of a statement, modifying the state.
 -}
@@ -549,16 +617,16 @@ checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
     StAssign accL ex -> do
-        let zipper               = focusAccess accL
-            (topL, ths)          = deepAccess zipper
-            VariableAccess idenL = lexInfo topL
-        mayDt  <- getsSymInfo idenL dataType
-        exprDt <- checkExpression ex
-        case mayDt of
+        (accDt,iden) <- getsSymInfoAccess accL dataType
+        exprDt        <- checkExpression ex
+        case accDt of
             Just idenDt -> do
-                markInitialized idenL
+                case lexInfo accL of
+                    VariableAccess idenL -> markInitialized idenL
+                    _                    -> return ()
                 when (idenDt /= exprDt && exprDt /= TypeError) $
-                    tellSError posn (InvalidAssignType (lexInfo idenL) idenDt exprDt)
+                    tellSError posn (InvalidAssignType iden idenDt exprDt)
+            -- The error has already been reported
             Nothing -> return ()
 
     StDeclaration dcl -> void $ processVariable dcl

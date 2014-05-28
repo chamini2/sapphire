@@ -43,6 +43,7 @@ data SymInfo = SymInfo
     , defPosn     :: Position
     , initialized :: Bool
     , used        :: Bool
+    --, pure        :: Bool
     }
 
 instance Show SymInfo where
@@ -87,6 +88,7 @@ data Value
     | ValBool     Bool
     | ValChar     Char
     | ValFloat    Float
+    | ValStruct   SymTable
     | ValFunction { parameters :: Seq (Lexeme DataType)
                   , impl       :: Maybe StBlock
                   , implPosn   :: Position
@@ -97,6 +99,7 @@ instance Show Value where
     show (ValBool v)         = show v
     show (ValChar v)         = show v
     show (ValFloat v)        = show v
+    show (ValStruct s)       = show s
     show (ValFunction p i _) = "[" ++ showI ++ "] (" ++ showP ++ ") ->"
         where
             showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
