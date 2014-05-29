@@ -1,4 +1,4 @@
-#funciona
+#   Factorial
 
 def factorial :: Int -> Int
 imp factorial (a) as

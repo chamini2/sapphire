@@ -5,7 +5,7 @@ Union Precision as
 end
 
 Union Cosa as
-      pupu :: Int
+      bla :: Int
     , prec :: Precision
 end
 
@@ -18,4 +18,4 @@ x . y = 2
 
 c . prec . integer = 1
 
-print c.pupu, x . x, r.integer
+print c.bla, x . x, r.integer

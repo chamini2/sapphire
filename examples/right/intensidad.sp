@@ -1,6 +1,6 @@
 # scope 0
 
-def hola :: Int, Int
+def hola :: Int, Int -> ()
 imp hola(a,b) as
     # scope 1
     print "hola, el numero es:", a+b

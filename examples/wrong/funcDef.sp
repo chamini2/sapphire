@@ -22,7 +22,7 @@ print a(2,3,4)
 print a
 
 # alerady defined
-def a :: Int,Int
+def a :: Int,Int -> ()
 
 # used but never implemented
 def b :: Int
