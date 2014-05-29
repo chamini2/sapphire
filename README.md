@@ -1,30 +1,30 @@
 Sapphire
 ========
 
-Lenguaje de programación desarrollado por Matteo Ferrando y Germán León.
+Programming Language developed by Matteo Ferrando and Germán León
 
-El [diseño](doc/diseno.md) del lenguaje sigue en desarrollo.
+The [language design](doc/diseno.md) is currently on development.
 
 ---
 
-Estamos usando las siguientes herramientas:
+Tools:
 
-* `ghc`: version 7.6.3
-* `alex`: version 3.0.5
+* `ghc`:   version 7.6.3
+* `alex`:  version 3.0.5
 * `happy`: version 1.18.10
 
-*basta instalar `haskell-platform`*
+*just install `haskell-platform`*
 
-Para compilar:
+Compiling a Sapphire program:
 
-1. entrar en *src/*
+1. cd to path *src/*
 2. `make`
-3. correr un programa:
-    * `make run`: esto te permite escribir un programa directamente, hasta presionar `ctrl-D`
-    * `make run ../examples/<file>.sp`: esto te permite correr un programa directamente en Sapphire.
+3. running the compiler:
+    * `make run`: write a program directly on the command line, until `ctrl-D` is pressed.
+    * `make run ../examples/<file>.sp`: compiles a program written in the given file.
 
-Extras:
 
-- `make clean`: borra archivos de compilación.
-- `make happyinfo`: crea un archivo `info.txt` con la información de la gramática
-y el parser que genera Happy.
+Extra usage:
+
+- `make clean`: erase all compilation files.
+- `make happyinfo`: generates the file `info.txt` with the grammar information.
