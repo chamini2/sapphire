@@ -23,7 +23,7 @@ Thing[10] arr
 # n.ident = "n"
 # print n
 
-Int[10 + 20][2] a
+Int[10][2] a
 Int[10 + 20]["hola"] f
 
 a[a[1][3]][3 + 2 * arr[1].coord[0]] = 2.0

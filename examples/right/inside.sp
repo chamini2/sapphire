@@ -41,7 +41,7 @@ imp a (i) as
 end
 
 def f :: Bool, Int -> Bool
-def d :: () -> Int
+def d :: Int
 
 imp f(b,f) as
   print b
