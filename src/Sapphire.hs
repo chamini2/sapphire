@@ -1,7 +1,7 @@
 module Main where
 
-import           Checker            (CheckState (..), Checker, checkProgram,
-                                     getErrors, runProgramChecker)
+import           Checker             (CheckState (..), Checker, checkProgram,
+                                      getErrors, runProgramChecker)
 import           Parser
 
 import           Control.Monad       (guard, void)

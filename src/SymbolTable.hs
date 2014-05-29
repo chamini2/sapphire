@@ -36,10 +36,13 @@ module SymbolTable
 
 import           Language
 
+import           Control.Arrow (second)
 import           Data.Foldable as DF
+import           Data.Function (on)
+import           Data.List     (groupBy, sortBy)
 import qualified Data.Map      as DM
-import           Data.Sequence as DS hiding (drop, update)
-import           Prelude       as P  hiding (lookup, concatMap)
+import           Data.Sequence as DS hiding (zip, drop, update, sortBy)
+import           Prelude       as P hiding (concatMap, lookup, concat)
 
 data SymInfo = SymInfo
     { dataType :: DataType
@@ -61,13 +64,14 @@ type Offset = Int
 instance Show SymInfo where
     show (SymInfo dt ct v sn dp i u p o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP ++ showO
         where
-            showSN = "Scope: " ++ show sn ++ ", "
+            showSN = "Scope: " ++ show sn ++ ",\t"
             showCT = show ct ++ " | "
             showDT = show dt ++ case dt of
                 Record _ _ w -> " [" ++ show w ++ "] "
                 Union  _ _ w -> " [" ++ show w ++ "] "
+                Array  _ _ w -> " [" ++ show w ++ "] "
                 _            -> " "
-            showV  = showI ++ maybe "" show v ++ " "
+            showV  = showI ++ maybe "" show v ++ "\t"
                 where
                     showI  = "(" ++ (if i then "init" else "NOT init") ++ ")"
             showDP = show dp
@@ -136,10 +140,18 @@ instance Show Value where
 newtype SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
 
 instance Show SymTable where
-    show (SymTable m) = "Symbol Table:\n" ++ concatMap shower (DM.toList m)
+    show (SymTable m) = "Symbol Table:\n" ++ DF.concatMap (++"\n") list''''
         where
-            shower (var, info) = "\t" ++ var ++ " -> " ++ showInfo info ++ "\n"
-            showInfo = concatMap ((++) "\n\t\t" . show) . DF.toList
+            list :: [(Identifier, [SymInfo])]
+            list = map (second DF.toList) $ DM.toList m
+            list' :: [(Identifier, SymInfo)]
+            list' = concat $ map (\(var,ss) -> zip (repeat var) ss) list
+            list'' :: [(ScopeNum, [(Identifier, SymInfo)])]
+            list'' = map (\ls@((_,s):_) -> (scopeNum s,ls)) $ groupBy ((==) `on` (scopeNum . snd)) $ sortBy (compare `on` (scopeNum . snd)) list'
+            list''' :: [(ScopeNum, [(Identifier, SymInfo)])]
+            list''' = map (second (sortBy (compare `on` (defPosn . snd)))) list''
+            list'''' :: [String]
+            list'''' = map (\(sc,infos) -> show sc ++ " -> " ++ concat (map (\(iden,si) -> "\n\t\t" ++ iden ++ ":\t" ++ show si) infos)) list'''
 {- |
     Empty symbol table
  -}
@@ -147,7 +159,7 @@ emptyTable :: SymTable
 emptyTable = SymTable DM.empty
 
 initialTable :: SymTable
-initialTable = SymTable $ DM.fromList [ typeInt, typeFloat, typeBool, typeChar ]
+initialTable = SymTable $ DM.fromList [ typeInt, typeFloat, typeBool, typeChar, typeString ]
     where
         typeTuple typeN = (typeN, typeInfo typeN)
         typeInfo typeN = singleton $ emptySymInfo
@@ -156,10 +168,11 @@ initialTable = SymTable $ DM.fromList [ typeInt, typeFloat, typeBool, typeChar ]
                     , initial  = True
                     , used     = True
                     }
-        typeInt   = typeTuple "Int"
-        typeFloat = typeTuple "Float"
-        typeBool  = typeTuple "Bool"
-        typeChar  = typeTuple "Char"
+        typeInt    = typeTuple "Int"
+        typeFloat  = typeTuple "Float"
+        typeBool   = typeTuple "Bool"
+        typeChar   = typeTuple "Char"
+        typeString = typeTuple "String"
 {- |
     Adds a symbol to the symbol table along with its information
  -}

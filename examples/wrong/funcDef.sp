@@ -4,6 +4,11 @@ imp a (a,b) as
     return a + b
 end
 
+# already implemented
+imp a (a,c) as
+    return a - c
+end
+
 # Function as a statement
 a(2,3)
 
@@ -27,9 +32,9 @@ def a :: Int,Int -> ()
 # used but never implemented
 def b :: Int
 
+# Args (), not (Int)
 b (2)
 
-# Args (Int), not ()
 b ()
 
 # procedure as an expression
@@ -44,15 +49,23 @@ imp c () as
 end
 
 # def c :: Void -> Void
-# NOT ACCEPTED:     def c ::
 def c :: ()
-
 
 imp c () as
   print "hello"
 end
 
 c()
+
+def d :: Int -> Int
+
+if true then
+  # implement in same scope
+  imp d (a) as
+      return a
+  end
+end
+
 
 Int c
 

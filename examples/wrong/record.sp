@@ -3,34 +3,50 @@ Record Precision as
     floating :: Float
 end
 
-Record Cosa as
-      num  :: Int
-    , prec :: Precision
-    # , noexs :: NoExiste
+Record Thing as
+      num   :: Int
+
+    # has already been declared
+    # , num   :: Float
+    , prec  :: Precision
 end
 
-Union Mas as
-    c :: Cosa
+Union Deep as
+
+    # has not been defined
+    c :: Thing
   , p :: Precision
-  # , p :: Float
-  # , p :: Int
 end
 
-Cosa c
-Precision r1, r2
-Mas m
+Precision r1
+Deep m
 
-Int[10] array
+# only literal
+# Thing[10 + r1.integer][5] array
+Thing[10][6] array
 
-array[2] = "hola"
+# data type of size
+# Int["hola"] arreglo
+
+# 'array[1]' si not a structure
+array[1].num = 2
+# cant use 'Float' in index
+array[2.4][2].num = 4
+# cant assign 'Int' to '[[Int]]'
 array = 2
 
-c.prec.integer = 2
-c.prec.floating = 3
-c.prec.ppp = 3
+array[(m.c.prec.integer + 2) / array[3][2].num][1] = array[m.p.integer][array[1][3].num] # valid
 
-r1 = r2
+# cannot assing 'Int' to 'Float'
+m.c.prec.floating = 3
+m.c.prec.integer = 2
 
-m.c.prec.integer = 2.2
+# m is not an array
+m[3] = 2
 
-print c, r1, r2, m, array
+# no field 'no'
+m.c.prec.no = 3
+
+r1 = m.p
+
+print r1, m, array

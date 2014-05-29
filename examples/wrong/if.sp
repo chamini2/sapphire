@@ -4,7 +4,8 @@ z = 30
 
 print y,z
 
-if y^2 > z then
+# condición debe ser Bool, no Int
+if y^2 then
   Int v
   x = 10
   w = 5
@@ -31,7 +32,6 @@ end
 print x, w
 
 #habran warnings de definicion sin uso
-
 if v == 2 then
   print v
 end

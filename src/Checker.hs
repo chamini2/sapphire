@@ -146,7 +146,8 @@ instance Show StaticError where
         StructNoField          str fn    -> "structure '" ++ str ++ "' has no field named '" ++ fn ++ "'"
         IndexDataType          expr dt   -> "index expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
         ArraySizeDataType      expr dt   -> "array size expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
-        ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' is 'impure'"
+        --ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' is 'impure'"
+        ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' must be an 'Int' literal"
         -- Types
         TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
         LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"

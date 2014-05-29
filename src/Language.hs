@@ -5,15 +5,15 @@ import           Control.Monad.Identity hiding (forM_, mapM_)
 import           Control.Monad.State    hiding (forM_, mapM_)
 import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
+import qualified Data.Data              as DD
 import           Data.Foldable          as DF (concat, concatMap, foldr, forM_,
                                                mapM_, toList)
 import           Data.Function          (on)
-import qualified Data.Data              as DD
-import qualified Data.Typeable          as DT
 import           Data.Functor           ((<$))
 import           Data.List              (intercalate)
 import           Data.Maybe             (fromJust)
 import           Data.Sequence          as DS (Seq, fromList, singleton)
+import qualified Data.Typeable          as DT
 import           Prelude                hiding (concat, concatMap, mapM_)
 
 type Position = (Int, Int) -- (Row, Column)
@@ -123,6 +123,8 @@ deepAccess z@(Lex acc _, ths) = case acc of
 
 ----------------------------------------
 
+data DataWidth = DataWidth DataType Width
+
 data DataType
     = Int | Float | Bool | Char | Range | Type
     | String Width
@@ -132,15 +134,24 @@ data DataType
     | UserDef (Lexeme Identifier)
     | Void | TypeError  -- For compiler use
 --    | Undef
-    deriving (Ord, DT.Typeable, DD.Data)
+    deriving (Ord, Eq, DT.Typeable, DD.Data)
 
-instance Eq DataType where
-    a == b = case (a,b) of
-        (Record aIdenL _ _ , Record bIdenL _ _ ) -> lexInfo aIdenL == lexInfo bIdenL
-        (Union aIdenL _ _  , Union  bIdenL _ _ ) -> lexInfo aIdenL == lexInfo bIdenL
-        (Array aDt aSizeL _, Array bDt bSizeL _) -> (lexInfo aDt == lexInfo bDt) && (lexInfo aSizeL == lexInfo bSizeL)
-        (UserDef aIdenL    , UserDef bIdenL    ) -> lexInfo aIdenL == lexInfo bIdenL
-        _                                        -> DD.toConstr a == DD.toConstr b
+--instance Eq DataType where
+--    a == b = case (a,b) of
+--        (Int           , Int           ) -> True
+--        (Float         , Float         ) -> True
+--        (Bool          , Bool          ) -> True
+--        (Char          , Char          ) -> True
+--        (Range         , Range         ) -> True
+--        (Type          , Type          ) -> True
+--        (String _      , String _      ) -> True
+--        (Record aI aS _, Record bI bS _) -> (aI == bI) && (aS == bS)
+--        (Union  aI aS _, Union  bI bS _) -> (aI == bI) && (aS == bS)
+--        (Array  aI aE _, Array  bI bE _) -> (aI == bI) && (aE == bE)
+--        (UserDef aI    , UserDef bI    ) -> aI == bI
+--        (Void          , Void          ) -> True
+--        (TypeError     , TypeError     ) -> True
+--        _                                -> False
 
 instance Show DataType where
     show dt = case dt of
@@ -153,7 +164,7 @@ instance Show DataType where
         Type             -> "Type"
         Record iden fs w -> "Record " ++ lexInfo iden -- ++ (intercalate ", " $ toList $ fmap (show . lexInfo . fst) fs)
         Union  iden fs w -> "Union "  ++ lexInfo iden -- ++ (intercalate ", " $ toList $ fmap (show . lexInfo . fst) fs)
-        Array aDtL _ w   -> "[" ++ show (lexInfo aDtL) ++ " | " ++ show w ++ "]"
+        Array aDtL _ w   -> "[" ++ show (lexInfo aDtL) ++ "]"
         UserDef idenL    -> lexInfo idenL
         Void             -> "()"
         TypeError        -> error "DataType TypeError should never be 'shown'"

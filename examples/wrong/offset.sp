@@ -36,5 +36,3 @@ Record Deep as
     x :: Wrapper,
     y :: Wrapper
 end
-
-
