@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language where
 
 import           Control.Arrow          ((***))
@@ -9,6 +10,8 @@ import           Data.Foldable          as DF (foldr, forM_, mapM_, toList, conc
 import           Data.Functor           ((<$))
 import           Data.Maybe             (fromJust)
 import           Data.List              (intercalate)
+import           Data.Data              (Data(gunfold, toConstr, dataTypeOf), showConstr)
+import           Data.Typeable          (Typeable)
 import           Data.Sequence          as DS (Seq, singleton, fromList)
 import           Prelude                hiding (mapM_, concat, concatMap)
 
@@ -22,7 +25,7 @@ showPosn (line, col) = show line ++ "," ++ show col
 data Lexeme a = Lex
     { lexInfo :: a
     , lexPosn :: Position
-    } deriving (Eq)
+    } deriving (Eq, Ord)
 
 instance Show a => Show (Lexeme a) where
     show (Lex a p) = case p of
@@ -47,7 +50,7 @@ type StBlock = Seq (Lexeme Statement)
 data Access = VariableAccess (Lexeme Identifier)
             | ArrayAccess    (Lexeme Access)     (Lexeme Expression)
             | StructAccess   (Lexeme Access)     (Lexeme Identifier)
-            deriving (Eq)
+            deriving (Eq, Ord)
 
 instance Show Access where
     show acc = case acc of
@@ -121,37 +124,39 @@ deepAccess z@(Lex acc _, ths) = case acc of
 
 data DataType
     = Int | Float | Bool | Char | String | Range | Type
-    | Union  (Lexeme Identifier) (Seq Field)
-    | Record (Lexeme Identifier) (Seq Field)
-    | Array   (Lexeme DataType) (Lexeme Expression)
+    | Union  (Lexeme Identifier) (Seq Field) Width
+    | Record (Lexeme Identifier) (Seq Field) Width
+    | Array   (Lexeme DataType) (Lexeme Expression) Width
     | UserDef (Lexeme Identifier)
     | Void | Undef | TypeError  -- For compiler use
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show DataType where
     show dt = case dt of
-        Int            -> "Int"
-        Float          -> "Float"
-        Bool           -> "Bool"
-        Char           -> "Char"
-        String         -> "String"
-        Range          -> "Range"
-        Type           -> "Type"
-        Union  iden fs -> "Union " ++ lexInfo iden
-        Record iden fs -> "Record " ++ lexInfo iden
-        Array aDtL _   -> "[" ++ show (lexInfo aDtL) ++ "]"
-        UserDef idenL  -> lexInfo idenL
-        Void           -> "()"
-        Undef          -> error "DataType Undef should never be 'shown'"
-        TypeError      -> error "DataType TypeError should never be 'shown'"
+        Int              -> "Int"
+        Float            -> "Float"
+        Bool             -> "Bool"
+        Char             -> "Char"
+        String           -> "String"
+        Range            -> "Range"
+        Type             -> "Type"
+        Union  iden fs w -> "Union "  ++ lexInfo iden ++ " " ++ show w
+        Record iden fs w -> "Record " ++ lexInfo iden ++ " " ++ show w
+        Array aDtL _ _   -> "[" ++ show (lexInfo aDtL) ++ "]"
+        UserDef idenL    -> lexInfo idenL
+        Void             -> "()"
+        Undef            -> error "DataType Undef should never be 'shown'"
+        TypeError        -> error "DataType TypeError should never be 'shown'"
 
 type Field = (Lexeme Identifier, Lexeme DataType)
 
 getFields :: DataType -> Seq Field
 getFields dt = case dt of
-    Record _ fields -> fields
-    Union  _ fields -> fields
-    _               -> error "Language.getFields: should not attempt to get fields from non user-defined DataType"
+    Record _ fields _ -> fields
+    Union  _ fields _ -> fields
+    _                 -> error "Language.getFields: should not attempt to get fields from non user-defined DataType"
+
+type Width = Int
 
 ----------------------------------------
 
@@ -225,7 +230,7 @@ data Expression
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression) {-DataType-}
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show Expression where
     show = runPrinter . printExpression
@@ -237,7 +242,7 @@ data Binary
     = OpPlus  | OpMinus   | OpTimes | OpDivide | OpModulo | OpPower   | OpFromTo
     | OpEqual | OpUnequal | OpLess  | OpLessEq | OpGreat  | OpGreatEq | OpBelongs
     | OpOr    | OpAnd
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show Binary where
     show op = case op of
@@ -280,7 +285,7 @@ binaryOperation op = fromList $ case op of
         numbers = [(Int,Int), (Float,Float)]
 
 data Unary = OpNegate | OpNot
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show Unary where
     show op = case op of
@@ -552,5 +557,5 @@ printStatements tag is = do
 
 showDataType :: DataType -> String
 showDataType dt = case dt of
-    Array aDtL indexL -> showDataType (lexInfo aDtL) ++ "[" ++ showIndex (lexInfo indexL) ++ "]"
-    _                 -> show dt
+    Array aDtL indexL _ -> showDataType (lexInfo aDtL) ++ "[" ++ showIndex (lexInfo indexL) ++ "]"
+    _                   -> show dt

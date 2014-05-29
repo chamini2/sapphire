@@ -22,7 +22,7 @@ main = do
 printProgram :: Checker () -> IO ()
 printProgram chk = do
     let (state, writer) = runProgramChecker chk
-        CheckState stTable _ _ stAst _ _ = state
+        CheckState stTable _ _ stAst _ _ _ = state
     -- TEMPORAL
     print state
     let (lexE, parseE, staticE, afterW) = getErrors writer

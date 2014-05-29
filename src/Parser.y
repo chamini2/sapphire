@@ -156,8 +156,8 @@ Statement :: { Lexeme Statement }
     --| VariableId   "=" Expression   { StAssign (singleton $1) $3 <$ $1           }
 
     -- Definitions
-    | "Record" TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Record $2 $5 <$ $1) <$ $1 }
-    | "Union"  TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Union  $2 $5 <$ $1) <$ $1 }
+    | "Record" TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Record $2 $5 0 <$ $1) <$ $1 }
+    | "Union"  TypeId "as" MaybeNL FieldList MaybeNL "end"      { StStructDefinition (Union  $2 $5 0 <$ $1) <$ $1 }
     | DataType DeclareVariableList       { (StDeclarationList $ fmap (first (\iden -> Declaration iden $1 CatVariable <$ iden)) $2) <$ $1 }
 
     -- Functions
@@ -238,15 +238,15 @@ WhenList :: { Seq (Lexeme When) }
 ---------------------------------------
 
 DataType :: { Lexeme DataType }
-    : "Int"                         { Int         <$ $1 }
-    | "Float"                       { Float       <$ $1 }
-    | "Bool"                        { Bool        <$ $1 }
-    | "Char"                        { Char        <$ $1 }
-    | "String"                      { String      <$ $1 }
-    | "Range"                       { Range       <$ $1 }
-    | "Type"                        { Type        <$ $1 }
-    | TypeId                        { UserDef $1  <$ $1 }
-    | DataType "[" Expression "]"   { Array $1 $3 <$ $1 }
+    : "Int"                         { Int           <$ $1 }
+    | "Float"                       { Float         <$ $1 }
+    | "Bool"                        { Bool          <$ $1 }
+    | "Char"                        { Char          <$ $1 }
+    | "String"                      { String        <$ $1 }
+    | "Range"                       { Range         <$ $1 }
+    | "Type"                        { Type          <$ $1 }
+    | TypeId                        { UserDef $1    <$ $1 }
+    | DataType "[" Expression "]"   { Array $1 $3 0 <$ $1 }
 
 VariableList :: { Seq (Lexeme Identifier) }
     : VariableId                         { singleton $1 }

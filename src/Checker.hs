@@ -4,32 +4,53 @@ module Checker where
 import           Language
 import           SymbolTable
 
+import           Control.Applicative ((<$>))
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
+{-import           Data.Aeson-}
+import qualified Data.ByteString.Lazy as BS (ByteString, readFile)
 import           Data.Foldable          as DF (and, concatMap, elem, find,
                                                foldr, forM_, mapM_, notElem,
                                                toList, foldr1, foldlM, foldl)
 import           Data.Function          (on)
 import           Data.Functor           ((<$), (<$>))
 import           Data.List              (intercalate)
-import qualified Data.Map               as DM (empty, insertLookupWithKey, Map)
+import qualified Data.Map               as DM (empty, insertLookupWithKey, Map, fromList, lookup)
 import           Data.Maybe             (fromJust, isJust, isNothing)
 import           Data.Sequence          as DS (Seq, empty, filter, fromList,
                                                index, length, null, singleton,
                                                sortBy, zip, zipWith, (<|), (|>),
                                                (><), ViewL((:<),EmptyL), viewl)
 import           Data.Traversable       as DT (forM, mapM)
+import           GHC.Generics
 import           Prelude                as P hiding (and, concatMap, elem,
                                               filter, foldr, length, lookup,
                                               mapM, mapM_, notElem, null, zip,
                                               zipWith, foldr1, foldl)
 
+--------------------------------------------------------------------------------
+
 type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
-type CheckReader = Seq Flag
+--------------------------------------------------------------------------------
+
+data CheckReader = CheckReader 
+    { flags  :: Seq Flag
+    , arch   :: Architecture
+    }
+
 data Flag = OutputFile String | SupressWarnings | AllWarnings
     deriving (Eq)
+
+data Architecture = Arch 
+    { archName :: String
+    , widths   :: DM.Map DataType Width
+    } deriving (Show)
+
+instance Eq Architecture where
+    Arch n _ == Arch n2 _ = n == n2
+
 --------------------------------------------------------------------------------
 
 type CheckWriter = Seq CheckError
@@ -65,7 +86,7 @@ instance Show LexerError where
         LexerError  msg  -> msg
 
 data ParseError
-    = UnexpectedToken String -- show Token
+    = UnexpectedToken String 
     | ParseError      String
 
 instance Show ParseError where
@@ -182,10 +203,11 @@ data CheckState = CheckState
     , ast       :: Program
     , loopLvl   :: NestedLevel
     , funcStack :: Stack (DataType, Lexeme Identifier, ScopeNum)
+    , offsStack :: Stack Offset
     }
 
 instance Show CheckState where
-    show (CheckState t s c a _ _) = showT ++ showS ++ showC ++ showA
+    show (CheckState t s c a _ _ _) = showT ++ showS ++ showC ++ showA
         where
             showT = "Symbol Table:\n" ++ show t ++ "\n"
             showS = "Scope Stack:\n"  ++ show s ++ "\n"
@@ -203,9 +225,6 @@ errorPos err = case err of
     SError p _ -> p
     CWarn  p _ -> p
 
-currentScope :: Checker ScopeNum
-currentScope = gets (serial . peek . stack)
-
 ----------------------------------------
 
 tellLError :: Position -> LexerError -> Checker ()
@@ -222,8 +241,44 @@ tellCWarn  posn err = tell (singleton $ CWarn  posn err)
 
 ----------------------------------------
 
-flags :: CheckReader
-flags = empty
+cReader :: CheckReader
+cReader = CheckReader 
+    { flags  = empty 
+    , arch   = defaultArchitecture
+    }
+
+defaultArchitecture :: Architecture
+defaultArchitecture = Arch 
+    { archName = "mips"
+    , widths = DM.fromList
+        [ (Int       , 32)
+        , (Float     , 32)
+        {-, (Double    , 64)-}
+        , (Char      , 8)
+        , (Bool      , 8)
+        {-, ("pointer" , 32)-}
+        ]
+    }
+
+getCurrentArchitecture :: Checker Architecture
+getCurrentArchitecture = asks arch
+
+getPrimitiveDataTypeWidth :: DataType -> Checker Width
+getPrimitiveDataTypeWidth dt = asks (fromJust . DM.lookup dt . widths . arch)
+         
+getDataTypeWidth :: DataType -> Checker Width  
+getDataTypeWidth dt = case dt of 
+    Array _ _ w     -> return w
+    Record _ _ w    -> return w
+    Union _ _ w     -> return w
+    UserDef udIdenL -> do
+        mayDt <- getsSymInfoWithoutError udIdenL dataType
+        case mayDt of
+            Just udDt -> getDataTypeWidth udDt 
+            Nothing   -> error "Checker.getDataTypeWidth: lookup of existing struct returned Nothing"
+    _ -> getPrimitiveDataTypeWidth dt
+
+----------------------------------------
 
 initialState :: CheckState
 initialState = CheckState
@@ -233,6 +288,7 @@ initialState = CheckState
     , ast       = Program DS.empty
     , loopLvl   = 0
     , funcStack = singletonStack (Void, Lex "sapphire" (0,0), -1)
+    , offsStack = singletonStack 0
     }
 
 ----------------------------------------
@@ -241,7 +297,7 @@ runProgramChecker :: Checker a -> (CheckState, CheckWriter)
 runProgramChecker = (\(_,s,w) -> (s,w)) . runChecker
 
 runChecker :: Checker a -> (a, CheckState, CheckWriter)
-runChecker = runIdentity . flip (`runRWST` flags) initialState
+runChecker = runIdentity . flip (`runRWST` cReader) initialState
 
 getWriter :: Checker a -> CheckWriter
 getWriter = (\(_,_,w) -> w) . runChecker
@@ -303,6 +359,31 @@ enterScope = do
 -}
 exitScope :: Checker ()
 exitScope = modify (\s -> s { stack = snd . pop $ stack s })
+
+{- |
+    Gets the current scope on top of the stack
+-}
+currentScope :: Checker ScopeNum
+currentScope = gets (serial . peek . stack)
+
+----------------------------------------
+
+addOffsetBase :: Checker ()
+addOffsetBase = modify (\s -> s { offsStack = push 0 (offsStack s) })
+
+removeOffsetBase :: Checker Offset
+removeOffsetBase = do
+    (offset, stck) <- liftM pop $ gets offsStack
+    modify (\s -> s { offsStack = stck })
+    return offset
+
+currentOffset :: Checker Offset
+currentOffset = gets (peek . offsStack)
+
+modifyOffset :: (Width -> Offset) -> Checker ()
+modifyOffset f = do
+    co <- removeOffsetBase
+    modify (\s -> s { offsStack = push (f co) (offsStack s) })
 
 ----------------------------------------
 
@@ -491,7 +572,7 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
                             --val <- liftM ValStruct $ foldlM addField emptyTable (getFields $ dataType si)
                             --putValue idenL val
                             return True
-                Array aDtL indexL -> do
+                Array aDtL indexL _ -> do
                     indexDt <- checkExpression indexL
                     if indexDt == Int
                         then addSymbol idenL info >> return True
@@ -588,7 +669,7 @@ getsSymInfoAccess accL@(Lex acc posn) f = do
                 (_, [] ) -> return (Just (f si), str)
                 (_, ths) -> case lexInfo (head ths) of
                     HistoryArray  indexL -> case dataType si of
-                            Array inDtL _ -> do
+                            Array inDtL _ _ -> do
                                 indexDt <- checkExpression indexL
                                 if indexDt == Int
                                     then do
@@ -619,7 +700,7 @@ checkStatement (Lex st posn) = case st of
 
     StAssign accL exprL -> do
         (mayDt, accStr, topL) <- getsSymInfoAccess accL dataType
-        exprDt        <- checkExpression exprL
+        exprDt                <- checkExpression exprL
         case mayDt of
             Just idenDt -> do
                 markInitialized topL
@@ -632,8 +713,8 @@ checkStatement (Lex st posn) = case st of
 
     StStructDefinition dtL@(Lex dt posn) -> do
         let idenL = case dt  of
-                Record idenL _ -> idenL
-                Union  idenL _ -> idenL
+                Record idenL _ _ -> idenL
+                Union  idenL _ _ -> idenL
         defined <- processType $ Lex (Declaration idenL dtL CatUserDef) posn
         when defined $ markInitialized idenL
 

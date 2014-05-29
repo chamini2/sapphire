@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {- |
     Symbol table based on the LeBlanc-Cook symbol table abstraction
  -}
@@ -14,6 +15,8 @@ module SymbolTable
 
     , SymInfo(..)
     , emptySymInfo
+
+    , Offset
 
     , Scope(..)
     , ScopeNum
@@ -44,10 +47,11 @@ data SymInfo = SymInfo
     , initialized :: Bool
     , used        :: Bool
     --, pure        :: Bool
+    , offset      :: Offset
     }
 
 instance Show SymInfo where
-    show (SymInfo dt ct v sn dp i u) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU
+    show (SymInfo dt ct v sn dp i u o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showO
         where
             showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
@@ -57,6 +61,7 @@ instance Show SymInfo where
                     showI  = "(" ++ (if i then "init" else "NOT init") ++ ")"
             showDP = show dp
             showU  = " (" ++ (if u then "used" else "NOT used") ++ ")"
+            showO  = show o
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo
@@ -67,7 +72,12 @@ emptySymInfo = SymInfo
     , defPosn     = (0, 0)
     , initialized = False
     , used        = False
+    , offset      = 0   -- Offsets
     }
+
+--------------------------------------------------------------------------------
+
+type Offset = Int
 
 --------------------------------------------------------------------------------
 
@@ -112,7 +122,7 @@ instance Show Value where
 {- |
     Symbol Table
 -}
-data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
+newtype SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
 
 instance Show SymTable where
     show (SymTable m) = concatMap shower $ DM.toList m
