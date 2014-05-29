@@ -529,8 +529,8 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
             checkAccess :: DataType -> Checker Bool
             checkAccess dt = case dt of
                 UserDef udIdenL -> do
-                    mayUDefDt <- getsSymInfoWithoutError udIdenL dataType
-                    case mayUDefDt of
+                    mayUdDt <- getsSymInfoWithoutError udIdenL dataType
+                    case mayUdDt of
                         Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return False
                         Just dt -> do
                             markUsed udIdenL
@@ -645,14 +645,14 @@ getsSymInfoAccess accL@(Lex acc posn) f = do
                                         return (Nothing, str)
                             dt            -> tellSError posn (VariableNonArray str dt) >> return (Nothing, str)
                     HistoryStruct fieldNameL -> case dataType si of
-                        UserDef dtIdenL -> do
-                            uDefDt <- liftM fromJust $ getsSymInfoWithoutError dtIdenL dataType
-                            case find ((lexInfo fieldNameL ==) . lexInfo . fst) (getFields uDefDt) of
+                        UserDef udIdenL -> do
+                            udDt <- liftM fromJust $ getsSymInfoWithoutError udIdenL dataType
+                            case find ((lexInfo fieldNameL ==) . lexInfo . fst) (getFields udDt) of
                                 Just fieldL -> do
                                     let newSi  = si { dataType = lexInfo (snd fieldL) }
                                         newStr = str ++ "." ++ lexInfo fieldNameL
                                     matchType (fromJust $ backAccess zipper) newStr newSi
-                                Nothing -> tellSError posn (StructNoField (lexInfo dtIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
+                                Nothing -> tellSError posn (StructNoField (lexInfo udIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
                         dt -> tellSError posn (VariableNonStruct str dt) >> return (Nothing, str)
 
 {- |
