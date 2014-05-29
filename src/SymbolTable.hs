@@ -4,6 +4,7 @@
 module SymbolTable
     ( SymTable
     , emptyTable
+    , initialTable
     , insert
     , lookup
     , lookupWithScope
@@ -62,7 +63,10 @@ instance Show SymInfo where
         where
             showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
-            showDT = show dt ++ " "
+            showDT = show dt ++ case dt of
+                Record _ _ w -> " [" ++ show w ++ "] "
+                Union  _ _ w -> " [" ++ show w ++ "] "
+                _            -> " "
             showV  = showI ++ maybe "" show v ++ " "
                 where
                     showI  = "(" ++ (if i then "init" else "NOT init") ++ ")"
@@ -142,6 +146,20 @@ instance Show SymTable where
 emptyTable :: SymTable
 emptyTable = SymTable DM.empty
 
+initialTable :: SymTable
+initialTable = SymTable $ DM.fromList [ typeInt, typeFloat, typeBool, typeChar ]
+    where
+        typeTuple typeN = (typeN, typeInfo typeN)
+        typeInfo typeN = singleton $ emptySymInfo
+                    { dataType = UserDef (Lex typeN (0,0))
+                    , category = CatUserDef
+                    , initial  = True
+                    , used     = True
+                    }
+        typeInt   = typeTuple "Int"
+        typeFloat = typeTuple "Float"
+        typeBool  = typeTuple "Bool"
+        typeChar  = typeTuple "Char"
 {- |
     Adds a symbol to the symbol table along with its information
  -}

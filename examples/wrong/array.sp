@@ -1,3 +1,7 @@
+Record Int as
+  val :: Float
+end
+
 Int [10] [20] arreglo
 Bool[10]     barreglo
 Char[2][30]  carreglo
@@ -24,7 +28,8 @@ Thing[10] arr
 # print n
 
 Int[10][2] a
-Int[10 + 20]["hola"] f
+Int[10+20] f
+Int["hola"] f
 
 a[a[1][3]][3 + 2 * arr[1].coord[0]] = 2.0
 a["hola"] = 10
@@ -49,7 +54,7 @@ g = 1
 
 Int bbb = 1
 read bbb
-Int[bbb+ 2] dd
+Int[bbb+ 2] dd      # it doesn't get defined
 dd[d] = 2
 
 print dd[2]

@@ -300,7 +300,7 @@ getDataTypeWidth dt = case dt of
 
 initialState :: CheckState
 initialState = CheckState
-    { table     = emptyTable
+    { table     = initialTable
     , stack     = initialStack
     , scopeId   = 0
     , ast       = Program DS.empty
@@ -656,7 +656,9 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
     case maySi of
         Nothing -> do
             (valid, width) <- addSymbolCheckingAccess info
-            when valid $ modifyOffset (+ width)
+            when valid $ do
+                modifyOffset (+ width)
+                when (isAccess $ dataType info) $ markInitialized idenL
             return valid
         Just si
             | scopeNum si == sc -> tellSError posn (AlreadyDeclared (lexInfo idenL) (defPosn si)) >> return False
@@ -665,6 +667,12 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
                 when valid $ modifyOffset (+ width)
                 return valid
     where
+        isAccess :: DataType -> Bool
+        isAccess dt = case dt of
+            UserDef _   -> True
+            Array _ _ _ -> True
+            _           -> False
+
         addSymbolCheckingAccess :: SymInfo -> Checker (Bool, Width)
         addSymbolCheckingAccess info = do
             (valid, newDt, width) <- checkAccess $ dataType info
@@ -676,7 +684,7 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
                 mayUdDt <- getsSymInfoWithoutError udIdenL dataType
                 case mayUdDt of
                     Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return (False, dt, 0)
-                    Just dt -> markUsed udIdenL >> liftM ((,,) True dt) (getDataTypeWidth dt)
+                    Just udDt -> markUsed udIdenL >> liftM ((,,) True dt) (getDataTypeWidth udDt)
             Array aDtL sizeL _ -> do
                 (indexDt, indexPr) <- checkExpression sizeL
                 (indexBool, size) <- if indexDt == Int
@@ -695,7 +703,7 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
                 return (dtBool && indexBool, Array (dtDt <$ aDtL) sizeL newWidth, newWidth)
             _ -> do
                 dtW <- getDataTypeWidth dt
-                return (dtW /= 0, dt, dtW)
+                return (True, dt, dtW)
 
 processType :: Lexeme Declaration -> Checker Bool
 processType declL@(Lex (Declaration idenL@(Lex iden _) (Lex dt _) c) posn) = do

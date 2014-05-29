@@ -4,7 +4,7 @@ Record Precision as
 end
 
 Record Cosa as
-      pupu :: Int
+      num  :: Int
     , prec :: Precision
     # , noexs :: NoExiste
 end

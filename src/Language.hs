@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Language where
 
 import           Control.Monad.Identity hiding (forM_, mapM_)
@@ -6,6 +7,9 @@ import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
 import           Data.Foldable          as DF (concat, concatMap, foldr, forM_,
                                                mapM_, toList)
+import           Data.Function          (on)
+import qualified Data.Data              as DD
+import qualified Data.Typeable          as DT
 import           Data.Functor           ((<$))
 import           Data.List              (intercalate)
 import           Data.Maybe             (fromJust)
@@ -22,7 +26,7 @@ showPosn (line, col) = show line ++ "," ++ show col
 data Lexeme a = Lex
     { lexInfo :: a
     , lexPosn :: Position
-    } deriving (Eq, Ord)
+    } deriving (Eq, Ord, DT.Typeable, DD.Data)
 
 instance Show a => Show (Lexeme a) where
     show (Lex a p) = case p of
@@ -47,7 +51,7 @@ type StBlock = Seq (Lexeme Statement)
 data Access = VariableAccess (Lexeme Identifier)
             | ArrayAccess    (Lexeme Access)     (Lexeme Expression)
             | StructAccess   (Lexeme Access)     (Lexeme Identifier)
-            deriving (Eq, Ord)
+            deriving (Eq, Ord, DT.Typeable, DD.Data)
 
 instance Show Access where
     show acc = case acc of
@@ -128,7 +132,15 @@ data DataType
     | UserDef (Lexeme Identifier)
     | Void | TypeError  -- For compiler use
 --    | Undef
-    deriving (Eq, Ord)
+    deriving (Ord, DT.Typeable, DD.Data)
+
+instance Eq DataType where
+    a == b = case (a,b) of
+        (Record aIdenL _ _ , Record bIdenL _ _ ) -> lexInfo aIdenL == lexInfo bIdenL
+        (Union aIdenL _ _  , Union  bIdenL _ _ ) -> lexInfo aIdenL == lexInfo bIdenL
+        (Array aDt aSizeL _, Array bDt bSizeL _) -> (lexInfo aDt == lexInfo bDt) && (lexInfo aSizeL == lexInfo bSizeL)
+        (UserDef aIdenL    , UserDef bIdenL    ) -> lexInfo aIdenL == lexInfo bIdenL
+        _                                        -> DD.toConstr a == DD.toConstr b
 
 instance Show DataType where
     show dt = case dt of
@@ -139,8 +151,8 @@ instance Show DataType where
         String _         -> "String"
         Range            -> "Range"
         Type             -> "Type"
-        Record iden fs w -> "Record " ++ lexInfo iden ++ if w /= 0 then " [" ++ show w ++ "]" else ""
-        Union  iden fs w -> "Union "  ++ lexInfo iden ++ if w /= 0 then " [" ++ show w ++ "]" else ""
+        Record iden fs w -> "Record " ++ lexInfo iden -- ++ (intercalate ", " $ toList $ fmap (show . lexInfo . fst) fs)
+        Union  iden fs w -> "Union "  ++ lexInfo iden -- ++ (intercalate ", " $ toList $ fmap (show . lexInfo . fst) fs)
         Array aDtL _ w   -> "[" ++ show (lexInfo aDtL) ++ " | " ++ show w ++ "]"
         UserDef idenL    -> lexInfo idenL
         Void             -> "()"
@@ -229,7 +241,7 @@ data Expression
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression) {-DataType-}
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, DT.Typeable, DD.Data)
 
 instance Show Expression where
     show = runPrinter . printExpression
@@ -241,7 +253,7 @@ data Binary
     = OpPlus  | OpMinus   | OpTimes | OpDivide | OpModulo | OpPower   | OpFromTo
     | OpEqual | OpUnequal | OpLess  | OpLessEq | OpGreat  | OpGreatEq | OpBelongs
     | OpOr    | OpAnd
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, DT.Typeable, DD.Data)
 
 instance Show Binary where
     show op = case op of
@@ -286,7 +298,7 @@ binaryOperation op = fromList $ case op of
         repBool = repeat Bool
 
 data Unary = OpNegate | OpNot
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, DT.Typeable, DD.Data)
 
 instance Show Unary where
     show op = case op of
