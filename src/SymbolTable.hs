@@ -17,6 +17,7 @@ module SymbolTable
     , Init
     , Used
     , Pure
+    , Offset
 
     , Scope(..)
     , ScopeNum
@@ -47,14 +48,16 @@ data SymInfo = SymInfo
     , initial  :: Init
     , used     :: Used
     , pure     :: Pure
+    , offset   :: Offset
     }
 
-type Init = Bool
-type Used = Bool
-type Pure = Bool
+type Init   = Bool
+type Used   = Bool
+type Pure   = Bool
+type Offset = Int
 
 instance Show SymInfo where
-    show (SymInfo dt ct v sn dp i u p) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP
+    show (SymInfo dt ct v sn dp i u p o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP ++ showO
         where
             showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
@@ -65,6 +68,7 @@ instance Show SymInfo where
             showDP = show dp
             showU  = " (" ++ (if u then "used" else "NOT used") ++ ")"
             showP  = " (" ++ (if p then "pure" else "impure") ++ ")"
+            showO  = show o
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo
@@ -76,6 +80,7 @@ emptySymInfo = SymInfo
     , initial  = False
     , used     = False
     , pure     = True
+    , offset   = 0
     }
 
 --------------------------------------------------------------------------------
@@ -121,7 +126,7 @@ instance Show Value where
 {- |
     Symbol Table
 -}
-data SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
+newtype SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
 
 instance Show SymTable where
     show (SymTable m) = concatMap shower $ DM.toList m

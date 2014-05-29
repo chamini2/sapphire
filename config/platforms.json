@@ -1,19 +1,18 @@
-{
-    "platforms":
-    [
-        { // mips
-            "int":     32,
-            "float":   64,
-            "char":    8,
-            "bool":    8, // the minimum representation
-            "pointer": 32
-        },
-        { // llvm
-            "int":     32,
-            "float":   64,
-            "char":    8,
-            "bool":    8, // the minimum representation
-            "pointer": 32
-        }
-    ]
-}
+[
+    {
+        "architecture" : "mips",
+        "int":     32,
+        "float":   64,
+        "char":    8,
+        "bool":    8, 
+        "pointer": 32
+    },
+    {
+        "architecture" : "llvm",
+        "int":     32,
+        "float":   64,
+        "char":    8,
+        "bool":    8, 
+        "pointer": 32
+    }
+]
