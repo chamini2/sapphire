@@ -82,6 +82,7 @@ data StaticError
     | StructNoField          Identifier Identifier
     | IndexDataType          Expression DataType
     | ArraySizeDataType      Expression DataType
+    | ImpureArraySize        Expression
     -- Types
     | TypeAlreadyDefined   Identifier Position
     | LanguageTypeRedefine Identifier
@@ -125,6 +126,7 @@ instance Show StaticError where
         StructNoField          str fn    -> "structure '" ++ str ++ "' has no field named '" ++ fn ++ "'"
         IndexDataType          expr dt   -> "index expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
         ArraySizeDataType      expr dt   -> "array size expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
+        ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' is 'impure'"
         -- Types
         TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
         LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
@@ -203,9 +205,6 @@ errorPos err = case err of
     SError p _ -> p
     CWarn  p _ -> p
 
-currentScope :: Checker ScopeNum
-currentScope = gets (serial . peek . stack)
-
 ----------------------------------------
 
 tellLError :: Position -> LexerError -> Checker ()
@@ -279,7 +278,7 @@ checkWarnings = do
                 CatFunction -> do
                     let Just (ValFunction _ body iPosn) = value symI
                         implemented                     = isJust body
-                    case (initialized symI, used symI, implemented) of
+                    case (initial symI, used symI, implemented) of
                         (_    , True , False) -> tellSError dPosn (UsedNotImplemented sym)
                         (False, _    , True ) -> tellSError iPosn (NoReturn sym)
                         (_    , False, True ) -> tellCWarn  dPosn (DefinedNotUsed sym)
@@ -303,6 +302,12 @@ enterScope = do
 -}
 exitScope :: Checker ()
 exitScope = modify (\s -> s { stack = snd . pop $ stack s })
+
+{- |
+    Gets the current scope on top of the stack
+-}
+currentScope :: Checker ScopeNum
+currentScope = gets (serial . peek . stack)
 
 ----------------------------------------
 
@@ -334,6 +339,20 @@ enterFunction dt fnameL =  do
 exitFunction :: Checker ()
 exitFunction = modify (\s -> s { funcStack = snd . pop $ funcStack s })
 
+{- |
+    Gets the current function on top of the stack
+-}
+currentFunction :: Checker (DataType, Lexeme Identifier, ScopeNum)
+currentFunction = liftM peek $ gets funcStack
+
+{- |
+    Sets the current function as impure
+-}
+impureFunction :: Checker ()
+impureFunction = do
+    (_,fnameL, sc) <- currentFunction
+    modifySymInfoWithScope fnameL (\sym -> sym { pure = False }) sc
+
 --------------------------------------------------------------------------------
 
 {- |
@@ -359,7 +378,7 @@ getsSymInfo idenL@(Lex iden posn) f = do
 getsSymInfoWithoutError :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe a)
 getsSymInfoWithoutError (Lex iden _) f = do
     (tab, stck) <- gets (table &&& stack)
-    return $ fmap f $ lookupWithScope iden stck tab -- fmap f == maybe Nothing (Just . f)
+    return $ f <$> lookupWithScope iden stck tab -- f <$> == maybe Nothing (Just . f)
 
 {- |
     Modifies a symbol if said symbol exists in the table
@@ -390,7 +409,29 @@ putValue var val = modifySymInfo var (\sym -> sym { value = Just val })
     Marks the specified variable as initialized
 -}
 markInitialized :: Lexeme Identifier -> Checker ()
-markInitialized var = modifySymInfo var (\sym -> sym { initialized = True })
+markInitialized var = modifySymInfo var (\sym -> sym { initial = True })
+
+----------------------------------------
+
+{- |
+    Marks the specified variable as impure
+-}
+markImpure :: Lexeme Identifier -> Checker ()
+markImpure var = modifySymInfo var (\sym -> sym { pure = False })
+
+{- |
+    Marks the specified variable as pure
+-}
+markPure :: Lexeme Identifier -> Checker ()
+markPure var = modifySymInfo var (\sym -> sym { pure = True })
+
+{- |
+    Marks the specified variable as the specified pureness
+-}
+markPureness :: Lexeme Identifier -> Bool -> Checker ()
+markPureness var p = modifySymInfo var (\sym -> sym { pure = p })
+
+----------------------------------------
 
 {- |
     Gets a list of variables, checks which ones need initialization and intialises them.
@@ -398,7 +439,7 @@ markInitialized var = modifySymInfo var (\sym -> sym { initialized = True })
 markAllInitializedUsed :: Seq (Identifier, SymInfo) -> Checker ()
 markAllInitializedUsed vars = forM_ vars $ \(var,info) -> do
     let varL = Lex var (defPosn info)
-    when (initialized info) $ markInitialized varL
+    when (initial info) $ markInitialized varL
     when (used info)        $ markUsed        varL
 
 {- |
@@ -408,7 +449,7 @@ markUsed :: Lexeme Identifier -> Checker ()
 markUsed var = modifySymInfo var (\sym -> sym { used = True })
 
 checkMark :: Seq (Seq (Identifier, SymInfo)) -> Checker ()
-checkMark = markAllInitializedUsed . checkInitialization
+checkMark = markAllInitializedUsed . checkInitializationUsed
 
 {- |
     Returns the variables in the current scope
@@ -437,25 +478,26 @@ putScopeVariables vars = forM_ vars $ \(var, si) -> do
     Checks if a variable has been initialized in all possible scopes.
     Maintains used for variables used in at least one scope.
 -}
-checkInitialization :: Seq (Seq (Identifier, SymInfo)) -> Seq (Identifier, SymInfo)
-checkInitialization = foldr1 (zipWith func)
+checkInitializationUsed :: Seq (Seq (Identifier, SymInfo)) -> Seq (Identifier, SymInfo)
+checkInitializationUsed = foldr1 (zipWith func)
     where
         func :: (Identifier, SymInfo) -> (Identifier, SymInfo) -> (Identifier, SymInfo)
         func (a,sa) (b,sb) = if a /= b
-            then error "Checker.checkInitialization: zipping different variables"
-            else (a, sa { initialized = initialized sa && initialized sb
-                        , used        = used        sa || used        sb
+            then error "Checker.checkInitializationUsed: zipping different variables"
+            else (a, sa { initial = initial sa && initial sb
+                        , used    = used    sa || used        sb
+                        , pure    = pure    sa && pure        sb
                         })
 
-checkArguments :: Identifier -> Maybe Value -> Seq (Lexeme Expression) -> Position -> Checker ()
-checkArguments fname mayVal args posn = maybe failure success mayVal
+checkArguments :: Lexeme Identifier -> Maybe Value -> Seq (Lexeme Expression) -> Position -> Checker ()
+checkArguments fnameL mayVal args posn = maybe failure success mayVal
     where
         failure = error "Checker.checkArguments: function with no SymInfo value"
         success val = do
             let prms = lexInfo <$> parameters val
-            dts <- mapM checkExpression args
+            dts <- mapM (liftM fst . checkExpression) args
             unless (length args == length prms && and (zipWith (==) dts prms) || TypeError `elem` dts) $
-                tellSError posn (FunctionArguments fname prms dts)
+                tellSError posn (FunctionArguments (lexInfo fnameL) prms dts)
 
 ----------------------------------------
 
@@ -474,40 +516,43 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
             }
     maySi <- getsSymInfoWithoutError idenL id
     case maySi of
-        Nothing -> addSymbolCheckingUserDef info
+        Nothing -> addSymbolCheckingAccess info
         Just si
             | scopeNum si == sc -> tellSError posn (AlreadyDeclared (lexInfo idenL) (defPosn si)) >> return False
-            | otherwise         -> addSymbolCheckingUserDef info
+            | otherwise         -> addSymbolCheckingAccess info
         where
-            addSymbolCheckingUserDef :: SymInfo -> Checker Bool
-            addSymbolCheckingUserDef info = case dt of
+            addSymbolCheckingAccess :: SymInfo -> Checker Bool
+            addSymbolCheckingAccess info = do
+                valid <- checkAccess $ dataType info
+                when valid $ addSymbol idenL info
+                return valid
+            checkAccess :: DataType -> Checker Bool
+            checkAccess dt = case dt of
                 UserDef udIdenL -> do
-                    mayUDefSi <- getsSymInfoWithoutError udIdenL id
-                    case mayUDefSi of
+                    mayUDefDt <- getsSymInfoWithoutError udIdenL dataType
+                    case mayUDefDt of
                         Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return False
-                        Just si -> do
+                        Just dt -> do
                             markUsed udIdenL
-                            addSymbol idenL info
-                            --val <- liftM ValStruct $ foldlM addField emptyTable (getFields $ dataType si)
-                            --putValue idenL val
-                            return True
+                            fields <- mapM (checkAccess . lexInfo . snd) $ getFields dt
+                            return $ and fields
                 Array aDtL indexL -> do
-                    indexDt <- checkExpression indexL
-                    if indexDt == Int
-                        then addSymbol idenL info >> return True
+                    (indexDt, indexPr) <- checkExpression indexL
+                    indexBool <- if indexDt == Int
+                        then do
+                            -- This will not happen until 'pureness' is well implemented, so we just check if it is a literal
+                            unless indexPr $ tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL))
+                            -- Checks if the expression is a literal, this is temporal
+                            case lexInfo indexL of
+                                LitInt _ -> return ()
+                                _        -> tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL))
+                            return True
                         else do
-                            unless (indexDt == TypeError) $ tellSError posn (ArraySizeDataType (lexInfo indexL) indexDt)
+                            unless (indexDt == TypeError) $ tellSError (lexPosn indexL) (ArraySizeDataType (lexInfo indexL) indexDt)
                             return False
-                _ -> addSymbol idenL info >> return True
-            --addField :: SymTable -> Field -> Checker SymTable
-            --addField tab (fIdenL, dtL) = do
-            --    let fInfo = emptySymInfo {
-            --            dataType = lexInfo dtL,
-            --            category = CatField,
-            --            scopeNum = 0,
-            --            defPosn  = posn
-            --        }
-            --    return $ insert (lexInfo fIdenL) fInfo tab
+                    dtBool <- checkAccess $ lexInfo aDtL
+                    return $ dtBool && indexBool
+                _ -> return True
 
 processType :: Lexeme Declaration -> Checker Bool
 processType declL@(Lex (Declaration idenL@(Lex iden _) dtL _) posn) = do
@@ -580,7 +625,7 @@ getsSymInfoAccess accL@(Lex acc posn) f = do
         VariableAccess idenL = lexInfo topL
     maySi <- getsSymInfo idenL id
     case maySi of
-        Just si -> matchType zipper (lexInfo idenL) si >>= return . (\(a,b) -> (a, b, idenL))
+        Just si -> liftM (\(a,b) -> (a, b, idenL)) $ matchType zipper (lexInfo idenL) si
         Nothing -> return (Nothing, lexInfo idenL, idenL)
     where
         matchType ::  Zipper -> Identifier -> SymInfo -> Checker (Maybe a, Identifier)
@@ -589,7 +634,7 @@ getsSymInfoAccess accL@(Lex acc posn) f = do
                 (_, ths) -> case lexInfo (head ths) of
                     HistoryArray  indexL -> case dataType si of
                             Array inDtL _ -> do
-                                indexDt <- checkExpression indexL
+                                (indexDt, _) <- checkExpression indexL
                                 if indexDt == Int
                                     then do
                                         let newSi  = si { dataType = lexInfo inDtL }
@@ -602,7 +647,7 @@ getsSymInfoAccess accL@(Lex acc posn) f = do
                     HistoryStruct fieldNameL -> case dataType si of
                         UserDef dtIdenL -> do
                             uDefDt <- liftM fromJust $ getsSymInfoWithoutError dtIdenL dataType
-                            case find ((lexInfo fieldNameL==) . lexInfo . fst) (getFields uDefDt) of
+                            case find ((lexInfo fieldNameL ==) . lexInfo . fst) (getFields uDefDt) of
                                 Just fieldL -> do
                                     let newSi  = si { dataType = lexInfo (snd fieldL) }
                                         newStr = str ++ "." ++ lexInfo fieldNameL
@@ -618,38 +663,38 @@ checkStatement (Lex st posn) = case st of
     StNoop -> return ()
 
     StAssign accL exprL -> do
-        (mayDt, accStr, topL) <- getsSymInfoAccess accL dataType
-        exprDt        <- checkExpression exprL
-        case mayDt of
-            Just idenDt -> do
+        (mayDtPr, accStr, topL) <- getsSymInfoAccess accL (dataType &&& pure)
+        (exprDt, _)        <- checkExpression exprL
+        case mayDtPr of
+            Just (accDt, accPr) -> do
                 markInitialized topL
-                when (idenDt /= exprDt && exprDt /= TypeError) $
-                    tellSError posn (InvalidAssignType accStr idenDt exprDt)
+                when (accDt /= exprDt && exprDt /= TypeError) $
+                    tellSError posn (InvalidAssignType accStr accDt exprDt)
             -- The error has already been reported
             Nothing -> return ()
 
     StDeclaration dcl -> void $ processVariable dcl
 
     StStructDefinition dtL@(Lex dt posn) -> do
-        let idenL = case dt  of
+        let idenL = case dt of
                 Record idenL _ -> idenL
                 Union  idenL _ -> idenL
         defined <- processType $ Lex (Declaration idenL dtL CatUserDef) posn
         when defined $ markInitialized idenL
 
     StReturn ex -> do
-        dt <- checkExpression ex
-        (st, fnameL@(Lex fname _), sc) <- liftM peek $ gets funcStack
+        (dt, _) <- checkExpression ex
+        (st, fnameL@(Lex fname _), sc) <- currentFunction
         if st == Void
             then tellSError posn (ReturnProcedure dt fname)
             else do
                 when (st /= dt && dt /= TypeError) $ tellSError posn (ReturnType st dt fname)
                 -- Marks the function initialized, in the correct scope
-                modifySymInfoWithScope fnameL (\sym -> sym { initialized = True }) sc
+                modifySymInfoWithScope fnameL (\sym -> sym { initial = True }) sc
 
-    StFunctionDef decl@(Lex (Declaration iden _ _) _) dts -> do
+    StFunctionDef decl@(Lex (Declaration idenL _ _) _) dts -> do
         defined <- processFunction decl
-        when defined $ putValue iden $ ValFunction dts Nothing (0,0)
+        when defined $ putValue idenL $ ValFunction dts Nothing (0,0)
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
         currSc <- currentScope
@@ -683,25 +728,27 @@ checkStatement (Lex st posn) = case st of
                             putScopeVariables before
                             -- Only marks 'used'
                             checkMark $ fromList [varBody, before]
-                            let functions   = filter func varBody
-                                func (_,si) = category si == CatFunction && scopeNum si == currSc
+
+                            -- Marks the function as 'initialized' if it returns its value
+                            let functions    = filter func varBody
+                                func (_, si) = category si == CatFunction && scopeNum si == currSc
                             forM_ functions $ \(iden,si) ->
-                                when (initialized si) $ markInitialized $ Lex iden (defPosn si)
+                                when (initial si) $ markInitialized $ Lex iden (defPosn si)
                     -- Must implement functions in the same scope in which they are defined
                     (_, False, CatFunction) -> tellSError posn (ImpInDefScope fname dPosn)
                     -- It is not a function
                     (_, _    , cat        ) -> tellSError posn (WrongCategory fname CatFunction cat)
             Nothing -> tellSError posn (FunctionNotDefined fname)
 
-    StFunctionCall fnameL@(Lex fname _) args -> do
+    StProcedureCall fnameL args -> do
         maySi <- getsSymInfo fnameL (\si -> (category si, value si, dataType si))
         case maySi of
             Just si -> do
                 markUsed fnameL
                 case si of
-                    (CatFunction,mayVal,Void) -> checkArguments fname mayVal args posn
-                    (CatFunction,_,_)         -> tellSError posn (FunctionAsStatement fname)
-                    (ct,_,_)                  -> tellSError posn (WrongCategory fname CatFunction ct)
+                    (CatFunction,mayVal,Void) -> checkArguments fnameL mayVal args posn
+                    (CatFunction,_     ,_   ) -> tellSError posn (FunctionAsStatement (lexInfo fnameL))
+                    (cat        ,_     ,_   ) -> tellSError posn (WrongCategory (lexInfo fnameL) CatFunction cat)
             Nothing -> return ()
 
     StRead vars -> forM_ vars $ \accL -> do
@@ -713,7 +760,7 @@ checkStatement (Lex st posn) = case st of
     StPrint exs -> mapM_ checkExpression exs
 
     StIf cnd success failure -> do
-        dt <- checkExpression cnd
+        (dt, _) <- checkExpression cnd
         unless (dt == Bool || dt == TypeError) $ tellSError posn (ConditionDataType dt)
         before <- getScopeVariables
 
@@ -732,11 +779,11 @@ checkStatement (Lex st posn) = case st of
         checkMark $ fromList [varSucc,varFail]
 
     StCase ex cs othrw -> do
-        dt     <- checkExpression ex
-        before <- getScopeVariables
+        (dt, _) <- checkExpression ex
+        before  <- getScopeVariables
 
         varScopes <- forM cs $ \(Lex (When wexps sts) wposn) -> do
-            forM_ wexps $ checkExpression >=> \wd ->        -- forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
+            forM_ wexps $ checkExpression >=> \(wd, _) ->        -- forM_ wexps $ \wexp -> checkExpression wexp >>= \wd ->
                 unless (wd == dt || dt == TypeError || wd == TypeError) $
                     tellSError wposn (CaseWhenDataType dt wd)
 
@@ -761,7 +808,7 @@ checkStatement (Lex st posn) = case st of
         checkStatements rep
         exitLoop   >> exitScope
 
-        checkExpression cnd >>= \dt ->
+        checkExpression cnd >>= \(dt, _) ->
             unless (dt == Bool || dt == TypeError) $ tellSError posn (ConditionDataType dt)
 
         before <- getScopeVariables
@@ -776,7 +823,7 @@ checkStatement (Lex st posn) = case st of
         checkMark $ fromList [varBody, before]
 
     StFor var rng body -> do
-        dt <- checkExpression rng
+        (dt, _) <- checkExpression rng
         unless (dt == Range || dt == TypeError) $ tellSError posn (ForInDataType dt)
 
         before <- getScopeVariables
@@ -803,71 +850,65 @@ checkStatement (Lex st posn) = case st of
 {- |
     Checks the validity of an expression and returns it's value.
 -}
-checkExpression :: Lexeme Expression -> Checker DataType
+checkExpression :: Lexeme Expression -> Checker (DataType, Pure)
 checkExpression (Lex e posn) = case e of
     Variable accL -> do
         (maySi, _, topL) <- getsSymInfoAccess accL id
         case maySi of
             Just si -> do
                 markUsed topL
-                let ini = initialized si
-                    dt  = dataType si
-                case category si of
-                    CatVariable -> do
-                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo topL)
-                        return dt
-                    CatParameter -> do
-                        unless ini $ tellSError posn (VariableNotInitialized $ lexInfo topL)
-                        return dt
-                    ct -> do
-                        tellSError posn (WrongCategory (lexInfo topL) CatVariable ct)
-                        return TypeError
-            Nothing -> return TypeError
+                let cat = category si
+                if cat == CatVariable || cat == CatParameter
+                    then do
+                        unless (initial si) $ tellSError posn (VariableNotInitialized $ lexInfo topL)
+                        return (dataType si, pure si)
+                    else do
+                        tellSError posn (WrongCategory (lexInfo topL) CatVariable cat)
+                        return (TypeError, pure si)
+            Nothing -> return (TypeError, True)
 
-    FunctionCall fnameL@(Lex fname _) args -> do
+    FunctionCall fnameL args -> do
         maySi <- getsSymInfo fnameL id
         case maySi of
             Just si -> do
                 markUsed fnameL
                 case (category si, dataType si) of
                     (CatFunction, Void) -> do
-                        tellSError posn (ProcedureInExpression fname)
-                        return TypeError
-                    (CatFunction, dt) -> do
-                        checkArguments fname (value si) args posn
-                        return dt
-                    (ct,_) -> do
-                        tellSError posn (WrongCategory fname CatFunction ct)
-                        return TypeError
-            Nothing -> return TypeError
+                        tellSError posn (ProcedureInExpression (lexInfo fnameL))
+                        return (TypeError, pure si)
+                    (CatFunction, dt  ) -> do
+                        checkArguments fnameL (value si) args posn
+                        return (dt, pure si)
+                    (cat        , _   ) -> do
+                        tellSError posn (WrongCategory (lexInfo fnameL) CatFunction cat)
+                        return (TypeError, pure si)
+            Nothing -> return (TypeError, True)
 
-    LitInt _    -> return Int
+    LitInt _    -> return (Int, True)
 
-    LitFloat _  -> return Float
+    LitFloat _  -> return (Float, True)
 
-    LitBool _   -> return Bool
+    LitBool _   -> return (Bool, True)
 
-    LitChar _   -> return Char
+    LitChar _   -> return (Char, True)
 
-    LitString _ -> return String
+    LitString _ -> return (String, True)
 
     ExpBinary (Lex op _) l r  -> do
-        ldt <- checkExpression l
-        rdt <- checkExpression r
-        let dts = filter (((ldt,rdt)==) . fst) $ binaryOperation op
-        if null dts
-            then do
-                -- If there's a 'Void' an error has already been raised about this.
-                unless (TypeError == ldt || TypeError == rdt) $
-                    tellSError posn (BinaryTypes op (ldt,rdt))
-                return TypeError
-            else return . snd $ index dts 0
+        lInfo@(lDt, lPr) <- checkExpression l
+        rInfo@(rDt, rPr) <- checkExpression r
+        maybe (failure lInfo rInfo) (success lInfo rInfo) $ find (((lDt,rDt) ==) . fst) $ binaryOperation op
+        where
+            failure (lDt, lPr) (rDt, rPr) = do
+                unless (TypeError == lDt || TypeError == rDt) $ tellSError posn (BinaryTypes op (lDt,rDt))
+                return (TypeError, lPr && rPr)
+            success (_, lPr) (_, rPr) (_, dt) = return (dt, lPr && rPr)
 
     ExpUnary (Lex op _) expr  -> do
-        dt   <- checkExpression expr
-        let dts = filter ((dt==) . fst) $ unaryOperation op
-        if null dts
-            then do
-                tellSError posn (UnaryTypes op dt)
-                return TypeError
-            else return . snd $ index dts 0
+        oInfo@(oDt, oPr) <- checkExpression expr
+        maybe (failure oInfo) (success oInfo) $ find ((oDt ==) . fst) $  unaryOperation op
+        where
+            failure (oDt, oPr) = do
+                unless (TypeError == oDt) $ tellSError posn (UnaryTypes op oDt)
+                return (TypeError, oPr)
+            success (_, oPr) (_, dt) = return (dt, oPr)

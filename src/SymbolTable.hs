@@ -14,6 +14,9 @@ module SymbolTable
 
     , SymInfo(..)
     , emptySymInfo
+    , Init
+    , Used
+    , Pure
 
     , Scope(..)
     , ScopeNum
@@ -36,18 +39,22 @@ import           Data.Sequence as DS hiding (drop, update)
 import           Prelude       as P  hiding (lookup, concatMap)
 
 data SymInfo = SymInfo
-    { dataType    :: DataType
-    , category    :: Category
-    , value       :: Maybe Value
-    , scopeNum    :: ScopeNum
-    , defPosn     :: Position
-    , initialized :: Bool
-    , used        :: Bool
-    --, pure        :: Bool
+    { dataType :: DataType
+    , category :: Category
+    , value    :: Maybe Value
+    , scopeNum :: ScopeNum
+    , defPosn  :: Position
+    , initial  :: Init
+    , used     :: Used
+    , pure     :: Pure
     }
 
+type Init = Bool
+type Used = Bool
+type Pure = Bool
+
 instance Show SymInfo where
-    show (SymInfo dt ct v sn dp i u) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU
+    show (SymInfo dt ct v sn dp i u p) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP
         where
             showSN = "Scope: " ++ show sn ++ ", "
             showCT = show ct ++ " | "
@@ -57,16 +64,18 @@ instance Show SymInfo where
                     showI  = "(" ++ (if i then "init" else "NOT init") ++ ")"
             showDP = show dp
             showU  = " (" ++ (if u then "used" else "NOT used") ++ ")"
+            showP  = " (" ++ (if p then "pure" else "impure") ++ ")"
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo
-    { dataType    = Void
-    , category    = CatVariable
-    , value       = Nothing
-    , scopeNum    = -1
-    , defPosn     = (0, 0)
-    , initialized = False
-    , used        = False
+    { dataType = Void
+    , category = CatVariable
+    , value    = Nothing
+    , scopeNum = -1
+    , defPosn  = (0, 0)
+    , initial  = False
+    , used     = False
+    , pure     = True
     }
 
 --------------------------------------------------------------------------------

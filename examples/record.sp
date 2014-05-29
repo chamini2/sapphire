@@ -6,7 +6,7 @@ end
 Record Cosa as
       pupu :: Int
     , prec :: Precision
-    , noexs :: NoExiste
+    # , noexs :: NoExiste
 end
 
 Union Mas as

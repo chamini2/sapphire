@@ -164,10 +164,10 @@ data Statement
     | StDeclarationList  (DeclarationList Expression)
     | StStructDefinition (Lexeme DataType)
     -- Functions
-    | StReturn       (Lexeme Expression)
-    | StFunctionDef  (Lexeme Declaration) (Seq (Lexeme DataType))
-    | StFunctionImp  (Lexeme Identifier)  (Seq (Lexeme Identifier)) StBlock
-    | StFunctionCall (Lexeme Identifier)  (Seq (Lexeme Expression))
+    | StReturn        (Lexeme Expression)
+    | StFunctionDef   (Lexeme Declaration) (Seq (Lexeme DataType))
+    | StFunctionImp   (Lexeme Identifier)  (Seq (Lexeme Identifier)) StBlock
+    | StProcedureCall (Lexeme Identifier)  (Seq (Lexeme Expression))
     -- I/O
     | StRead  (Seq (Lexeme Access))
     | StPrint (Seq (Lexeme Expression))
@@ -265,19 +265,21 @@ binaryOperation op = fromList $ case op of
     OpTimes   -> zip numbers [Int, Float]
     OpDivide  -> zip numbers [Int, Float]
     OpModulo  -> zip numbers [Int, Float]
-    OpPower   -> zip [(Int,Int), (Float,Int)] [Int, Float]
-    OpFromTo  -> [((Int,Int),Range)]
-    OpOr      -> [((Bool,Bool),Bool)]
-    OpAnd     -> [((Bool,Bool),Bool)]
-    OpEqual   -> ((Bool,Bool),Bool) : zip numbers [Bool, Bool]
-    OpUnequal -> ((Bool,Bool),Bool) : zip numbers [Bool, Bool]
-    OpLess    -> zip numbers [Bool, Bool]
-    OpLessEq  -> zip numbers [Bool, Bool]
-    OpGreat   -> zip numbers [Bool, Bool]
-    OpGreatEq -> zip numbers [Bool, Bool]
-    OpBelongs -> zip [(Int,Range), (Float,Range)] [Bool, Bool]
+    OpPower   -> zip [(Int, Int), (Float, Int)] [Int, Float]
+    OpFromTo  -> [ ((Int, Int), Range)]
+    OpOr      -> [ (boolean, Bool) ]
+    OpAnd     -> [ (boolean, Bool) ]
+    OpEqual   -> zip (boolean : numbers) repBool
+    OpUnequal -> zip (boolean : numbers) repBool
+    OpLess    -> zip numbers repBool
+    OpLessEq  -> zip numbers repBool
+    OpGreat   -> zip numbers repBool
+    OpGreatEq -> zip numbers repBool
+    OpBelongs -> zip [(Int, Range), (Float, Range)] repBool
     where
-        numbers = [(Int,Int), (Float,Float)]
+        numbers = [(Int, Int), (Float, Float)]
+        boolean = (Bool, Bool)
+        repBool = repeat Bool
 
 data Unary = OpNegate | OpNot
     deriving (Eq)
@@ -337,7 +339,7 @@ printStatement st = case st of
 
     StReturn (Lex expr _)     -> printExpressionWithTag "RETURN" expr
 
-    StFunctionCall iden args -> do
+    StProcedureCall iden args -> do
         printNonTerminal "FUNCTION CALL"
         raiseTabs
         printNonTerminal "- function name: "

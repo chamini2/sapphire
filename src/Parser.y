@@ -163,7 +163,7 @@ Statement :: { Lexeme Statement }
     -- Functions
     | "def" VariableId "::" Signature                                      { StFunctionDef ((Declaration $2 (snd $4) CatFunction) <$ $2) (fst $4) <$ $1 }
     | "imp" VariableId "(" MaybeVariableList ")" "as" StatementList "end"  { StFunctionImp  $2 $4 $7 <$ $1 }
-    | VariableId "(" MaybeExpressionList ")"                               { StFunctionCall $1 $3    <$ $1 }
+    | VariableId "(" MaybeExpressionList ")"                               { StProcedureCall $1 $3    <$ $1 }
     | "return" Expression                                                  { StReturn $2 <$ $1 }
 
     -- Conditional
