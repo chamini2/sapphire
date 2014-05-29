@@ -4,29 +4,29 @@ module Checker where
 import           Language
 import           SymbolTable
 
-import           Control.Applicative ((<$>))
 import           Control.Arrow          ((&&&))
 import           Control.Monad.Identity (Identity (..), runIdentity)
 import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
-{-import           Data.Aeson-}
-import           Data.Foldable          as DF (and, concatMap, elem, find,
-                                               foldr, forM_, mapM_, notElem,
-                                               toList, foldr1, foldlM, foldl)
+import           Data.Foldable          as DF (all, and, concatMap, elem, find,
+                                               foldl, foldlM, foldr, foldr1,
+                                               forM_, mapM_, notElem, sum,
+                                               toList)
 import           Data.Function          (on)
 import           Data.Functor           ((<$), (<$>))
 import           Data.List              (intercalate)
-import qualified Data.Map               as DM (empty, insertLookupWithKey, Map, fromList, lookup)
+import qualified Data.Map               as DM (Map, empty, fromList,
+                                               insertLookupWithKey, lookup)
 import           Data.Maybe             (fromJust, isJust, isNothing)
-import           Data.Sequence          as DS (Seq, empty, filter, fromList,
-                                               index, length, null, singleton,
-                                               sortBy, zip, zipWith, (<|), (|>),
-                                               (><), ViewL((:<),EmptyL), viewl)
+import           Data.Sequence          as DS (Seq, ViewL ((:<), EmptyL), empty,
+                                               filter, fromList, index, length,
+                                               null, singleton, sortBy, viewl,
+                                               zip, zipWith, (<|), (><), (|>))
 import           Data.Traversable       as DT (forM, mapM)
 import           GHC.Generics
-import           Prelude                as P hiding (and, concatMap, elem,
-                                              filter, foldr, length, lookup,
-                                              mapM, mapM_, notElem, null, zip,
-                                              zipWith, foldr1, foldl)
+import           Prelude                as P hiding (all, and, concatMap, elem,
+                                              filter, foldl, foldr, foldr1,
+                                              length, lookup, mapM, mapM_,
+                                              notElem, null, sum, zip, zipWith)
 
 --------------------------------------------------------------------------------
 
@@ -34,15 +34,15 @@ type Checker a = RWST CheckReader CheckWriter CheckState Identity a
 
 --------------------------------------------------------------------------------
 
-data CheckReader = CheckReader 
-    { flags  :: Seq Flag
-    , arch   :: Architecture
+data CheckReader = CheckReader
+    { flags :: Seq Flag
+    , arch  :: Architecture
     }
 
 data Flag = OutputFile String | SupressWarnings | AllWarnings
     deriving (Eq)
 
-data Architecture = Arch 
+data Architecture = Arch
     { archName :: String
     , widths   :: DM.Map DataType Width
     } deriving (Show)
@@ -85,7 +85,7 @@ instance Show LexerError where
         LexerError  msg  -> msg
 
 data ParseError
-    = UnexpectedToken String 
+    = UnexpectedToken String
     | ParseError      String
 
 instance Show ParseError where
@@ -210,10 +210,10 @@ data CheckState = CheckState
 instance Show CheckState where
     show (CheckState t s c a _ _ _) = showT ++ showS ++ showC ++ showA
         where
-            showT = "Symbol Table:\n" ++ show t ++ "\n"
+            showT = show t ++ "\n"
             showS = "Scope Stack:\n"  ++ show s ++ "\n"
             showC = "Scope Number:\t" ++ show c ++ "\n"
-            showA = "Program:\n"      ++ show a ++ "\n"
+            showA = show a ++ "\n"
 
 type NestedLevel = Int
 
@@ -242,14 +242,14 @@ tellCWarn  posn err = tell (singleton $ CWarn  posn err)
 
 ----------------------------------------
 
-cReader :: CheckReader
-cReader = CheckReader 
-    { flags  = empty 
+initialReader :: CheckReader
+initialReader = CheckReader
+    { flags  = empty
     , arch   = defaultArchitecture
     }
 
 defaultArchitecture :: Architecture
-defaultArchitecture = Arch 
+defaultArchitecture = Arch
     { archName = "mips"
     , widths = DM.fromList
         [ (Int       , 32)
@@ -266,16 +266,19 @@ getCurrentArchitecture = asks arch
 
 getPrimitiveDataTypeWidth :: DataType -> Checker Width
 getPrimitiveDataTypeWidth dt = asks (fromJust . DM.lookup dt . widths . arch)
-         
-getDataTypeWidth :: DataType -> Checker Width  
-getDataTypeWidth dt = case dt of 
+
+getDataTypeWidth :: DataType -> Checker Width
+getDataTypeWidth dt = case dt of
+    Void            -> return 0
+    TypeError       -> error "Checker.getDataTypeWidth: asking for width of TypeError"
+    String w        -> return w
     Array _ _ w     -> return w
     Record _ _ w    -> return w
     Union _ _ w     -> return w
     UserDef udIdenL -> do
         mayDt <- getsSymInfoWithoutError udIdenL dataType
         case mayDt of
-            Just udDt -> getDataTypeWidth udDt 
+            Just udDt -> getDataTypeWidth udDt
             Nothing   -> error "Checker.getDataTypeWidth: lookup of existing struct returned Nothing"
     _ -> getPrimitiveDataTypeWidth dt
 
@@ -298,7 +301,7 @@ runProgramChecker :: Checker a -> (CheckState, CheckWriter)
 runProgramChecker = (\(_,s,w) -> (s,w)) . runChecker
 
 runChecker :: Checker a -> (a, CheckState, CheckWriter)
-runChecker = runIdentity . flip (`runRWST` cReader) initialState
+runChecker = runIdentity . flip (`runRWST` initialReader) initialState
 
 getWriter :: Checker a -> CheckWriter
 getWriter = (\(_,_,w) -> w) . runChecker
@@ -334,7 +337,7 @@ checkWarnings = do
             let dPosn = defPosn symI
             case category symI of
                 CatFunction -> do
-                    let Just (ValFunction _ body iPosn) = value symI
+                    let Just (ValFunction _ body iPosn _) = value symI
                         implemented                     = isJust body
                     case (initial symI, used symI, implemented) of
                         (_    , True , False) -> tellSError dPosn (UsedNotImplemented sym)
@@ -354,12 +357,13 @@ enterScope = do
     cs <- gets scopeId
     let sc = Scope { serial = cs + 1 }
     modify (\s -> s { stack = push sc (stack s), scopeId = cs + 1 })
+    addOffsetBase
 
 {- |
     Exiting a scope that has just been checked
 -}
-exitScope :: Checker ()
-exitScope = modify (\s -> s { stack = snd . pop $ stack s })
+exitScope :: Checker Offset
+exitScope = modify (\s -> s { stack = snd . pop $ stack s }) >> removeOffsetBase
 
 {- |
     Gets the current scope on top of the stack
@@ -385,6 +389,7 @@ modifyOffset :: (Width -> Offset) -> Checker ()
 modifyOffset f = do
     co <- removeOffsetBase
     modify (\s -> s { offsStack = push (f co) (offsStack s) })
+
 
 ----------------------------------------
 
@@ -456,6 +461,46 @@ getsSymInfoWithoutError :: Lexeme Identifier -> (SymInfo -> a) -> Checker (Maybe
 getsSymInfoWithoutError (Lex iden _) f = do
     (tab, stck) <- gets (table &&& stack)
     return $ f <$> lookupWithScope iden stck tab -- f <$> == maybe Nothing (Just . f)
+
+{- |
+    Gets an Access' attribute if said symbol exists in the table, otherwise Nothing.
+-}
+getsSymInfoAccess :: forall a . Lexeme Access -> (SymInfo -> a) -> Checker (Maybe a, Identifier, Lexeme Identifier)
+getsSymInfoAccess accL@(Lex acc posn) f = do
+    let zipper@(topL, ths)   = deepAccess $ focusAccess accL
+        VariableAccess idenL = lexInfo topL
+    maySi <- getsSymInfo idenL id
+    case maySi of
+        Just si -> liftM (\(a,b) -> (a, b, idenL)) $ matchType zipper (lexInfo idenL) si
+        Nothing -> return (Nothing, lexInfo idenL, idenL)
+    where
+        matchType ::  Zipper -> Identifier -> SymInfo -> Checker (Maybe a, Identifier)
+        matchType zipper str si = case zipper of
+                (_, [] ) -> return (Just (f si), str)
+                (_, ths) -> case lexInfo (head ths) of
+                    HistoryArray  indexL -> case dataType si of
+                            Array inDtL _ _ -> do
+                                (indexDt, _) <- checkExpression indexL
+                                if indexDt == Int
+                                    then do
+                                        let newSi  = si { dataType = lexInfo inDtL }
+                                            newStr = str ++ "[" ++ showIndex (lexInfo indexL) ++ "]"
+                                        matchType (fromJust $ backAccess zipper) newStr newSi
+                                    else do
+                                        unless (indexDt == TypeError) $ tellSError posn (IndexDataType (lexInfo indexL) indexDt)
+                                        return (Nothing, str)
+                            dt            -> tellSError posn (VariableNonArray str dt) >> return (Nothing, str)
+                    HistoryStruct fieldNameL -> case dataType si of
+                        UserDef udIdenL -> do
+                            udDt <- liftM fromJust $ getsSymInfoWithoutError udIdenL dataType
+                            case find ((lexInfo fieldNameL ==) . lexInfo . fst) (getFields udDt) of
+                                Just fieldL -> do
+                                    let newSi  = si { dataType = lexInfo (snd fieldL) }
+                                        newStr = str ++ "." ++ lexInfo fieldNameL
+                                    matchType (fromJust $ backAccess zipper) newStr newSi
+                                Nothing -> tellSError posn (StructNoField (lexInfo udIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
+                        dt -> tellSError posn (VariableNonStruct str dt) >> return (Nothing, str)
+
 
 {- |
     Modifies a symbol if said symbol exists in the table
@@ -584,80 +629,106 @@ checkArguments fnameL mayVal args posn = maybe failure success mayVal
 -}
 processVariable :: Lexeme Declaration -> Checker Bool
 processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
-    sc <- currentScope
-    let info = emptySymInfo {
-                dataType = dt,
-                category = c,
-                scopeNum = sc,
-                defPosn  = posn
+    sc  <- currentScope
+    off <- currentOffset
+    let info = emptySymInfo
+            { dataType = dt
+            , category = c
+            , scopeNum = sc
+            , defPosn  = posn
+            , offset   = off
             }
     maySi <- getsSymInfoWithoutError idenL id
     case maySi of
-        Nothing -> addSymbolCheckingAccess info
+        Nothing -> do
+            (valid, width) <- addSymbolCheckingAccess info
+            when valid $ modifyOffset (+ width)
+            return valid
         Just si
             | scopeNum si == sc -> tellSError posn (AlreadyDeclared (lexInfo idenL) (defPosn si)) >> return False
-            | otherwise         -> addSymbolCheckingAccess info
-        where
-            addSymbolCheckingAccess :: SymInfo -> Checker Bool
-            addSymbolCheckingAccess info = do
-                valid <- checkAccess $ dataType info
-                when valid $ addSymbol idenL info
+            | otherwise         -> do
+                (valid, width) <- addSymbolCheckingAccess info
+                when valid $ modifyOffset (+ width)
                 return valid
-            checkAccess :: DataType -> Checker Bool
-            checkAccess dt = case dt of
-                UserDef udIdenL -> do
-                    mayUdDt <- getsSymInfoWithoutError udIdenL dataType
-                    case mayUdDt of
-                        Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return False
-                        Just dt -> do
-                            markUsed udIdenL
-                            fields <- mapM (checkAccess . lexInfo . snd) $ getFields dt
-                            return $ and fields
-                Array aDtL indexL _ -> do
-                    (indexDt, indexPr) <- checkExpression indexL
-                    indexBool <- if indexDt == Int
-                        then do
-                            -- This will not happen until 'pureness' is well implemented, so we just check if it is a literal
-                            unless indexPr $ tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL))
-                            -- Checks if the expression is a literal, this is temporal
-                            case lexInfo indexL of
-                                LitInt _ -> return ()
-                                _        -> tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL))
-                            return True
-                        else do
-                            unless (indexDt == TypeError) $ tellSError (lexPosn indexL) (ArraySizeDataType (lexInfo indexL) indexDt)
-                            return False
-                    dtBool <- checkAccess $ lexInfo aDtL
-                    return $ dtBool && indexBool
-                _ -> return True
+    where
+        addSymbolCheckingAccess :: SymInfo -> Checker (Bool, Width)
+        addSymbolCheckingAccess info = do
+            (valid, newDt, width) <- checkAccess $ dataType info
+            when valid $ addSymbol idenL (info { dataType = newDt })
+            return (valid, width)
+        checkAccess :: DataType -> Checker (Bool, DataType, Width)
+        checkAccess dt = case dt of
+            UserDef udIdenL -> do
+                mayUdDt <- getsSymInfoWithoutError udIdenL dataType
+                case mayUdDt of
+                    Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return (False, dt, 0)
+                    Just dt -> markUsed udIdenL >> liftM ((,,) True dt) (getDataTypeWidth dt)
+            Array aDtL indexL _ -> do
+                (indexDt, indexPr) <- checkExpression indexL
+                (indexBool, size) <- if indexDt == Int
+                    then do
+                        -- This will not happen until 'pureness' is well implemented, so we just check if it is a literal
+                        unless indexPr $ tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL))
+                        -- Checks if the expression is a literal, this is temporal
+                        case lexInfo indexL of
+                            LitInt sizeL -> return (True, lexInfo sizeL)
+                            _           -> tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL)) >> return (False, 0)
+                    else do
+                        unless (indexDt == TypeError) $ tellSError (lexPosn indexL) (ArraySizeDataType (lexInfo indexL) indexDt)
+                        return (False, 0)
+                (dtBool, dtDt, dtWidth) <- checkAccess $ lexInfo aDtL
+                let newWidth = dtWidth * size
+                tellSError posn $ StaticError $ "size: " ++ show size ++ " dtWidth: " ++ show dtWidth
+                return $ (dtBool && indexBool, Array (dtDt <$ aDtL) indexL newWidth, newWidth)
+            _ -> liftM ((,,) True dt) $ getDataTypeWidth dt
 
 processType :: Lexeme Declaration -> Checker Bool
-processType declL@(Lex (Declaration idenL@(Lex iden _) dtL _) posn) = do
-    valid <- liftM fst $ foldlM validateFields (True, DM.empty) (getFields $ lexInfo dtL)
+processType declL@(Lex (Declaration idenL@(Lex iden _) (Lex dt _) c) posn) = do
+    (width, valid, _) <- foldlM validateFields (0, True, DM.empty) (getFields dt)
     if valid
-        then processGeneric declL success
+        then do
+            sc  <- currentScope
+            let info = emptySymInfo {
+                        dataType = setWidth width dt,
+                        category = c,
+                        scopeNum = sc,
+                        defPosn  = posn
+                    }
+            maySi <- getsSymInfoWithoutError idenL id
+            case maySi of
+                Nothing -> addSymbol idenL info >> return True
+                Just si -> success info si
         else return False
     where
         success info si
             | scopeNum si == scopeNum info = tellSError posn (TypeAlreadyDefined iden (defPosn si)) >> return False
             | scopeNum si == -1            = tellSError posn (LanguageTypeRedefine iden) >> return False
             | otherwise                    = addSymbol idenL info >> return True
-        validateFields :: (Bool, DM.Map Identifier Position) -> Field -> Checker (Bool, DM.Map Identifier Position)
-        validateFields (valid, fieldMap) (Lex fIden fPosn, dtL) = do
+        setWidth :: Width -> DataType -> DataType
+        setWidth width dt = case dt of
+            Record idenL fields _ -> Record idenL fields width
+            Union idenL fields _  -> Union  idenL fields width
+            _                     -> error "Checker.processType.setWidth: setting width to non user-defined DataType"
+        validateFields :: (Width, Bool, DM.Map Identifier Position) -> Field -> Checker (Width, Bool, DM.Map Identifier Position)
+        validateFields (width, valid, fieldMap) (Lex fIden fPosn, dtL) = do
             let (mayPosn, newfMap) = DM.insertLookupWithKey (\_ _ a -> a) fIden fPosn fieldMap
             case mayPosn of
                 Just posn -> do
                     tellSError fPosn (AlreadyDeclared fIden posn)
-                    return (False, newfMap)
+                    return (0, False, newfMap)
                 Nothing   -> case lexInfo dtL of
                     UserDef udIdenL -> do
-                        maySi <- getsSymInfoWithoutError udIdenL id
-                        case maySi of
-                            Just _ -> return (valid, newfMap)
+                        mayDt <- getsSymInfoWithoutError udIdenL dataType
+                        case mayDt of
+                            Just udDt -> do
+                                udDtW <- getDataTypeWidth udDt
+                                return (width + udDtW, valid, newfMap)
                             Nothing -> do
                                 tellSError fPosn (UndefinedType (lexInfo udIdenL))
-                                return (False, newfMap)
-                    _ -> return (valid, newfMap)
+                                return (0, False, newfMap)
+                    _ -> do
+                        dtW <- getDataTypeWidth (lexInfo dtL)
+                        return (width + dtW, valid, newfMap)
 
 processFunction :: Lexeme Declaration -> Checker Bool
 processFunction decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success
@@ -695,42 +766,6 @@ checkProgram lexErrors pr@(Program sts) = do
 
 checkStatements :: StBlock -> Checker ()
 checkStatements = mapM_ checkStatement
-
-getsSymInfoAccess :: forall a . Lexeme Access -> (SymInfo -> a) -> Checker (Maybe a, Identifier, Lexeme Identifier)
-getsSymInfoAccess accL@(Lex acc posn) f = do
-    let zipper@(topL, ths)   = deepAccess $ focusAccess accL
-        VariableAccess idenL = lexInfo topL
-    maySi <- getsSymInfo idenL id
-    case maySi of
-        Just si -> liftM (\(a,b) -> (a, b, idenL)) $ matchType zipper (lexInfo idenL) si
-        Nothing -> return (Nothing, lexInfo idenL, idenL)
-    where
-        matchType ::  Zipper -> Identifier -> SymInfo -> Checker (Maybe a, Identifier)
-        matchType zipper str si = case zipper of
-                (_, [] ) -> return (Just (f si), str)
-                (_, ths) -> case lexInfo (head ths) of
-                    HistoryArray  indexL -> case dataType si of
-                            Array inDtL _ _ -> do
-                                (indexDt, _) <- checkExpression indexL
-                                if indexDt == Int
-                                    then do
-                                        let newSi  = si { dataType = lexInfo inDtL }
-                                            newStr = str ++ "[" ++ showIndex (lexInfo indexL) ++ "]"
-                                        matchType (fromJust $ backAccess zipper) newStr newSi
-                                    else do
-                                        unless (indexDt == TypeError) $ tellSError posn (IndexDataType (lexInfo indexL) indexDt)
-                                        return (Nothing, str)
-                            dt            -> tellSError posn (VariableNonArray str dt) >> return (Nothing, str)
-                    HistoryStruct fieldNameL -> case dataType si of
-                        UserDef udIdenL -> do
-                            udDt <- liftM fromJust $ getsSymInfoWithoutError udIdenL dataType
-                            case find ((lexInfo fieldNameL ==) . lexInfo . fst) (getFields udDt) of
-                                Just fieldL -> do
-                                    let newSi  = si { dataType = lexInfo (snd fieldL) }
-                                        newStr = str ++ "." ++ lexInfo fieldNameL
-                                    matchType (fromJust $ backAccess zipper) newStr newSi
-                                Nothing -> tellSError posn (StructNoField (lexInfo udIdenL) (lexInfo fieldNameL)) >> return (Nothing, str)
-                        dt -> tellSError posn (VariableNonStruct str dt) >> return (Nothing, str)
 
 {- |
     Checks the validity of a statement, modifying the state.
@@ -771,7 +806,7 @@ checkStatement (Lex st posn) = case st of
 
     StFunctionDef decl@(Lex (Declaration idenL _ _) _) dts -> do
         defined <- processFunction decl
-        when defined $ putValue idenL $ ValFunction dts Nothing (0,0)
+        when defined $ putValue idenL $ ValFunction dts Nothing (0,0) 0
 
     StFunctionImp fnameL@(Lex fname _) params body -> do
         currSc <- currentScope
@@ -784,10 +819,8 @@ checkStatement (Lex st posn) = case st of
                 case (value si, sameSc, category si) of
                     (Just val, True, CatFunction) -> case val of
                         -- Has already been implemented
-                        ValFunction _ (Just _) iPosn -> tellSError posn (AlreadyImplemented fname iPosn)
-                        ValFunction vParams Nothing _ -> do
-                            putValue fnameL $ val { impl = Just body, implPosn = posn }
-
+                        ValFunction _ (Just _) iPosn _ -> tellSError posn (AlreadyImplemented fname iPosn)
+                        ValFunction vParams Nothing _ _ -> do
                             before <- getScopeVariables
                             enterFunction dt fnameL >> enterScope   -- Order is important here (enterFunction uses the currentScope)
                             -- For procedures
@@ -799,7 +832,8 @@ checkStatement (Lex st posn) = case st of
 
                             checkStatements body
 
-                            exitScope >> exitFunction
+                            width <- exitScope
+                            exitFunction
                             varBody <- getScopeVariables
 
                             putScopeVariables before
@@ -811,6 +845,9 @@ checkStatement (Lex st posn) = case st of
                                 func (_, si) = category si == CatFunction && scopeNum si == currSc
                             forM_ functions $ \(iden,si) ->
                                 when (initial si) $ markInitialized $ Lex iden (defPosn si)
+
+                            -- Setting body, posn and width
+                            putValue fnameL $ val { impl = Just body, implPosn = posn, implWidth = width }
                     -- Must implement functions in the same scope in which they are defined
                     (_, False, CatFunction) -> tellSError posn (ImpInDefScope fname dPosn)
                     -- It is not a function
@@ -843,13 +880,13 @@ checkStatement (Lex st posn) = case st of
 
         enterScope
         checkStatements success
-        exitScope
+        exitScope >>= \width -> modifyOffset (+ width)
         varSucc <- getScopeVariables
         putScopeVariables before
 
         enterScope
         checkStatements failure
-        exitScope
+        exitScope >>= \width -> modifyOffset (+ width)
         varFail <- getScopeVariables
         putScopeVariables before
 
@@ -866,7 +903,7 @@ checkStatement (Lex st posn) = case st of
 
             enterScope
             checkStatements sts
-            exitScope
+            exitScope >>= \width -> modifyOffset (+ width)
             varWhen <- getScopeVariables
             putScopeVariables before
 
@@ -874,7 +911,7 @@ checkStatement (Lex st posn) = case st of
 
         enterScope
         checkStatements othrw
-        exitScope
+        exitScope >>= \width -> modifyOffset (+ width)
         varOtherwise <- getScopeVariables
 
         putScopeVariables before
@@ -883,7 +920,7 @@ checkStatement (Lex st posn) = case st of
     StLoop rep cnd body -> do
         enterScope >> enterLoop
         checkStatements rep
-        exitLoop   >> exitScope
+        exitLoop   >> exitScope >>= \width -> modifyOffset (+ width)
 
         checkExpression cnd >>= \(dt, _) ->
             unless (dt == Bool || dt == TypeError) $ tellSError posn (ConditionDataType dt)
@@ -892,7 +929,7 @@ checkStatement (Lex st posn) = case st of
 
         enterScope >> enterLoop
         checkStatements body
-        exitLoop   >> exitScope
+        exitLoop   >> exitScope >>= \width -> modifyOffset (+ width)
         varBody <- getScopeVariables
 
         putScopeVariables before
@@ -909,7 +946,7 @@ checkStatement (Lex st posn) = case st of
         processVariable $ Declaration var (Int <$ var) CatVariable <$ var
         markInitialized var
         checkStatements body
-        exitLoop >> exitScope
+        exitLoop >> exitScope >>= \width -> modifyOffset (+ width)
         varBody <- getScopeVariables
 
         putScopeVariables before
@@ -961,15 +998,15 @@ checkExpression (Lex e posn) = case e of
                         return (TypeError, pure si)
             Nothing -> return (TypeError, True)
 
-    LitInt _    -> return (Int, True)
+    LitInt _      -> return (Int, True)
 
-    LitFloat _  -> return (Float, True)
+    LitFloat _    -> return (Float, True)
 
-    LitBool _   -> return (Bool, True)
+    LitBool _     -> return (Bool, True)
 
-    LitChar _   -> return (Char, True)
+    LitChar _     -> return (Char, True)
 
-    LitString _ -> return (String, True)
+    LitString _ w -> return (String w, True)
 
     ExpBinary (Lex op _) l r  -> do
         lInfo@(lDt, lPr) <- checkExpression l

@@ -14,6 +14,7 @@ module SymbolTable
 
     , SymInfo(..)
     , emptySymInfo
+
     , Init
     , Used
     , Pure
@@ -68,7 +69,7 @@ instance Show SymInfo where
             showDP = show dp
             showU  = " (" ++ (if u then "used" else "NOT used") ++ ")"
             showP  = " (" ++ (if p then "pure" else "impure") ++ ")"
-            showO  = show o
+            showO  = " (offset " ++ show o ++ ")"
 
 emptySymInfo :: SymInfo
 emptySymInfo = SymInfo
@@ -106,20 +107,22 @@ data Value
     | ValFunction { parameters :: Seq (Lexeme DataType)
                   , impl       :: Maybe StBlock
                   , implPosn   :: Position
+                  , implWidth  :: Width
                   }
 
 instance Show Value where
-    show (ValInt v)          = show v
-    show (ValBool v)         = show v
-    show (ValChar v)         = show v
-    show (ValFloat v)        = show v
-    show (ValStruct s)       = show s
-    show (ValFunction p i _) = "[" ++ showI ++ "] (" ++ showP ++ ") ->"
-        where
-            showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
-            showI = case i of
-                Just _  -> "implemented"
-                Nothing -> "NOT implemented"
+    show val = " " ++ case val of
+        ValInt v            ->  show v
+        ValBool v           ->  show v
+        ValChar v           ->  show v
+        ValFloat v          ->  show v
+        ValStruct s         ->  show s
+        ValFunction p i _ w ->  "[" ++ showI ++ "] (" ++ showP ++ ") ->"
+            where
+                showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
+                showI = case i of
+                    Just _  -> "implemented | " ++ show w
+                    Nothing -> "NOT implemented"
 
 ----------------------------------------
 
@@ -129,10 +132,10 @@ instance Show Value where
 newtype SymTable = SymTable (DM.Map Identifier (Seq SymInfo))
 
 instance Show SymTable where
-    show (SymTable m) = concatMap shower $ DM.toList m
+    show (SymTable m) = "Symbol Table:\n" ++ concatMap shower (DM.toList m)
         where
-            shower (var, info) = var ++ " -> " ++ showInfo info ++ "\n"
-            showInfo = concatMap ((++) "\n\t" . show) . DF.toList
+            shower (var, info) = "\t" ++ var ++ " -> " ++ showInfo info ++ "\n"
+            showInfo = concatMap ((++) "\n\t\t" . show) . DF.toList
 {- |
     Empty symbol table
  -}

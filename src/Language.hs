@@ -1,19 +1,16 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module Language where
 
-import           Control.Arrow          ((***))
 import           Control.Monad.Identity hiding (forM_, mapM_)
 import           Control.Monad.State    hiding (forM_, mapM_)
 import           Control.Monad.Writer   hiding (forM_, mapM_)
 import           Data.Char              (toLower)
-import           Data.Foldable          as DF (foldr, forM_, mapM_, toList, concat, concatMap)
+import           Data.Foldable          as DF (concat, concatMap, foldr, forM_,
+                                               mapM_, toList)
 import           Data.Functor           ((<$))
-import           Data.Maybe             (fromJust)
 import           Data.List              (intercalate)
-import           Data.Data              (Data(gunfold, toConstr, dataTypeOf), showConstr)
-import           Data.Typeable          (Typeable)
-import           Data.Sequence          as DS (Seq, singleton, fromList)
-import           Prelude                hiding (mapM_, concat, concatMap)
+import           Data.Maybe             (fromJust)
+import           Data.Sequence          as DS (Seq, fromList, singleton)
+import           Prelude                hiding (concat, concatMap, mapM_)
 
 type Position = (Int, Int) -- (Row, Column)
 
@@ -40,7 +37,7 @@ instance Functor Lexeme where
 newtype Program = Program StBlock
 
 instance Show Program where
-    show (Program sts) = concatMap show $ toList sts
+    show (Program sts) = runPrinter $ printProgram sts
 
 type Identifier = String
 type StBlock = Seq (Lexeme Statement)
@@ -123,12 +120,14 @@ deepAccess z@(Lex acc _, ths) = case acc of
 ----------------------------------------
 
 data DataType
-    = Int | Float | Bool | Char | String | Range | Type
-    | Union  (Lexeme Identifier) (Seq Field) Width
+    = Int | Float | Bool | Char | Range | Type
+    | String Width
     | Record (Lexeme Identifier) (Seq Field) Width
+    | Union  (Lexeme Identifier) (Seq Field) Width
     | Array   (Lexeme DataType) (Lexeme Expression) Width
     | UserDef (Lexeme Identifier)
-    | Void | Undef | TypeError  -- For compiler use
+    | Void | TypeError  -- For compiler use
+--    | Undef
     deriving (Eq, Ord)
 
 instance Show DataType where
@@ -137,16 +136,16 @@ instance Show DataType where
         Float            -> "Float"
         Bool             -> "Bool"
         Char             -> "Char"
-        String           -> "String"
+        String _         -> "String"
         Range            -> "Range"
         Type             -> "Type"
-        Union  iden fs w -> "Union "  ++ lexInfo iden ++ " " ++ show w
-        Record iden fs w -> "Record " ++ lexInfo iden ++ " " ++ show w
-        Array aDtL _ _   -> "[" ++ show (lexInfo aDtL) ++ "]"
+        Record iden fs w -> "Record " ++ lexInfo iden ++ if w /= 0 then " [" ++ show w ++ "]" else ""
+        Union  iden fs w -> "Union "  ++ lexInfo iden ++ if w /= 0 then " [" ++ show w ++ "]" else ""
+        Array aDtL _ w   -> "[" ++ show (lexInfo aDtL) ++ " | " ++ show w ++ "]"
         UserDef idenL    -> lexInfo idenL
         Void             -> "()"
-        Undef            -> error "DataType Undef should never be 'shown'"
         TypeError        -> error "DataType TypeError should never be 'shown'"
+        --Undef            -> error "DataType Undef should never be 'shown'"
 
 type Field = (Lexeme Identifier, Lexeme DataType)
 
@@ -225,7 +224,7 @@ data Expression
     | LitFloat  (Lexeme Float)
     | LitBool   (Lexeme Bool)
     | LitChar   (Lexeme Char)
-    | LitString (Lexeme String)
+    | LitString (Lexeme String) Width
 --    | LitRange  (Lexeme Range)
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression) {-DataType-}
@@ -458,11 +457,11 @@ printExpression e = case e of
         mapM_ (printExpression . lexInfo) args
         lowerTabs
         lowerTabs
-    LitInt    i -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
-    LitChar   c -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)
-    LitBool   b -> printNonTerminal $ "BOOLEAN LITERAL: "   ++ map toLower (show (lexInfo b))
-    LitFloat  f -> printNonTerminal $ "FLOAT LITERAL: "     ++ show (lexInfo f)
-    LitString s -> printNonTerminal $ "STRING LITERAL: "    ++ show (lexInfo s)
+    LitInt    i   -> printNonTerminal $ "INTEGER LITERAL: "   ++ show (lexInfo i)
+    LitChar   c   -> printNonTerminal $ "CHARACTER LITERAL: " ++ show (lexInfo c)
+    LitBool   b   -> printNonTerminal $ "BOOLEAN LITERAL: "   ++ map toLower (show (lexInfo b))
+    LitFloat  f   -> printNonTerminal $ "FLOAT LITERAL: "     ++ show (lexInfo f)
+    LitString s _ -> printNonTerminal $ "STRING LITERAL: "    ++ show (lexInfo s)
     ExpBinary op l r -> do
         printNonTerminal "BINARY OPERATION"
         raiseTabs
@@ -494,11 +493,11 @@ printExpressionIndex e = case e of
         printNonTerminalIndex ")"
         where
             func argL = printNonTerminalIndex ", " >> printExpressionIndex (lexInfo argL)
-    LitInt    i -> printNonTerminalIndex $ show (lexInfo i)
-    LitChar   c -> printNonTerminalIndex $ show (lexInfo c)
-    LitBool   b -> printNonTerminalIndex $ show (lexInfo b)
-    LitFloat  f -> printNonTerminalIndex $ show (lexInfo f)
-    LitString s -> printNonTerminalIndex $ show (lexInfo s)
+    LitInt    i   -> printNonTerminalIndex $ show (lexInfo i)
+    LitChar   c   -> printNonTerminalIndex $ show (lexInfo c)
+    LitBool   b   -> printNonTerminalIndex $ show (lexInfo b)
+    LitFloat  f   -> printNonTerminalIndex $ show (lexInfo f)
+    LitString s _ -> printNonTerminalIndex $ show (lexInfo s)
     ExpBinary op l r -> do
         printExpressionIndex (lexInfo l)
         printNonTerminalIndex " "
@@ -518,8 +517,8 @@ printBinary op = printNonTerminalIndex $ case op of
     OpModulo  -> "%"
     OpPower   -> "^"
     OpFromTo  -> ".."
-    OpOr      -> "||"
-    OpAnd     -> "&&"
+    OpOr      -> "or"
+    OpAnd     -> "and"
     OpEqual   -> "=="
     OpUnequal -> "/="
     OpLess    -> "<"
@@ -556,6 +555,16 @@ printStatements :: String -> StBlock -> Printer ()
 printStatements tag is = do
     printNonTerminal tag
     raiseTabs >> mapM_ (printStatement . lexInfo) is >> lowerTabs
+
+printProgram :: StBlock -> Printer ()
+printProgram is = do
+    printNonTerminal "Program:"
+    raiseTabs >> mapM_ (\(Lex s p) -> printPosn p >> printStatement s) is >> lowerTabs
+
+printPosn :: Position -> Printer ()
+printPosn posn = do
+    t <- gets tabs
+    tell $ DS.singleton $ replicate t '\t' ++ showPosn posn ++ ":"
 
 showDataType :: DataType -> String
 showDataType dt = case dt of

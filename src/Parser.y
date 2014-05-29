@@ -9,7 +9,7 @@ import           Checker
 import           Control.Arrow (first)
 import           Data.Foldable as DF (concatMap, foldr)
 import           Data.Functor
-import           Data.Sequence hiding (reverse)
+import           Data.Sequence hiding (reverse, length)
 import           Prelude       hiding (concatMap, foldr)
 }
 
@@ -242,7 +242,7 @@ DataType :: { Lexeme DataType }
     | "Float"                       { Float         <$ $1 }
     | "Bool"                        { Bool          <$ $1 }
     | "Char"                        { Char          <$ $1 }
-    | "String"                      { String        <$ $1 }
+    | "String"                      { String 0      <$ $1 }
     | "Range"                       { Range         <$ $1 }
     | "Type"                        { Type          <$ $1 }
     | TypeId                        { UserDef $1    <$ $1 }
@@ -285,12 +285,12 @@ Expression :: { Lexeme Expression }
     -- Function call
     | VariableId "(" MaybeExpressionList ")"     { FunctionCall $1 $3 <$ $1 }
     -- Literals
-    | int                           { LitInt    (unTkInt    `fmap` $1) <$ $1 }
-    | float                         { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
-    | string                        { LitString (unTkString `fmap` $1) <$ $1 }
-    | char                          { LitChar   (unTkChar   `fmap` $1) <$ $1 }
-    | "true"                        { LitBool   (unTkBool   `fmap` $1) <$ $1 }
-    | "false"                       { LitBool   (unTkBool   `fmap` $1) <$ $1 }
+    | int                           { LitInt    (unTkInt    `fmap` $1)                                    <$ $1 }
+    | float                         { LitFloat  (unTkFloat  `fmap` $1)                                    <$ $1 }
+    | char                          { LitChar   (unTkChar   `fmap` $1)                                    <$ $1 }
+    | string                        { LitString (unTkString `fmap` $1) (length . unTkString $ lexInfo $1) <$ $1 }
+    | "true"                        { LitBool   (unTkBool   `fmap` $1)                                    <$ $1 }
+    | "false"                       { LitBool   (unTkBool   `fmap` $1)                                    <$ $1 }
     -- Operators
     | Expression "+"   Expression   { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
     | Expression "-"   Expression   { ExpBinary (OpMinus   <$ $2) $1 $3 <$ $1 }
