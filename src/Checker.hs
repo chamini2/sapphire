@@ -269,12 +269,26 @@ getPrimitiveDataTypeWidth dt = asks (fromJust . DM.lookup dt . widths . arch)
 
 getDataTypeWidth :: DataType -> Checker Width
 getDataTypeWidth dt = case dt of
-    Void            -> return 0
-    TypeError       -> error "Checker.getDataTypeWidth: asking for width of TypeError"
-    String w        -> return w
-    Array _ _ w     -> return w
-    Record _ _ w    -> return w
-    Union _ _ w     -> return w
+    Void              -> return 0
+    TypeError         -> error "Checker.getDataTypeWidth: asking for width of TypeError"
+    String w          -> return w
+    Array dtL sizeL w -> if w /= 0
+        then return w
+        else do
+            (sizeDt, sizePr) <- checkExpression sizeL
+            dtW              <- getDataTypeWidth (lexInfo dtL)
+
+            unless sizePr $ tellSError (lexPosn sizeL) (ImpureArraySize (lexInfo sizeL))
+
+            if sizeDt == Int
+                then case lexInfo sizeL of
+                    LitInt intL -> return $ dtW * (lexInfo intL)
+                    _           -> tellSError (lexPosn sizeL) (ImpureArraySize $ lexInfo sizeL) >> return 0
+                else do
+                    unless (sizeDt == TypeError) $ tellSError (lexPosn sizeL) (ArraySizeDataType (lexInfo sizeL) sizeDt)
+                    return 0
+    Record _ _ w -> return w
+    Union _ _ w  -> return w
     UserDef udIdenL -> do
         mayDt <- getsSymInfoWithoutError udIdenL dataType
         case mayDt of
@@ -663,28 +677,29 @@ processVariable decl@(Lex (Declaration idenL (Lex dt _) c) posn) = do
                 case mayUdDt of
                     Nothing -> tellSError posn (UndefinedType (lexInfo udIdenL)) >> return (False, dt, 0)
                     Just dt -> markUsed udIdenL >> liftM ((,,) True dt) (getDataTypeWidth dt)
-            Array aDtL indexL _ -> do
-                (indexDt, indexPr) <- checkExpression indexL
+            Array aDtL sizeL _ -> do
+                (indexDt, indexPr) <- checkExpression sizeL
                 (indexBool, size) <- if indexDt == Int
                     then do
                         -- This will not happen until 'pureness' is well implemented, so we just check if it is a literal
-                        unless indexPr $ tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL))
+                        unless indexPr $ tellSError (lexPosn sizeL) (ImpureArraySize (lexInfo sizeL))
                         -- Checks if the expression is a literal, this is temporal
-                        case lexInfo indexL of
+                        case lexInfo sizeL of
                             LitInt sizeL -> return (True, lexInfo sizeL)
-                            _           -> tellSError (lexPosn indexL) (ImpureArraySize (lexInfo indexL)) >> return (False, 0)
+                            _            -> tellSError (lexPosn sizeL) (ImpureArraySize (lexInfo sizeL)) >> return (False, 0)
                     else do
-                        unless (indexDt == TypeError) $ tellSError (lexPosn indexL) (ArraySizeDataType (lexInfo indexL) indexDt)
+                        unless (indexDt == TypeError) $ tellSError (lexPosn sizeL) (ArraySizeDataType (lexInfo sizeL) indexDt)
                         return (False, 0)
                 (dtBool, dtDt, dtWidth) <- checkAccess $ lexInfo aDtL
                 let newWidth = dtWidth * size
-                tellSError posn $ StaticError $ "size: " ++ show size ++ " dtWidth: " ++ show dtWidth
-                return $ (dtBool && indexBool, Array (dtDt <$ aDtL) indexL newWidth, newWidth)
-            _ -> liftM ((,,) True dt) $ getDataTypeWidth dt
+                return (dtBool && indexBool, Array (dtDt <$ aDtL) sizeL newWidth, newWidth)
+            _ -> do
+                dtW <- getDataTypeWidth dt
+                return (dtW /= 0, dt, dtW)
 
 processType :: Lexeme Declaration -> Checker Bool
 processType declL@(Lex (Declaration idenL@(Lex iden _) (Lex dt _) c) posn) = do
-    (width, valid, _) <- foldlM validateFields (0, True, DM.empty) (getFields dt)
+    (valid, width, _) <- foldlM validateFields (True, 0, DM.empty) (getFields dt)
     if valid
         then do
             sc  <- currentScope
@@ -709,26 +724,31 @@ processType declL@(Lex (Declaration idenL@(Lex iden _) (Lex dt _) c) posn) = do
             Record idenL fields _ -> Record idenL fields width
             Union idenL fields _  -> Union  idenL fields width
             _                     -> error "Checker.processType.setWidth: setting width to non user-defined DataType"
-        validateFields :: (Width, Bool, DM.Map Identifier Position) -> Field -> Checker (Width, Bool, DM.Map Identifier Position)
-        validateFields (width, valid, fieldMap) (Lex fIden fPosn, dtL) = do
+        validateFields :: (Bool, Width, DM.Map Identifier Position) -> Field -> Checker (Bool, Width, DM.Map Identifier Position)
+        validateFields (valid, width, fieldMap) (Lex fIden fPosn, dtL) = do
             let (mayPosn, newfMap) = DM.insertLookupWithKey (\_ _ a -> a) fIden fPosn fieldMap
             case mayPosn of
                 Just posn -> do
                     tellSError fPosn (AlreadyDeclared fIden posn)
-                    return (0, False, newfMap)
+                    return (False, 0, newfMap)
                 Nothing   -> case lexInfo dtL of
                     UserDef udIdenL -> do
                         mayDt <- getsSymInfoWithoutError udIdenL dataType
                         case mayDt of
                             Just udDt -> do
                                 udDtW <- getDataTypeWidth udDt
-                                return (width + udDtW, valid, newfMap)
+                                return (valid, width + udDtW, newfMap)
                             Nothing -> do
                                 tellSError fPosn (UndefinedType (lexInfo udIdenL))
-                                return (0, False, newfMap)
+                                return (False, 0, newfMap)
+                    Array aDtL sizeL _ -> case lexInfo sizeL of
+                        LitInt sizeL -> do
+                            dtWidth <- getDataTypeWidth (lexInfo aDtL)
+                            return (True, dtWidth * lexInfo sizeL, newfMap)
+                        _           -> tellSError (lexPosn sizeL) (ImpureArraySize (lexInfo sizeL)) >> return (False, 0, newfMap)
                     _ -> do
                         dtW <- getDataTypeWidth (lexInfo dtL)
-                        return (width + dtW, valid, newfMap)
+                        return (valid, width + dtW, newfMap)
 
 processFunction :: Lexeme Declaration -> Checker Bool
 processFunction decl@(Lex (Declaration idenL@(Lex iden _) _ _) posn) = processGeneric decl success

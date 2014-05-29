@@ -19,6 +19,10 @@ Record Punto as
     , y :: Int
 end
 
+Record Linea as
+    coord :: Punto[10]
+end
+
 Record Mapa as
     coord :: Punto[10][10]
 end
