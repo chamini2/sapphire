@@ -66,11 +66,6 @@ def j : Bool b, Int i, Char c -> Char
     # if we remove the conventional single quotes, and use a prefix "operator"
     # we avoid users trying to write characters as strings, like 'abc'
     return 'a'
-    return $a
-    return &a
-    return 'a
-    return a'
-    return !a
   else
     return c
   end
