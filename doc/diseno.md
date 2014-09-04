@@ -189,14 +189,14 @@ Esta instrucción es equivalente a `<var> = <var> <op> <expr>`. El `<op>` puede 
 Ejemplos:
 
 ~~~ruby
-    Bool valid
-    Int num, ind = 0
+    valid : Bool
+    num, ind : Int
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    <Type> <id> [, <id>..]
+    <id> [, <id>..] : <Type>
 ~~~
 
 Declara variables para el *alcance* actual.
@@ -208,7 +208,7 @@ Se escribe primero el `Tipo` de las variables a declarar y luego una lista de id
 Ejemplos:
 
 ~~~ruby
-    [[Int]] array = [10]*[10], veinte = [20]*[2];
+    array : Int[10][20]
 ~~~
 
 ***prototipo***
@@ -216,7 +216,7 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    [<Type>] <id> = [<expr Int>] [, <id> = [<expre Int>]..]
+    <id> [, <id>..] : <Type>[<expr Int>] 
 ~~~
 
 
@@ -228,16 +228,21 @@ Ejemplos:
 
 ~~~ruby
     Record Automovil as
-        placa            :: String,
-        ano              :: Int,
-        marca = "Toyota" :: String
+        placa : String
+        ano   : Int
+        marca : String
     end
+
+    Record Punto as x,y : Int; nombre : String end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    Record <Id> as <id> [= <expr Int>] :: <Type> [, <id> [= <expr Int>] :: <Type>..] end
+    Record <Id> as
+        <declaracion>
+        [ <declaracion>... ]
+    end
 ~~~
 
 Estructuras como `struct` del lenguaje `C`.
@@ -248,15 +253,18 @@ Ejemplos:
 
 ~~~ruby
     Union Precision as
-        integer = 0 :: Int ,
-        floating = 0.0 :: Float
+        integer  : Int
+        floating : Float
     end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    Union <Id> as <id> :: <Type> [, <id> :: <Type>..] end
+    Union <Id> as
+        <declaracion>
+        [ <declaracion>... ]
+    end
 ~~~
 
 Uniones como `union` del lenguaje `C`.
@@ -266,32 +274,25 @@ Uniones como `union` del lenguaje `C`.
 Ejemplos:
 
 ~~~ruby
-    def iguales :: (Int, Int) -> Bool
-    imp iguales(a, b) as
+    def iguales : Int a, Int b -> Bool
         return a == b
     end
-~~~
 
-> *es equivalente a:*
+    def say_hi_n_times : Int n -> () 
+        for i in 0..n+1
+            print "hi!\n"
+        end
+    end
 
-~~~ruby
-    # definición
-    def iguales :: Int, Int -> Bool
-
-        # ...código...
-
-    # implementación
-    imp iguales(a, b) as
-        return a == b;
+    def am_i_pretty : Bool
+        return true
     end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    def <id> :: <firma>
-
-    imp <id>(<ids..>) as
+    def <id> : <params> -> <Type>
         <statements..>
     end
 ~~~
@@ -325,13 +326,14 @@ Instrucción `return` típica.
 Ejemplos:
 
 ~~~ruby
-    read valid, num
+    read "dame dos número ", uno, dos
+    read tres
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    read <id> [, <ids..>]
+    read [ <String>, ] <id> [, <id>.. ]
 ~~~
 
 Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range`).
@@ -341,13 +343,19 @@ Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más va
 Ejemplos:
 
 ~~~ruby
-    print index, num
+    print "El número vale: ", i_to_s(num)
+
+    print ( "Este es un print muy largo"
+          , "con varias líneas, de hecho son "
+          , i_to_s(3), " líneas"
+          )
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    print <expr> [, <exprs..>]
+    print <String> [, <String>.. ]
+    print (<String> [,<String>.. ])
 ~~~
 
 Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<exprs..>` se evalúan completamente antes de imprimir los valores por pantalla.
@@ -364,6 +372,12 @@ Ejemplos:
     else
         print "I dunno\n"
     end
+
+    if (a > 2 or
+        b < 1 and
+        c < 2) then
+        print "sí"
+    end
 ~~~
 
 Sintaxis:
@@ -371,8 +385,14 @@ Sintaxis:
 ~~~ruby
     if <expr Bool> then
         <statements..>
+    [elif <expr Bool> then
+        <statements..>]
     [else
         <statements..>]
+    end
+
+    if (<expr <Bool> [ \n ]) then
+        <statements..>
     end
 ~~~
 
@@ -415,11 +435,11 @@ Ejemplos:
 
 ~~~ruby
     case age
-        when 0,1,2,3 do
+        when 0, 1, 2, 3 do
             print "bebé"
-        when 4,5,6,7,8,9,10,11,12 do
+        when 4, 5, 6, 7, 8, 9, 10, 11, 12 do
             print "niño"
-        when 10,11,12,13,14,15,16,17 do
+        when 10, 11, 12, 13, 14, 15, 16, 17 do
             # notar que el 10,11 y 12 están en "niño" y "joven"
             print "joven"
         otherwise
@@ -605,12 +625,18 @@ La precedencia de los operadores relacionales son las siguientes:
 
 Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
-* `def to_Int :: Float -> Int`
+* `def f_to_i : Float -> Int`
 
-* `def to_Float :: Int -> Float`
+* `def i_to_f : Int -> Float`
 
-* `def to_String :: a -> String` *(no es necesaria para `print`)*
+* `def length : [a] -> Int`
 
-* `def length :: [a] -> Int`
+* `def map : ((a -> b), [a]) -> [b]`
 
-* `def map :: ((a -> b), [a]) -> [b]`
+* `def i_to_s : Int   -> String`
+
+* `def f_to_s : Float -> String`
+
+* `def c_to_s : Char  -> String`
+
+* `def b_to_s : Bool  -> String`
