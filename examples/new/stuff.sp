@@ -14,20 +14,24 @@ read "give me c ", c
 
 # it can't be like Haskell because we name the variable next to the type
 # so it would be to_s : a a -> String
-# unless we make 'sugar' for when there's only a var name, it's a whatever type
+# unless we make "syntactic sugar" for when there's only a var name, it's a "whatever type"
 
-# print : [ _A ] -> IO ()
-# print "hola, a vale " a " y b + a vale " (b + a) " cuánto crees que vale b?\n"
+# print :: [ String ] -> IO ()
+print ( "Hola. 'a' vale "
+      , to_s(a)
+      , " y 'b + a' vale "
+      , to_s(b + a)
+      , " cuánto crees que vale 'b'?\n"
+      )
 
-# print : [ String ] -> IO ()
-print "hola, a vale ", to_s(a), " y b + a vale ", to_s(b + a), " cuánto crees que vale b?\n"
-
-if a == 10 and b % 2
-  or c > 0
-    then
-        print "sí"
-    else
-        print "no"
+if (a == 10 and b % 2
+    or c > 0
+    or c > 1
+    or c == 1
+    or c == 2) then
+    print "sí"
+else
+    print "no"
 end
 
 #############################
@@ -60,7 +64,10 @@ def i : Bool b -> ()
   end
 end
 
-def j : Bool b, Int i, Char c -> Char
+def j :  Bool b  # paramtero 1
+      ,  Int i   # paramtero 1
+      ,  Char c  # paramtero 1
+      -> Char    # paramtero 1
   if b == (i % 2 == 0) then
     print c
     return 'a'
@@ -81,4 +88,4 @@ Union EitherIntFloat as
   float : Float
 end
 
-Union OIntOFloat as int : Int; float : Float end
+Union IntOFloat as int : Int; float : Float end
