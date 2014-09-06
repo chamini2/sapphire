@@ -64,7 +64,7 @@ type Offset = Int
 instance Show SymInfo where
     show (SymInfo dt ct v sn dp i u p o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP ++ showO
         where
-            showSN = "Scope: " ++ show sn ++ ",\t"
+            showSN = "Scope " ++ show sn ++ ",\t"
             showCT = show ct ++ " | "
             showDT = show dt ++ case dt of
                 Record _ _ w -> " [" ++ show w ++ "] "
@@ -120,16 +120,16 @@ data Value
 
 instance Show Value where
     show val = " " ++ case val of
-        ValInt v            ->  show v
-        ValBool v           ->  show v
-        ValChar v           ->  show v
-        ValFloat v          ->  show v
-        ValStruct s         ->  show s
-        ValFunction p i _ w ->  "[" ++ showI ++ "] (" ++ showP ++ ") ->"
+        ValInt v             ->  show v
+        ValBool v            ->  show v
+        ValChar v            ->  show v
+        ValFloat v           ->  show v
+        ValStruct s          ->  show s
+        ValFunction p i ip w ->  "[" ++ showI ++ "] (" ++ showP ++ ") ->"
             where
                 showP = drop 2 $ concatMap (\(Lex dt _) -> ", " ++ show dt) $ toList p
                 showI = case i of
-                    Just _  -> "implemented | " ++ show w
+                    Just _  -> "implemented at " ++ showPosn ip ++ " | " ++ show w
                     Nothing -> "NOT implemented"
 
 ----------------------------------------
@@ -161,9 +161,9 @@ emptyTable = SymTable DM.empty
 initialTable :: SymTable
 initialTable = SymTable $ DM.fromList [ typeInt, typeFloat, typeBool, typeChar, typeString ]
     where
-        typeTuple typeN = (typeN, typeInfo typeN)
-        typeInfo typeN = singleton $ emptySymInfo
-                    { dataType = UserDef (Lex typeN (0,0))
+        typeTuple name = (name, typeInfo name)
+        typeInfo name = singleton $ emptySymInfo
+                    { dataType = UserDef (Lex name (0,0))
                     , category = CatUserDef
                     , initial  = True
                     , used     = True

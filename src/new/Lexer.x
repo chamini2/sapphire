@@ -26,6 +26,7 @@ import           Data.Sequence (Seq, (|>), empty, null)
 %wrapper "monadUserState"
 
 $newline   = [\n\r]
+
 @spaces    = ($white # $newline)|\\$newline
 
 @skip = [\; $white]+
@@ -38,14 +39,20 @@ $alpha = [$small $large]
 
 $idchar = [$alpha $digit]
 
+@inside_string          = ($printable # [\"\\] | \\[abfnrtv])
+@inside_multilinestring = (@inside_string | $newline | \" | \"\")
+
 @varid  = $small $idchar*
 @typeid = $large $idchar*
 
-@int         = $digit+
-@float       = $digit+(\.$digit+)?
-@string      = \"(($printable # [\"\\])|\\[abfnrtv]|\\$newline)*\"
-@stringerror = \"(($printable # [\"\\])|\\[abfnrtv]|\\$newline)*
-@char        = \'$printable\'
+@int              = $digit+
+@float            = $digit+(\.$digit+)?
+@char             = \'$printable\'
+
+@string                 = \"@inside_string*\"
+@string_error           = \"@inside_string*
+@multiline_string       = \"\"\"@inside_multilinestring\"\"\"
+@multiline_string_error = \"\"\"@inside_multilinestring
 
 --------------------------------------------------------------------------------
 
@@ -67,11 +74,8 @@ tokens :-
         ")"             { lex' TkRParen         }
         "["             { lex' TkLBrackets      }
         "]"             { lex' TkRBrackets      }
-        "{"             { lex' TkLBraces        }
-        "}"             { lex' TkRBraces        }
 
         -- Types
-        "Void"          { lex' TkVoidType       }
         "Int"           { lex' TkIntType        }
         "Bool"          { lex' TkBoolType       }
         "Float"         { lex' TkFloatType      }
@@ -86,9 +90,8 @@ tokens :-
         -- -- Declarations
         "="             { lex' TkAssign         }
         "def"           { lex' TkDef            }
-        "imp"           { lex' TkImp            }
         "as"            { lex' TkAs             }
-        "::"            { lex' TkSignature      }
+        ":"             { lex' TkSignature      }
         "->"            { lex' TkArrow          }
         "."             { lex' TkDot            }
 
@@ -154,13 +157,16 @@ tokens :-
         "<="            { lex' TkLessEq         }
         ">="            { lex' TkGreatEq        }
 
+        -- -- String
+        --"++"            { lex' TkConcat         }
+
         -- -- Identifiers
         @varid          { lex TkVarId           }
         @typeid         { lex TkTypeId          }
 
         -- Errors
         .               { lex (TkError . head) }
-        @stringerror    { lex (TkStringError . tail . filterNewline) }
+        @string_error   { lex (TkStringError . tail . filterNewline) }
 
 {
 
@@ -172,15 +178,15 @@ data Token
     = TkNewLine | TkEnd | TkReturn | TkSemicolon | TkComma
 
     -- -- Brackets
-    | TkLParen | TkRParen | TkLBrackets | TkRBrackets | TkLBraces | TkRBraces
+    | TkLParen | TkRParen | TkLBrackets | TkRBrackets
 
     -- Types
-    | TkVoidType | TkIntType | TkBoolType | TkFloatType | TkCharType
+    | TkIntType | TkBoolType | TkFloatType | TkCharType
     | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
 
     -- Statements
     -- -- Declarations
-    | TkAssign | TkDef | TkImp | TkAs | TkSignature | TkArrow | TkDot
+    | TkAssign | TkDef | TkAs | TkSignature | TkArrow | TkDot
 
     -- -- In/Out
     | TkRead | TkPrint
@@ -212,11 +218,14 @@ data Token
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
 
+    -- -- String
+    | TkConcat
+
     -- -- Identifiers
     | TkVarId  { unTkVarId  :: String }
     | TkTypeId { unTkTypeId :: String }
 
-    -- Compiling
+    -- Compiler
     | TkEOF
     | TkError       { unTkError       :: Char   }
     | TkStringError { unTkStringError :: String }
@@ -233,9 +242,6 @@ instance Show Token where
         TkRParen        -> "')'"
         TkLBrackets     -> "'['"
         TkRBrackets     -> "']'"
-        TkLBraces       -> "'{'"
-        TkRBraces       -> "'}'"
-        TkVoidType      -> "type 'Void'"
         TkIntType       -> "type 'Int'"
         TkBoolType      -> "type 'Bool'"
         TkFloatType     -> "type 'Float'"
@@ -247,7 +253,6 @@ instance Show Token where
         TkTypeType      -> "type 'Type'"
         TkAssign        -> "'='"
         TkDef           -> "'def'"
-        TkImp           -> "'imp'"
         TkAs            -> "'as'"
         TkSignature     -> "'::'"
         TkArrow         -> "'->'"
@@ -292,6 +297,7 @@ instance Show Token where
         TkGreat         -> "'>'"
         TkLessEq        -> "'<='"
         TkGreatEq       -> "'>='"
+        --TkConcat        -> "'++'"
         TkVarId _       -> "variable identifier"
         TkTypeId _      -> "type identifier"
         TkEOF           -> "'EOF'"
@@ -305,7 +311,7 @@ data AlexUserState = AlexUSt { lexerErrors :: Seq CheckError }
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUSt empty
 
--- some useful interaces to the Alex monad (which is naturally an instance of state monad)
+-- some useful functions for the Alex monad (which is naturally an instance of state monad)
 modifyUserState :: (AlexUserState -> AlexUserState) -> Alex ()
 modifyUserState f = Alex $ \s -> let st = alex_ust s in Right (s {alex_ust = f st},())
 
@@ -321,24 +327,24 @@ addLexerError (Lex t p) = do
 
 ----------------------------------------
 
-filterNewline :: String -> String
-filterNewline = foldr func []
+filterBackSlash :: String -> String
+filterBackSlash = foldr func []
     where
-        func c str = case (c,str) of
-            ('\\','\n':'\r':strs) -> strs
-            ('\\','\r':'\n':strs) -> strs
-            ('\\','\n':strs)      -> strs
-            ('\\','a':strs) -> '\a' : strs
-            ('\\','b':strs) -> '\b' : strs
-            ('\\','f':strs) -> '\f' : strs
-            ('\\','n':strs) -> '\n' : strs
-            ('\\','r':strs) -> '\r' : strs
-            ('\\','t':strs) -> '\t' : strs
-            ('\\','v':strs) -> '\v' : strs
-            _               -> c : str
+        func :: Char -> String -> String
+        func c str
+            | c == '\\' = case head str of
+                'a' -> '\a' : tail str
+                'b' -> '\b' : tail str
+                'f' -> '\f' : tail str
+                'n' -> '\n' : tail str
+                'r' -> '\r' : tail str
+                't' -> '\t' : tail str
+                'v' -> '\v' : tail str
+            | otherwise = c : str
+
 
 toPosition :: AlexPosn -> Position
-toPosition (AlexPn _ line col) = (line,col)
+toPosition (AlexPn _ row col) = (row, col)
 
 alexEOF :: Alex (Lexeme Token)
 alexEOF = liftM (Lex TkEOF) alexGetPosn
@@ -347,11 +353,6 @@ alexEOF = liftM (Lex TkEOF) alexGetPosn
 -- ourselves...
 lex :: (String -> Token) -> AlexAction (Lexeme Token)
 lex f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
-
--- For constructing tokens that do not depend on
--- the input
-lex' :: Token -> AlexAction (Lexeme Token)
-lex' = lex . const
 
 alexGetPosn :: Alex Position
 alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
@@ -362,6 +363,7 @@ runAlex' input (Alex f) =
         ust = lexerErrors (alex_ust st)
     in (ust,a)
     where
+        state :: AlexState
         state = AlexState
             { alex_pos = alexStartPos
             , alex_inp = input

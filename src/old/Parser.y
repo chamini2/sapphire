@@ -33,11 +33,11 @@ import           Prelude       hiding (concatMap, foldr)
         ")"             { Lex TkRParen      _ }
         "["             { Lex TkLBrackets   _ }
         "]"             { Lex TkRBrackets   _ }
-        "{"             { Lex TkLBraces     _ }
-        "}"             { Lex TkRBraces     _ }
+        --"{"             { Lex TkLBraces     _ }
+        --"}"             { Lex TkRBraces     _ }
 
         -- Types
-        "Void"          { Lex TkVoidType    _ }
+        --"Void"          { Lex TkVoidType    _ }
         "Int"           { Lex TkIntType     _ }
         "Bool"          { Lex TkBoolType    _ }
         "Float"         { Lex TkFloatType   _ }
