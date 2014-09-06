@@ -5,9 +5,9 @@ cabal-dev
 *.chi
 *.chs.h
 .virthualenv
-src/Lexer.hs
-src/Parser.hs
-src/Sapphire
+src/*/Lexer.hs
+src/*/Parser.hs
+src/*/Sapphire
 
 # Vim
 *.swp

@@ -123,6 +123,7 @@ deepAccess z@(Lex acc _, ths) = case acc of
 
 ----------------------------------------
 
+type Width = Int
 data DataWidth = DataWidth DataType Width
 
 data DataType
@@ -178,7 +179,6 @@ getFields dt = case dt of
     Union  _ fields _ -> fields
     _                 -> error "Language.getFields: should not attempt to get fields from non user-defined DataType"
 
-type Width = Int
 
 ----------------------------------------
 
