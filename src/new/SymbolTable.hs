@@ -36,12 +36,12 @@ module SymbolTable
 
 import           Language
 
-import           Control.Arrow (second)
-import           Data.Foldable as DF
-import           Data.Function (on)
-import           Data.List     (groupBy, sortBy)
-import qualified Data.Map      as DM
-import           Data.Sequence as DS hiding (zip, drop, update, sortBy)
+--import           Control.Arrow (second)
+--import           Data.Foldable as DF
+--import           Data.Function (on)
+--import           Data.List     (groupBy, sortBy)
+--import qualified Data.Map      as DM
+--import           Data.Sequence as DS hiding (zip, drop, update, sortBy)
 import           Prelude       as P hiding (concatMap, lookup, concat)
 
 data SymInfo = SymInfo

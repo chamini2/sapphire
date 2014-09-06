@@ -14,12 +14,12 @@ module Lexer
     , alexGetPosn
     ) where
 
-import           Checker       (CheckError (LError), LexerError (..))
-import           Language      (Position, Lexeme (..))
+import           Error         (Error (LError), LexerError (..))
+import           Language      (Position (Posn), Lexeme (..))
 
-import           Prelude       hiding (lex, null)
 import           Control.Monad (liftM)
 import           Data.Sequence (Seq, (|>), empty, null)
+import           Prelude       hiding (lex, null)
 
 }
 
@@ -132,7 +132,7 @@ tokens :-
         @float          { lex  (TkFloat . read) }
         @char           { lex  (TkChar . read)  }
         -- -- -- Filtering newlines
-        @string         { lex  (TkString . init . tail . filterNewline) }
+        @string         { lex  (TkString . init . tail . filterBackSlash) }
 
         -- -- Num
         "+"             { lex' TkPlus           }
@@ -147,8 +147,6 @@ tokens :-
         "and"           { lex' TkAnd            }
         "not"           { lex' TkNot            }
 
-        "@"             { lex' TkBelongs        }
-
         "=="            { lex' TkEqual          }
         "/="            { lex' TkUnequal        }
 
@@ -156,6 +154,8 @@ tokens :-
         ">"             { lex' TkGreat          }
         "<="            { lex' TkLessEq         }
         ">="            { lex' TkGreatEq        }
+
+        "@"             { lex' TkBelongs        }
 
         -- -- String
         --"++"            { lex' TkConcat         }
@@ -166,7 +166,7 @@ tokens :-
 
         -- Errors
         .               { lex (TkError . head) }
-        @string_error   { lex (TkStringError . tail . filterNewline) }
+        @string_error   { lex (TkStringError . tail . filterBackSlash) }
 
 {
 
@@ -214,9 +214,9 @@ data Token
 
     -- -- Bool
     | TkOr | TkAnd | TkNot
-    | TkBelongs
     | TkEqual | TkUnequal
     | TkLess | TkGreat | TkLessEq | TkGreatEq
+    | TkBelongs
 
     -- -- String
     | TkConcat
@@ -290,13 +290,13 @@ instance Show Token where
         TkOr            -> "'or'"
         TkAnd           -> "'and'"
         TkNot           -> "'not'"
-        TkBelongs       -> "'@'"
         TkEqual         -> "'=='"
         TkUnequal       -> "'/='"
         TkLess          -> "'<'"
         TkGreat         -> "'>'"
         TkLessEq        -> "'<='"
         TkGreatEq       -> "'>='"
+        TkBelongs       -> "'@'"
         --TkConcat        -> "'++'"
         TkVarId _       -> "variable identifier"
         TkTypeId _      -> "type identifier"
@@ -306,12 +306,12 @@ instance Show Token where
 
 --------------------------------------------------------------------------------
 
-data AlexUserState = AlexUSt { lexerErrors :: Seq CheckError }
+data AlexUserState = AlexUSt { lexerErrors :: Seq Error }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUSt empty
 
--- some useful functions for the Alex monad (which is naturally an instance of state monad)
+-- Some useful functions for the Alex monad (which is naturally an instance of state monad)
 modifyUserState :: (AlexUserState -> AlexUserState) -> Alex ()
 modifyUserState f = Alex $ \s -> let st = alex_ust s in Right (s {alex_ust = f st},())
 
@@ -344,20 +344,23 @@ filterBackSlash = foldr func []
 
 
 toPosition :: AlexPosn -> Position
-toPosition (AlexPn _ row col) = (row, col)
+toPosition (AlexPn _ row col) = Posn (row, col)
 
 alexEOF :: Alex (Lexeme Token)
 alexEOF = liftM (Lex TkEOF) alexGetPosn
 
--- Unfortunately, we have to extract the matching bit of string
--- ourselves...
+-- Unfortunately, we have to extract the matching bit of string ourselves...
 lex :: (String -> Token) -> AlexAction (Lexeme Token)
 lex f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
+
+-- For constructing tokens that do not depend on the input
+lex' :: Token -> AlexAction (Lexeme Token)
+lex' = lex . const
 
 alexGetPosn :: Alex Position
 alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
 
-runAlex' :: String -> Alex a -> (Seq CheckError, a)
+runAlex' :: String -> Alex a -> (Seq Error, a)
 runAlex' input (Alex f) =
     let Right (st,a) = f state
         ust = lexerErrors (alex_ust st)
