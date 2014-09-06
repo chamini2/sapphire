@@ -113,8 +113,9 @@ data Statement
 --    | StFunctionImp   (Lexeme Identifier)  (Seq (Lexeme Identifier)) StBlock
 --    | StProcedureCall (Lexeme Identifier)  (Seq (Lexeme Expression))
     -- I/O
---    | StRead  (Seq (Lexeme Access))
---    | StPrint (Seq (Lexeme Expression))
+--    | StRead     (Lexeme Access)
+    | StPrintList (Seq (Lexeme Expression))
+    | StPrint     (Lexeme Expression)
     -- Conditional
 --    | StIf   (Lexeme Expression) StBlock StBlock
 --    | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
