@@ -26,6 +26,9 @@ newtype Position = Posn (Int, Int)
 instance Show Position where
     show (Posn (row, col)) = show row ++ "," ++ show col
 
+defaultPosn :: Position
+defaultPosn = Posn (0,0)
+
 ----------------------------------------
 
 data Lexeme a = Lex
