@@ -1,10 +1,10 @@
-def binarySearch :: (Int[0], Int) -> Int
+def binarySearch :: (Int[10], Int) -> Int
 
 Int n
 print "Enter number of elements: "
 read n
 
-Int[10] myArray
+Int[10] array
 print "Enter ", n," integers: "
 for i in 0..(n-1) do
     read array[i]
@@ -20,8 +20,7 @@ imp binarySearch(array, elem) as
 
     repeat
         middle = (first + last) / 2
-    end
-    until first > last do
+    end until first > last do
 
         if array[middle] < elem then
             first = middle+1
@@ -35,4 +34,3 @@ imp binarySearch(array, elem) as
     # not found
     return -1
 end
-

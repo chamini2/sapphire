@@ -64,11 +64,12 @@ def i : Bool b -> ()
   end
 end
 
-def j :  Bool b  # paramtero 1
-      ,  Int i   # paramtero 1
-      ,  Char c  # paramtero 1
-      -> Char    # paramtero 1
-  if b == (i % 2 == 0) then
+def j : ( Bool b  # paramtero 1
+        , Int i   # paramtero 1
+        , Char c  # paramtero 1
+        ) -> Char # paramtero 1
+  if (b == (i % 2 == 0) and
+      i > 10) then
     print c
     return 'a'
   else
@@ -89,3 +90,14 @@ Union EitherIntFloat as
 end
 
 Union IntOFloat as int : Int; float : Float end
+
+case object
+    when ( syntax_error # becuyase hisa
+         , lexical_error # akjsndjkandjks
+         , vairable ) do
+        print "hola"
+    when 0 do
+        print "pupú"
+    otherwise
+        print "\n"
+end
