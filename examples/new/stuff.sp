@@ -6,7 +6,7 @@ a, b, c : Int
 # read "give me c " c
 read "give me a ", a
 read "give me b ", b
-read "give me c ", c
+read               c
 
 # to_s : _A a -> String
 # '_A' could be convention to "whatever type"
@@ -17,7 +17,7 @@ read "give me c ", c
 # unless we make "syntactic sugar" for when there's only a var name, it's a "whatever type"
 
 # print :: [ String ] -> IO ()
-print ( "Hola. 'a' vale "
+print ( "'a' vale "
       , to_s(a)
       , " y 'b + a' vale "
       , to_s(b + a)
