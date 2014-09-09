@@ -17,12 +17,12 @@ read               c
 # unless we make "syntactic sugar" for when there's only a var name, it's a "whatever type"
 
 # print :: [ String ] -> IO ()
-print ( "'a' vale "
+print [ "'a' vale "
       , to_s(a)
       , " y 'b + a' vale "
       , to_s(b + a)
       , " cuánto crees que vale 'b'?\n"
-      )
+      ]
 
 if (a == 10 and b % 2
     or c > 0
