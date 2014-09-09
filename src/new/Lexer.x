@@ -15,7 +15,8 @@ module Lexer
     ) where
 
 import           Error         (Error (LError), LexerError (..))
-import           Language      (Position (Posn), Lexeme (..))
+import           Position
+import           Lexeme
 
 import           Control.Monad (liftM)
 import           Data.Sequence (Seq, (|>), empty, null)
@@ -77,8 +78,8 @@ tokens :-
 
         -- Types
         "Int"           { lex' TkIntType        }
-        "Bool"          { lex' TkBoolType       }
         "Float"         { lex' TkFloatType      }
+        "Bool"          { lex' TkBoolType       }
         "Char"          { lex' TkCharType       }
         "String"        { lex' TkStringType     }
         "Range"         { lex' TkRangeType      }
@@ -181,7 +182,7 @@ data Token
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets
 
     -- Types
-    | TkIntType | TkBoolType | TkFloatType | TkCharType
+    | TkIntType | TkFloatType | TkBoolType | TkCharType
     | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
 
     -- Statements
@@ -243,8 +244,8 @@ instance Show Token where
         TkLBrackets     -> "'['"
         TkRBrackets     -> "']'"
         TkIntType       -> "type 'Int'"
-        TkBoolType      -> "type 'Bool'"
         TkFloatType     -> "type 'Float'"
+        TkBoolType      -> "type 'Bool'"
         TkCharType      -> "type 'Char'"
         TkStringType    -> "type 'String'"
         TkRangeType     -> "type 'Range'"

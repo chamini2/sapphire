@@ -2,6 +2,7 @@ module Main where
 
 --import           Checker             (CheckState (..), Checker, checkProgram, getErrors, runProgramChecker)
 import           Parser
+import           Definition
 
 --import           Control.Monad       (guard, void)
 --import           Control.Monad.Trans (lift)
@@ -16,11 +17,16 @@ main = do
     input <- if P.null args
         then getContents
         else readFile $ head args
-    --printProgram $ uncurry checkProgram $ parseProgram input
-    let (errors, program) = parseProgram input
-    mapM_ print errors
-    print program
+    printProgram $ uncurry definitionProgram $ parseProgram input
     putStrLn "done."
+
+printProgram :: Definition () -> IO ()
+printProgram def = do
+    let (state, writer) = runProgramDefinition def
+        DefState symTableST _ _ astST = state
+    print state
+    mapM_ print writer
+
 
 --printProgram :: Checker () -> IO ()
 --printProgram chk = do

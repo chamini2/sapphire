@@ -1,5 +1,25 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module Language where
+module Language
+    ( Program(..)
+
+    , Identifier
+    , StBlock
+
+    , DataType(..)
+
+    , Field
+
+    , Statement(..)
+    , Declaration(..)
+    , Category(..)
+
+    , Expression(..)
+    , Binary(..)
+    , Unary(..)
+    ) where
+
+import            Position ()
+import            Lexeme
 
 --import           Control.Monad.Identity hiding (forM_, mapM_)
 --import           Control.Monad.State    hiding (forM_, mapM_)
@@ -19,32 +39,6 @@ import           Data.Sequence          as DS (Seq, fromList)
 import qualified Data.Typeable          as DT (Typeable)
 import           Prelude                hiding (concat, concatMap, mapM_)
 
--- Posn (Row, Column)
-newtype Position = Posn (Int, Int)
-    deriving (Bounded, Eq, DD.Data, Ord, Read, DT.Typeable)
-
-instance Show Position where
-    show (Posn (row, col)) = show row ++ "," ++ show col
-
-defaultPosn :: Position
-defaultPosn = Posn (0,0)
-
-----------------------------------------
-
-data Lexeme a = Lex
-    { lexInfo :: a
-    , lexPosn :: Position
-    } deriving (Eq, Ord, DT.Typeable, DD.Data)
-
-instance Show a => Show (Lexeme a) where
-    show (Lex a p) = case p of
-        -- Everything in "(0,0)" shouldn't be shown
-        Posn (0,0) -> ""
-        _          -> show p ++ ": " ++ show a
-
-instance Functor Lexeme where
-    fmap f (Lex a p) = Lex (f a) p
-
 --------------------------------------------------------------------------------
 
 newtype Program = Program StBlock
@@ -60,41 +54,41 @@ type StBlock    = Seq (Lexeme Statement)
 
 ----------------------------------------
 
-type Width = Int
-
 data DataType
     = Int | Float | Bool | Char | Range | Type
-    | String Width
-    | Record (Lexeme Identifier) (Seq Field) Width
-    | Union  (Lexeme Identifier) (Seq Field) Width
+--    | String Width
+    | Record (Lexeme Identifier) (Seq Field)
+    | Union  (Lexeme Identifier) (Seq Field)
 --    | Array   (Lexeme DataType) (Lexeme Int) Width
---    | UserDef (Lexeme Identifier)
+    | UserDef (Lexeme Identifier)
     | Void | TypeError  -- For compiler use
     deriving (Ord, Eq, DT.Typeable, DD.Data)
 
 instance Show DataType where
     show dt = case dt of
-        Int             -> "Int"
-        Float           -> "Float"
-        Bool            -> "Bool"
-        Char            -> "Char"
-        String _        -> "String"
-        Range           -> "Range"
-        Type            -> "Type"
-        Record iden fs w -> "Record " ++ lexInfo iden ++ (" (" ++ (intercalate ", " $ toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show (lexInfo d)) fs) ++ ")")
-        Union  iden fs w -> "Union "  ++ lexInfo iden ++ (" (" ++ (intercalate ", " $ toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show (lexInfo d)) fs) ++ ")")
---        Array aDtL _ s  -> show (lexInfo aDtL) ++ "[" ++ show s ++ "]"
---        UserDef idenL   -> lexInfo idenL
-        Void            -> "()"
-        TypeError       -> error "DataType TypeError should never be shown"
+        Int            -> "Int"
+        Float          -> "Float"
+        Bool           -> "Bool"
+        Char           -> "Char"
+--        String _       -> "String"
+        Range          -> "Range"
+        Type           -> "Type"
+        Record iden fs -> "Record " ++ lexInfo iden ++ showFields fs
+        Union  iden fs -> "Union "  ++ lexInfo iden ++ showFields fs
+--        Array aDtL _ w -> show (lexInfo aDtL) ++ "[" ++ show w ++ "]"
+        UserDef idenL  -> lexInfo idenL
+        Void           -> "()"
+        TypeError      -> error "DataType TypeError should never be shown"
+        where
+            showFields fs = " {" ++ intercalate ", " (toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show (lexInfo d)) fs) ++ "}"
 
 type Field = (Lexeme Identifier, Lexeme DataType)
 
 getFields :: DataType -> Seq Field
 getFields dt = case dt of
-    Record _ fields _ -> fields
-    Union  _ fields _ -> fields
-    _                 -> error "Language.getFields: should not attempt to get fields from non-structure DataType"
+    Record _ fields -> fields
+    Union  _ fields -> fields
+    _               -> error "Language.getFields: should not attempt to get fields from non-structure DataType"
 
 
 ----------------------------------------
@@ -104,20 +98,20 @@ data Statement
     = StNoop
 --    | StAssign (Lexeme Access) (Lexeme Expression)
     -- Definitions
-    | StDeclaration      (Lexeme Declaration)
-    | StDeclarationList  (Seq (Lexeme Declaration))     -- Only used in Parser
-    | StStructDefinition (Lexeme DataType)
+    | StVariableDeclaration (Lexeme Declaration)
+    | StDeclarationList     (Seq (Lexeme Declaration))  -- Only used in Parser
+    | StStructDefinition    (Lexeme DataType)
     -- Functions
     | StReturn        (Lexeme Expression)
---    | StFunctionDef   (Lexeme Declaration) (Seq (Lexeme DataType))
+    | StFunctionDef   (Lexeme Declaration) (Seq (Lexeme Declaration)) StBlock
 --    | StFunctionImp   (Lexeme Identifier)  (Seq (Lexeme Identifier)) StBlock
---    | StProcedureCall (Lexeme Identifier)  (Seq (Lexeme Expression))
+    | StProcedureCall (Lexeme Identifier)  (Seq (Lexeme Expression))
     -- I/O
 --    | StRead     (Lexeme Access)
-    | StPrintList (Seq (Lexeme Expression))
+    | StPrintList (Seq (Lexeme Expression))             -- Only used in Parser
     | StPrint     (Lexeme Expression)
     -- Conditional
---    | StIf   (Lexeme Expression) StBlock StBlock
+    | StIf   (Lexeme Expression) StBlock StBlock
 --    | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
     -- Loops
 --    | StLoop     StBlock (Lexeme Expression) StBlock
@@ -140,6 +134,7 @@ data Category
     | CatParameter
     | CatField
     | CatUserDef
+    | CatLanguage   -- Language definitions
     deriving (Eq)
 
 instance Show Category where
@@ -148,6 +143,12 @@ instance Show Category where
     show CatParameter = "parameter"
     show CatField     = "field"
     show CatUserDef   = "data type"
+    show CatLanguage  = "data type"
+
+----------------------------------------
+
+--data When = When (Seq (Lexeme Expression)) StBlock
+--    deriving (Show)
 
 ----------------------------------------
 
@@ -162,7 +163,7 @@ data Expression
     | LitFloat  (Lexeme Float)
     | LitBool   (Lexeme Bool)
     | LitChar   (Lexeme Char)
-    | LitString (Lexeme String) Width
+    | LitString (Lexeme String)
 --    | LitRange  (Lexeme Range)
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression)
@@ -218,26 +219,28 @@ instance Show Binary where
 
 binaryOperation :: Binary -> Seq ((DataType, DataType), DataType)
 binaryOperation op = fromList $ case op of
-    OpPlus    -> zip numbers [Int, Float]
-    OpMinus   -> zip numbers [Int, Float]
-    OpTimes   -> zip numbers [Int, Float]
-    OpDivide  -> zip numbers [Int, Float]
-    OpModulo  -> zip numbers [Int, Float]
-    OpPower   -> zip [(Int, Int), (Float, Int)] [Int, Float]
-    OpFromTo  -> [ ((Int, Int), Range)]
-    OpOr      -> [ (boolean, Bool) ]
-    OpAnd     -> [ (boolean, Bool) ]
-    OpEqual   -> zip (boolean : numbers) repBool
-    OpUnequal -> zip (boolean : numbers) repBool
-    OpLess    -> zip numbers repBool
-    OpLessEq  -> zip numbers repBool
-    OpGreat   -> zip numbers repBool
-    OpGreatEq -> zip numbers repBool
-    OpBelongs -> zip [(Int, Range), (Float, Range)] repBool
+    OpPlus    -> arithmetic
+    OpMinus   -> arithmetic
+    OpTimes   -> arithmetic
+    OpDivide  -> arithmetic
+    OpModulo  -> arithmetic
+    OpPower   -> [ ((Int, Int), Int), ((Float, Int), Float) ]
+    OpFromTo  -> [ ((Int, Int), Range) ]
+    OpOr      -> boolean
+    OpAnd     -> boolean
+    OpEqual   -> everything
+    OpUnequal -> everything
+    OpLess    -> arithmeticCompare
+    OpLessEq  -> arithmeticCompare
+    OpGreat   -> arithmeticCompare
+    OpGreatEq -> arithmeticCompare
+    OpBelongs -> [ ((Int, Range), Bool) ]
     where
+        everything = arithmetic ++ boolean
+        arithmetic = [((Int, Int), Int), ((Float, Float), Float)]
+        boolean = [ ((Bool, Bool), Bool) ]
+        arithmeticCompare = zip numbers $ repeat Bool
         numbers = [(Int, Int), (Float, Float)]
-        boolean = (Bool, Bool)
-        repBool = repeat Bool
 
 data Unary = OpNegate | OpNot
     deriving (Eq, Ord, DT.Typeable, DD.Data)
