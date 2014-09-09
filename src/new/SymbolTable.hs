@@ -22,13 +22,24 @@ module SymbolTable
     , Width
 
     , Value(..)
+
+    -- From Stack
+    , Stack(..)
+    , top
+    , pop
+    , push
+    , initialStack
+    --, singletonStack
+
+    -- From Scope
+    , Scope(..)
+    , ScopeNum
+    --, initialScope
     ) where
 
 import           Language
 import           Scope
 import           Stack
-import           Position
-import           Lexeme
 
 import           Data.Foldable as DF
 import           Control.Arrow (second)
@@ -38,6 +49,28 @@ import qualified Data.Map      as DM
 import           Data.Sequence as DS hiding (zip, drop, update, sortBy)
 import           Prelude       as P hiding (concatMap, lookup, concat)
 
+{-data SymbolInfo = SymInfo
+                    { dataType :: DataType
+                    , category :: Category
+                    , scopeNum :: ScopeNum
+                    , defPosn  :: Position
+                    , offset   :: Offset
+                    , width    :: Width
+                    , used     :: Used
+                    }
+                | SymType
+                    { dataType :: DataType
+                    , width    :: Width
+                    , used     :: Used
+                    }
+                | SymFunction
+                    { parameters :: Seq (Lexeme DataType)
+                    , body       :: StBlock
+                    , width      :: Width
+                    , used       :: Used
+                    }
+                deriving Show
+-}
 data SymbolInfo = SymInfo
     { dataType :: DataType
     , category :: Category

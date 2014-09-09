@@ -2,11 +2,7 @@ module Definition where
 
 import           Error
 import           Language
-import           Scope
-import           Stack
 import           SymbolTable
-import           Position
-import           Lexeme
 
 import           Control.Arrow          ((&&&))
 --import           Control.Monad.Identity (Identity (..), runIdentity)
@@ -14,8 +10,7 @@ import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
 import           Data.Foldable          as DF (mapM_, forM_)
 --import           Data.Foldable          as DF (all, and, concatMap, elem, find, foldl, foldlM, foldr, foldr1, forM_, mapM_, notElem, sum, toList)
 import           Data.Function          (on)
-import           Data.Functor           ((<$>))
---import           Data.Functor           ((<$), (<$>))
+import           Data.Functor           ((<$), (<$>))
 --import           Data.List              (intercalate)
 import qualified Data.Map               as DM (Map, fromList, toList)
 --import qualified Data.Map               as DM (Map, empty, fromList, insertLookupWithKey, lookup)
@@ -170,13 +165,31 @@ currentScope = gets (serial . top . stack)
 addSymbol :: Identifier -> SymbolInfo -> Definition ()
 addSymbol idn info = modify $ \s -> s { table = insert idn info (table s) }
 
---getSymbolInfo :: Identifier -> Checker (Maybe a)
---getSymbolInfo idn = getsSymbolInfo idn id
+getSymbolInfo :: Identifier -> Definition (Maybe SymbolInfo)
+getSymbolInfo = flip getsSymbolInfo id
 
 getsSymbolInfo :: Identifier -> (SymbolInfo -> a) -> Definition (Maybe a)
 getsSymbolInfo idn f = do
-    (tab, stck) <- gets (table &&& stack)
-    return $ f <$> lookupWithScope idn stck tab -- f <$> == maybe Nothing (Just . f)
+    (tab, stk) <- gets (table &&& stack)
+    return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
+
+----------------------------------------
+
+--modifySymbolInfo :: Identifier -> (SymbolInfo -> SymbolInfo) -> Definition ()
+--modifySymbolInfo idn f = do
+--    maySymI <- getsSymbolInfo idn scopeNum
+--    -- forM_ maySymI (modifySymbolInfoWithScope idn f)
+--    case maySymI of
+--        Nothing -> return ()
+--        Just symScopeN -> modifySymbolInfoWithScope idn f symScopeN
+
+--modifySymbolInfoWithScope :: Identifier -> (SymbolInfo -> SymbolInfo) -> ScopeNum -> Definition ()
+--modifySymbolInfoWithScope idn f scope = do
+--    tab <- gets table
+--    maySymI <- getSymbolInfo idn
+--    case maySymI of
+--        Just _  -> modify (\s -> s { table = updateWithScope idn scope f tab })
+--        Nothing -> return ()
 
 --------------------------------------------------------------------------------
 
@@ -225,8 +238,6 @@ definitionStatements = mapM_ definitionStatement
 definitionStatement :: Lexeme Statement -> Definition ()
 definitionStatement stL = case lexInfo stL of
 
-    --StAssign accL expL ->
-
     StVariableDeclaration dclL -> void $ processDeclaration dclL
 
     StStructDefinition (Lex dt dtP) -> do
@@ -258,10 +269,6 @@ definitionStatement stL = case lexInfo stL of
             definitionStatements block
             exitScope
 
-    --StProcedureCall idnL expLs ->
-
-    --StRead accL -> return ()
-
     StIf _ success failure -> do
         enterScope
         definitionStatements success
@@ -282,14 +289,20 @@ definitionStatement stL = case lexInfo stL of
         definitionStatements othrBlock
         exitScope
 
-    --StLoop rep cndL block ->
+    StLoop rep _ block -> do
+        enterScope
+        definitionStatements rep
+        exitScope
 
-    --StFor idnL expL block ->
+        enterScope
+        definitionStatements block
+        exitScope
+
+    StFor idnL _ block -> do
+        let dcl = Declaration idnL (Int <$ idnL) CatVariable <$ idnL
+        enterScope
+        processDeclaration dcl
+        definitionStatements block
+        exitScope
 
     _ -> return ()
-    --StNoop -> return ()
-    --StReturn expL -> return ()
-    --StPrint expL -> return ()
-    --StBreak -> return ()
-    --StContinue -> return ()
-

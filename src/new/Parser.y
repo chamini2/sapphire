@@ -173,8 +173,6 @@ Statement :: { Lexeme Statement }
     | "Union"  TypeId "as" FieldList "end"      { StStructDefinition (Union  $2 $4 <$ $1) <$ $1 }
 
     -- Functions
-    --| "def" VariableId "::" Signature                                      { StFunctionDef ((Declaration $2 (snd $4) CatFunction) <$ $2) (fst $4) <$ $1 }
-    --| "imp" VariableId "(" MaybeVariableList ")" "as" StatementList "end"  { StFunctionImp  $2 $4 $7 <$ $1 }
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef (Declaration ($2) (snd $4) CatFunction <$ $1) (fst $4) $6 <$ $1 }
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
     | "return" Expression                                               { StReturn $2 <$ $1 }
@@ -193,13 +191,13 @@ Statement :: { Lexeme Statement }
     | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
 
     -- Loops
-    --| "while" Expression "do" StatementList "end"                                              { StLoop empty $2          $4    <$ $1 }
-    --| "until" Expression "do" StatementList "end"                                              { StLoop empty (notExp $2) $4    <$ $1 }
-    --| "repeat" StatementList "end" MaybeNL "while" Expression                                  { StLoop $2    $6          empty <$ $1 }
-    --| "repeat" StatementList "end" MaybeNL "until" Expression                                  { StLoop $2    (notExp $6) empty <$ $1 }
-    --| "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"         { StLoop $2    $6          $8    <$ $1 }
-    --| "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"         { StLoop $2    (notExp $6) $8    <$ $1 }
-    --| "for" VariableId "in" Expression "do" StatementList "end"                                { StFor $2 $4 $6 <$ $1 }
+    | "while" Expression "do" StatementList "end"                                              { StLoop empty $2          $4    <$ $1 }
+    | "until" Expression "do" StatementList "end"                                              { StLoop empty (notExp $2) $4    <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "while" Expression                                  { StLoop $2    $6          empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "until" Expression                                  { StLoop $2    (notExp $6) empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"         { StLoop $2    $6          $8    <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"         { StLoop $2    (notExp $6) $8    <$ $1 }
+    | "for" VariableId "in" Expression "do" StatementList "end"                                { StFor $2 $4 $6 <$ $1 }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
 
@@ -285,10 +283,9 @@ Expression :: { Lexeme Expression }
     -- Variable
     --: Access                        { Variable $1 <$ $1 }
     -- Function call
-    --| VariableId "(" MaybeExpressionListNL ")"      { FunctionCall $1 $3 <$ $1 }
+    : VariableId "(" MaybeExpressionListNL ")"      { FunctionCall $1 $3 <$ $1 }
     -- Literals
-    --| int                           { LitInt    (unTkInt    `fmap` $1)                                    <$ $1 }
-    : int                           { LitInt    (unTkInt    `fmap` $1) <$ $1 }
+    | int                           { LitInt    (unTkInt    `fmap` $1) <$ $1 }
     | float                         { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
     | "true"                        { LitBool   (unTkBool   `fmap` $1) <$ $1 }
     | "false"                       { LitBool   (unTkBool   `fmap` $1) <$ $1 }

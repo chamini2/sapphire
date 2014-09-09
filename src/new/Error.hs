@@ -1,8 +1,6 @@
 module Error where
 
 import           Language
-import           Position
-import           Lexeme
 
 import           Data.Function          (on)
 

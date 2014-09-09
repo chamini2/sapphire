@@ -4,8 +4,8 @@ module Position
     , defaultPosn
     ) where
 
-import qualified Data.Data              as DD (Data)
-import qualified Data.Typeable          as DT (Typeable)
+import qualified Data.Data     as DD (Data)
+import qualified Data.Typeable as DT (Typeable)
 
 -- Posn (Row, Column)
 newtype Position = Posn (Int, Int)
