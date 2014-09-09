@@ -258,8 +258,6 @@ definitionStatement stL = case lexInfo stL of
             definitionStatements block
             exitScope
 
-    --StFunctionImp idnL idnLs block ->
-
     --StProcedureCall idnL expLs ->
 
     --StRead accL -> return ()
@@ -273,7 +271,16 @@ definitionStatement stL = case lexInfo stL of
         definitionStatements failure
         exitScope
 
-    --StCase expL whnLs othr ->
+    StCase _ whnLs othrBlock -> do
+        -- Definitions in each 'when'
+        forM_ whnLs $ \(Lex (When _ wBlock) _) -> do
+            enterScope
+            definitionStatements wBlock
+            exitScope
+        -- Definitions in 'otherwise'
+        enterScope
+        definitionStatements othrBlock
+        exitScope
 
     --StLoop rep cndL block ->
 

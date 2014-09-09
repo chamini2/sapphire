@@ -183,8 +183,8 @@ Statement :: { Lexeme Statement }
     | "if"     Expression MaybeNL "then" StatementList ElIfs "end"                  { StIf $2          $5 $6    <$ $1 }
     | "unless" Expression MaybeNL "then" StatementList "end"                        { StIf (notExp $2) $5 empty <$ $1 }
     | "unless" Expression MaybeNL "then" StatementList "else" StatementList "end"   { StIf (notExp $2) $5 $7    <$ $1 }
-    --| "case" Expression MaybeNL WhenList "end"                                      { StCase $2 $4 empty <$ $1 }
-    --| "case" Expression MaybeNL WhenList "otherwise" StatementList "end"            { StCase $2 $4 $6    <$ $1 }
+    | "case" Expression MaybeNL WhenList "end"                                      { StCase $2 $4 empty <$ $1 }
+    | "case" Expression MaybeNL WhenList "otherwise" StatementList "end"            { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
     --| "read"             Expression         ","         AccessList                  { StRead  $2 <$ $1 }
@@ -227,7 +227,7 @@ DataType :: { Lexeme DataType }
     | "Float"                       { Float         <$ $1 }
     | "Bool"                        { Bool          <$ $1 }
     | "Char"                        { Char          <$ $1 }
-    --| "String"                      { String (-1)   <$ $1 }
+    | "String"                      { String        <$ $1 }
     | "Range"                       { Range         <$ $1 }
     | "Type"                        { Type          <$ $1 }
     | TypeId                        { UserDef $1    <$ $1 }
@@ -270,6 +270,13 @@ ElIfs :: { StBlock }
     :                                                      { empty }
     | "else" StatementList                                 { $2    }
     | "elif" Expression MaybeNL "then" StatementList ElIfs { singleton $ StIf $2 $5 $6 <$ $1 }
+
+WhenList :: { Seq (Lexeme When) }
+    : When              { singleton $1 }
+    | WhenList When     { $1 |> $2     }
+
+When :: { Lexeme When }
+    : "when" ExpressionListNL "do" StatementList  { When $2 $4 <$ $1 }
 
 ---------------------------------------
 -- Expressions
