@@ -12,6 +12,7 @@ module Language
     , Statement(..)
     , Declaration(..)
     , Category(..)
+    , When(..)
 
     , Expression(..)
     , Binary(..)
@@ -56,7 +57,7 @@ type StBlock    = Seq (Lexeme Statement)
 
 data DataType
     = Int | Float | Bool | Char | Range | Type
---    | String Width
+    | String
     | Record (Lexeme Identifier) (Seq Field)
     | Union  (Lexeme Identifier) (Seq Field)
 --    | Array   (Lexeme DataType) (Lexeme Int) Width
@@ -70,7 +71,7 @@ instance Show DataType where
         Float          -> "Float"
         Bool           -> "Bool"
         Char           -> "Char"
---        String _       -> "String"
+        String         -> "String"
         Range          -> "Range"
         Type           -> "Type"
         Record iden fs -> "Record " ++ lexInfo iden ++ showFields fs
@@ -112,7 +113,7 @@ data Statement
     | StPrint     (Lexeme Expression)
     -- Conditional
     | StIf   (Lexeme Expression) StBlock StBlock
---    | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
+    | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
     -- Loops
 --    | StLoop     StBlock (Lexeme Expression) StBlock
 --    | StFor      (Lexeme Identifier) (Lexeme Expression)  StBlock
@@ -147,8 +148,8 @@ instance Show Category where
 
 ----------------------------------------
 
---data When = When (Seq (Lexeme Expression)) StBlock
---    deriving (Show)
+data When = When (Seq (Lexeme Expression)) StBlock
+    deriving (Show)
 
 ----------------------------------------
 
