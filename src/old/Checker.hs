@@ -48,7 +48,7 @@ data Architecture = Arch
     } deriving (Show)
 
 instance Eq Architecture where
-    Arch n _ == Arch n2 _ = n == n2
+    (==) = (==) `on` archName
 
 --------------------------------------------------------------------------------
 

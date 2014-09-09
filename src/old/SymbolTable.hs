@@ -145,7 +145,7 @@ instance Show SymTable where
             list :: [(Identifier, [SymInfo])]
             list = map (second DF.toList) $ DM.toList m
             list' :: [(Identifier, SymInfo)]
-            list' = concat $ map (\(var,ss) -> zip (repeat var) ss) list
+            list' = concatMap (\(var,ss) -> zip (repeat var) ss) list
             list'' :: [(ScopeNum, [(Identifier, SymInfo)])]
             list'' = map (\ls@((_,s):_) -> (scopeNum s,ls)) $ groupBy ((==) `on` (scopeNum . snd)) $ sortBy (compare `on` (scopeNum . snd)) list'
             list''' :: [(ScopeNum, [(Identifier, SymInfo)])]
