@@ -1,6 +1,6 @@
 module Error where
 
-import           Language
+import           Program
 
 import           Data.Function          (on)
 

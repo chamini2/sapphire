@@ -135,7 +135,7 @@ tokens :-
         -- -- -- Filtering newlines
         @string         { lex  (TkString . init . tail . filterBackSlash) }
 
-        -- -- Num
+        -- -- Arithmetic
         "+"             { lex' TkPlus           }
         "-"             { lex' TkMinus          }
         "*"             { lex' TkTimes          }
@@ -143,7 +143,7 @@ tokens :-
         "%"             { lex' TkModulo         }
         "^"             { lex' TkPower          }
 
-        -- -- Bool
+        -- -- Boolean
         "or"            { lex' TkOr             }
         "and"           { lex' TkAnd            }
         "not"           { lex' TkNot            }

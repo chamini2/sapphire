@@ -1,18 +1,15 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module DataType
     ( DataType(..)
     , Field
     , getFields
     ) where
 
-import           Lexeme
 import           Identifier
+import           Lexeme
 
-import qualified Data.Data              as DD (Data)
-import           Data.Foldable          as DF (toList)
-import           Data.List              (intercalate)
-import           Data.Sequence          as DS (Seq)
-import qualified Data.Typeable          as DT (Typeable)
+import           Data.Foldable as DF (toList)
+import           Data.List     (intercalate)
+import           Data.Sequence as DS (Seq)
 
 data DataType
     = Int | Float | Bool | Char | Range | Type
@@ -22,7 +19,7 @@ data DataType
 --    | Array   (Lexeme DataType) (Lexeme Int) Width
     | UserDef (Lexeme Identifier)
     | Void | TypeError  -- For compiler use
-    deriving (Ord, Eq, DT.Typeable, DD.Data)
+    deriving (Ord, Eq)
 
 instance Show DataType where
     show dt = case dt of

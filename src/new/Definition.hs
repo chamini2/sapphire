@@ -1,7 +1,7 @@
 module Definition where
 
 import           Error
-import           Language
+import           Program
 import           SymbolTable
 
 import           Control.Arrow          ((&&&))
@@ -156,37 +156,36 @@ enterScope = do
 exitScope :: Definition ()
 exitScope = modify $ \s -> s { stack = pop $ stack s }
 
-
 currentScope :: Definition ScopeNum
 currentScope = gets (serial . top . stack)
 
 ----------------------------------------
 
-addSymbol :: Identifier -> SymbolInfo -> Definition ()
+addSymbol :: Identifier -> Symbol -> Definition ()
 addSymbol idn info = modify $ \s -> s { table = insert idn info (table s) }
 
-getSymbolInfo :: Identifier -> Definition (Maybe SymbolInfo)
-getSymbolInfo = flip getsSymbolInfo id
+getSymbol :: Identifier -> Definition (Maybe Symbol)
+getSymbol = flip getsSymbol id
 
-getsSymbolInfo :: Identifier -> (SymbolInfo -> a) -> Definition (Maybe a)
-getsSymbolInfo idn f = do
+getsSymbol :: Identifier -> (Symbol -> a) -> Definition (Maybe a)
+getsSymbol idn f = do
     (tab, stk) <- gets (table &&& stack)
     return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
 
 ----------------------------------------
 
---modifySymbolInfo :: Identifier -> (SymbolInfo -> SymbolInfo) -> Definition ()
---modifySymbolInfo idn f = do
---    maySymI <- getsSymbolInfo idn scopeNum
---    -- forM_ maySymI (modifySymbolInfoWithScope idn f)
+--modifySymbol :: Identifier -> (Symbol -> Symbol) -> Definition ()
+--modifySymbol idn f = do
+--    maySymI <- getsSymbol idn scopeNum
+--    -- forM_ maySymI (modifySymbolWithScope idn f)
 --    case maySymI of
 --        Nothing -> return ()
---        Just symScopeN -> modifySymbolInfoWithScope idn f symScopeN
+--        Just symScopeN -> modifySymbolWithScope idn f symScopeN
 
---modifySymbolInfoWithScope :: Identifier -> (SymbolInfo -> SymbolInfo) -> ScopeNum -> Definition ()
---modifySymbolInfoWithScope idn f scope = do
+--modifySymbolWithScope :: Identifier -> (Symbol -> Symbol) -> ScopeNum -> Definition ()
+--modifySymbolWithScope idn f scope = do
 --    tab <- gets table
---    maySymI <- getSymbolInfo idn
+--    maySymI <- getSymbol idn
 --    case maySymI of
 --        Just _  -> modify (\s -> s { table = updateWithScope idn scope f tab })
 --        Nothing -> return ()
@@ -197,13 +196,13 @@ processDeclaration :: Lexeme Declaration -> Definition Bool
 processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
     current <- currentScope
     let idn = lexInfo idnL
-        info = emptySymbolInfo
+        info = emptySymInfo
             { dataType = lexInfo dtL
             , category = cat
             , scopeNum = current
             , defPosn  = dclP
             }
-    maySymI <- getsSymbolInfo idn (\s -> (scopeNum s, defPosn s, category s))
+    maySymI <- getsSymbol idn (\s -> (scopeNum s, defPosn s, symbolCategory s))
     case maySymI of
         Nothing -> addSymbol idn info >> return True
         Just (symScopeN, symDefP, symCat)
@@ -215,12 +214,11 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
 
 initializeTable :: Architecture -> Definition ()
 initializeTable arc = forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
-        let info = emptySymbolInfo
-                { dataType = Type
-                , category = CatLanguage
-                , initial  = True
+        let info = emptySymType
+                { dataType = dt
+                , langDef  = True
                 , used     = True
-                , value    = Just $ ValType dt wth
+                , width    = wth
                 }
         addSymbol (show dt) info
 
@@ -236,7 +234,7 @@ definitionStatements :: StBlock -> Definition ()
 definitionStatements = mapM_ definitionStatement
 
 definitionStatement :: Lexeme Statement -> Definition ()
-definitionStatement stL = case lexInfo stL of
+definitionStatement (Lex st stP) = case st of
 
     StVariableDeclaration dclL -> void $ processDeclaration dclL
 
@@ -245,29 +243,40 @@ definitionStatement stL = case lexInfo stL of
         let idn = case dt of
                 Record idnL _ -> lexInfo idnL
                 Union  idnL _ -> lexInfo idnL
-            info = emptySymbolInfo
-                { dataType = Type
-                , category = CatUserDef
-                , value    = Just $ ValType dt (-1)
-                , scopeNum = current
+            info = emptySymType
+                { dataType = dt
                 , defPosn  = dtP
-                , initial  = True
+                , scopeNum = current
                 }
-        maySymI <- getsSymbolInfo idn (scopeNum &&& defPosn)
+        maySymI <- getsSymbol idn (scopeNum &&& defPosn)
         case maySymI of
             Nothing -> addSymbol idn info
             Just (symScopeN, symDefP)
                 | symScopeN == -1 -> tellSError dtP (TypeIsLanguageDefined idn)
                 | otherwise       -> tellSError dtP (TypeAlreadyDefined idn symDefP)
 
-    StFunctionDef dclL sig block -> do
-        added <- processDeclaration dclL
+    StFunctionDef idnL (Sign parms dtL) block -> do
+        current <- currentScope
+        let idn = lexInfo idnL
+            info = emptySymFunction
+                { paramTypes = dclDataType . lexInfo <$> parms      -- fmap (dclDataType . lexInfo) parms
+                , returnType = lexInfo dtL
+                , body       = block
+                , defPosn    = lexPosn idnL
+                , scopeNum   = current
+                }
+        maySymI <- getsSymbol idn (\s -> (scopeNum s, defPosn s, symbolCategory s))
+        case maySymI of
+            Nothing -> addSymbol idn info
+            Just (symScopeN, symDefP, symCat)
+                | symCat == CatFunction -> tellSError stP (FunctionRedefinition idn symDefP)
+                | symScopeN == current  -> tellSError stP (AlreadyDeclared idn symDefP)
+                | otherwise             -> addSymbol idn info
 
-        when added $ do
-            enterScope
-            mapM_ processDeclaration sig
-            definitionStatements block
-            exitScope
+        enterScope
+        mapM_ processDeclaration parms
+        definitionStatements block
+        exitScope
 
     StIf _ success failure -> do
         enterScope

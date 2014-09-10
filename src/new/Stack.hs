@@ -10,8 +10,8 @@ module Stack
 
 import           Scope
 
-import           Data.Foldable as DF
-import           Prelude       as P hiding (concatMap, lookup, concat)
+import           Data.Foldable as DF (Foldable (..), concatMap)
+import           Prelude       as P hiding (concatMap)
 
 newtype Stack a = Stack [a]
 
@@ -21,7 +21,7 @@ instance Show a => Show (Stack a) where
 instance Functor Stack where
     fmap f (Stack s) = Stack $ map f s
 
-instance DF.Foldable Stack where
+instance Foldable Stack where
     foldr f b (Stack s) = P.foldr f b s
 
 {- |

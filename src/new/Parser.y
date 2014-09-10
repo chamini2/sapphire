@@ -4,7 +4,7 @@
 module Parser (parseProgram) where
 
 import           Lexer
-import           Language
+import           Program
 import           Position
 import           Lexeme
 import           Error         (Error)
@@ -12,7 +12,7 @@ import           Error         (Error)
 --import           Control.Arrow (first)
 --import           Data.Foldable as DF (concatMap, foldr)
 import           Data.Functor
-import           Data.Sequence hiding (reverse, length)
+import           Data.Sequence as DS hiding (length)
 import           Prelude       hiding (concatMap, foldr)
 }
 
@@ -168,12 +168,12 @@ Statement :: { Lexeme Statement }
     --| Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
-    | VariableList ":" DataType     { (StDeclarationList $ fmap (\iden -> Declaration iden $3 CatVariable <$ iden) $1) <$ $3 }
+    | VariableList ":" DataType     { (StDeclarationList $ fmap (\iden -> Declaration iden $3 CatVariable <$ iden) $1) <$ $1 }
     | "Record" TypeId "as" FieldList "end"      { StStructDefinition (Record $2 $4 <$ $1) <$ $1 }
     | "Union"  TypeId "as" FieldList "end"      { StStructDefinition (Union  $2 $4 <$ $1) <$ $1 }
 
     -- Functions
-    | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef (Declaration ($2) (snd $4) CatFunction <$ $1) (fst $4) $6 <$ $1 }
+    | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
     | "return" Expression                                               { StReturn $2 <$ $1 }
 
@@ -244,10 +244,10 @@ Field :: { (Seq (Lexeme Identifier), Lexeme DataType) }
 ---------------------------------------
 -- Function definition
 
-Signature :: { (Seq (Lexeme Declaration), Lexeme DataType) }
-    : ParameterList "->" ReturnType                             { ($1   , $3) }
-    | "(" ParameterListNL ")" MaybeNL "->" MaybeNL ReturnType   { ($2   , $7) }
-    | ReturnType                                                { (empty, $1) }
+Signature :: { Signature }
+    : ParameterList "->" ReturnType                             { Sign $1    $3 }
+    | "(" ParameterListNL ")" MaybeNL "->" MaybeNL ReturnType   { Sign $2    $7 }
+    | ReturnType                                                { Sign empty $1 }
 
 ReturnType :: { Lexeme DataType }
     : DataType      { $1 }
