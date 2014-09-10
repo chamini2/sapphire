@@ -48,7 +48,7 @@ pop (Stack (_ : s)) = Stack s
     The scope stack has the inital scope by default.
 -}
 initialStack :: Stack Scope
-initialStack = Stack [ initialScope ]
+initialStack = Stack [ initialScope, outerScope ]
 
 singletonStack :: a -> Stack a
 singletonStack n = Stack [ n ]

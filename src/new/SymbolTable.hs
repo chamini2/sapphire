@@ -39,6 +39,7 @@ module SymbolTable
     , Scope(..)
     , ScopeNum
     --, initialScope
+    --, outerScope
     ) where
 
 import           Identifier
@@ -73,7 +74,7 @@ instance Show SymbolTable where
             list''' :: [(ScopeNum, [(Identifier, Symbol)])]
             list''' = map (second (sortBy (compare `on` (defPosn . snd)))) list''
             list'''' :: [String]
-            list'''' = map (\(sc,infos) -> show sc ++ " -> " ++ concatMap (\(iden,si) -> "\n\t\t" ++ iden ++ ":\t" ++ show si) infos) list'''
+            list'''' = map (\(sc,infos) -> show sc ++ " -> " ++ concatMap (\(idn,si) -> "\n\t\t'" ++ idn ++ "':\t" ++ show si) infos) list'''
 
 --------------------------------------------------------------------------------
 
@@ -109,8 +110,8 @@ lookup var (SymTable m) = do
 toListFilter :: SymbolTable -> ScopeNum -> Seq (Identifier, Symbol)
 toListFilter st@(SymTable m) sc = fromList $ foldl' func [] $ DM.keys m
     where
-        func ls iden = maybe ls (\j -> (iden, j) : ls) $ maySI iden
-        maySI iden   = lookupWithScope iden (singletonStack (Scope sc)) st
+        func ls idn = maybe ls (\j -> (idn, j) : ls) $ maySI idn
+        maySI idn   = lookupWithScope idn (singletonStack (Scope sc)) st
 
 {- |
     Looks up the symbol identifier in the specified scope in the symbol table

@@ -77,15 +77,15 @@ tokens :-
         "]"             { lex' TkRBrackets      }
 
         -- Types
-        "Int"           { lex' TkIntType        }
-        "Float"         { lex' TkFloatType      }
-        "Bool"          { lex' TkBoolType       }
-        "Char"          { lex' TkCharType       }
-        "String"        { lex' TkStringType     }
-        "Range"         { lex' TkRangeType      }
+        --"Int"           { lex' TkIntType        }
+        --"Float"         { lex' TkFloatType      }
+        --"Bool"          { lex' TkBoolType       }
+        --"Char"          { lex' TkCharType       }
+        --"String"        { lex' TkStringType     }
+        --"Range"         { lex' TkRangeType      }
+        --"Type"          { lex' TkTypeType       }
         "Union"         { lex' TkUnionType      }
         "Record"        { lex' TkRecordType     }
-        "Type"          { lex' TkTypeType       }
 
         -- Statements
         -- -- Declarations
@@ -182,8 +182,9 @@ data Token
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets
 
     -- Types
-    | TkIntType | TkFloatType | TkBoolType | TkCharType
-    | TkStringType | TkRangeType | TkUnionType | TkRecordType | TkTypeType
+--    | TkIntType | TkFloatType | TkBoolType | TkCharType
+--    | TkStringType | TkRangeType | TkTypeType
+    | TkUnionType | TkRecordType
 
     -- Statements
     -- -- Declarations
@@ -243,15 +244,15 @@ instance Show Token where
         TkRParen        -> "')'"
         TkLBrackets     -> "'['"
         TkRBrackets     -> "']'"
-        TkIntType       -> "type 'Int'"
-        TkFloatType     -> "type 'Float'"
-        TkBoolType      -> "type 'Bool'"
-        TkCharType      -> "type 'Char'"
-        TkStringType    -> "type 'String'"
-        TkRangeType     -> "type 'Range'"
+        --TkIntType       -> "type 'Int'"
+        --TkFloatType     -> "type 'Float'"
+        --TkBoolType      -> "type 'Bool'"
+        --TkCharType      -> "type 'Char'"
+        --TkStringType    -> "type 'String'"
+        --TkRangeType     -> "type 'Range'"
+        --TkTypeType      -> "type 'Type'"
         TkUnionType     -> "type 'Union'"
         TkRecordType    -> "type 'Record'"
-        TkTypeType      -> "type 'Type'"
         TkAssign        -> "'='"
         TkDef           -> "'def'"
         TkAs            -> "'as'"

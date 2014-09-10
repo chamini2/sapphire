@@ -4,23 +4,14 @@ import           Error
 import           Program
 import           SymbolTable
 
-import           Control.Arrow          ((&&&))
---import           Control.Monad.Identity (Identity (..), runIdentity)
-import           Control.Monad.RWS      hiding (forM, forM_, mapM, mapM_)
-import           Data.Foldable          as DF (mapM_, forM_)
---import           Data.Foldable          as DF (all, and, concatMap, elem, find, foldl, foldlM, foldr, foldr1, forM_, mapM_, notElem, sum, toList)
-import           Data.Function          (on)
-import           Data.Functor           ((<$), (<$>))
---import           Data.List              (intercalate)
-import qualified Data.Map               as DM (Map, fromList, toList)
---import qualified Data.Map               as DM (Map, empty, fromList, insertLookupWithKey, lookup)
---import           Data.Maybe             (fromJust, isJust, isNothing)
-import           Data.Sequence          as DS (Seq, singleton, empty)
---import           Data.Sequence          as DS (Seq, ViewL ((:<), EmptyL), empty, filter, fromList, index, length, null, singleton, sortBy, viewl, zip, zipWith, (<|), (><), (|>))
---import           Data.Traversable       as DT (forM, mapM)
---import           GHC.Generics
-import           Prelude                as P hiding (mapM_)
---import           Prelude                as P hiding (all, and, concatMap, elem, filter, foldl, foldr, foldr1, length, lookup, mapM, mapM_, notElem, null, sum, zip, zipWith)
+import           Control.Arrow     ((&&&))
+import           Control.Monad.RWS hiding (forM, forM_, mapM, mapM_)
+import           Data.Foldable     as DF (forM_, mapM_)
+import           Data.Function     (on)
+import           Data.Functor      ((<$), (<$>))
+import qualified Data.Map          as DM (Map, fromList, toList)
+import           Data.Sequence     as DS (Seq, empty, singleton)
+import           Prelude           as P hiding (mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -54,10 +45,10 @@ type DefWriter = Seq Error
 -- State
 
 data DefState = DefState
-    { table     :: SymbolTable
-    , stack     :: Stack Scope
-    , scopeId   :: ScopeNum
-    , ast       :: Program
+    { table   :: SymbolTable
+    , stack   :: Stack Scope
+    , scopeId :: ScopeNum
+    , ast     :: Program
     --, loopLvl   :: NestedLevel
     --, funcStack :: Stack (DataType, Lexeme Identifier, ScopeNum)
     --, offsStack :: Stack Offset
@@ -212,8 +203,8 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
 
 --------------------------------------------------------------------------------
 
-initializeTable :: Architecture -> Definition ()
-initializeTable arc = forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
+initializeTable :: Definition ()
+initializeTable = asks arch >>= \arc -> forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
         let info = emptySymType
                 { dataType = dt
                 , langDef  = True
@@ -224,8 +215,7 @@ initializeTable arc = forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
 
 definitionProgram :: Seq Error -> Program -> Definition ()
 definitionProgram lexErrors program@(Program block) = do
-    arc <- asks arch
-    initializeTable arc
+    initializeTable
     modify $ \s -> s { ast = program }
     tell lexErrors
     definitionStatements block
@@ -248,12 +238,12 @@ definitionStatement (Lex st stP) = case st of
                 , defPosn  = dtP
                 , scopeNum = current
                 }
-        maySymI <- getsSymbol idn (scopeNum &&& defPosn)
+        maySymI <- getsSymbol idn (langDef &&& defPosn)
         case maySymI of
             Nothing -> addSymbol idn info
-            Just (symScopeN, symDefP)
-                | symScopeN == -1 -> tellSError dtP (TypeIsLanguageDefined idn)
-                | otherwise       -> tellSError dtP (TypeAlreadyDefined idn symDefP)
+            Just (symLangD, symDefP)
+                | symLangD  -> tellSError dtP (TypeIsLanguageDefined idn)
+                | otherwise -> tellSError dtP (TypeAlreadyDefined idn symDefP)
 
     StFunctionDef idnL (Sign parms dtL) block -> do
         current <- currentScope

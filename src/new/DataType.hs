@@ -12,17 +12,18 @@ import           Data.List     (intercalate)
 import           Data.Sequence as DS (Seq)
 
 data DataType
-    = Int | Float | Bool | Char | Range | Type
+    = DataType (Lexeme Identifier)
+    | Int | Float | Bool | Char | Range | Type
     | String
     | Record (Lexeme Identifier) (Seq Field)
     | Union  (Lexeme Identifier) (Seq Field)
---    | Array   (Lexeme DataType) (Lexeme Int) Width
-    | UserDef (Lexeme Identifier)
+    | Array  (Lexeme DataType)   (Lexeme Int)
     | Void | TypeError  -- For compiler use
     deriving (Ord, Eq)
 
 instance Show DataType where
     show dt = case dt of
+        DataType idnL  -> "DataType " ++ lexInfo idnL
         Int            -> "Int"
         Float          -> "Float"
         Bool           -> "Bool"
@@ -30,10 +31,9 @@ instance Show DataType where
         String         -> "String"
         Range          -> "Range"
         Type           -> "Type"
-        Record iden fs -> "Record " ++ lexInfo iden ++ showFields fs
-        Union  iden fs -> "Union "  ++ lexInfo iden ++ showFields fs
---        Array aDtL _ w -> show (lexInfo aDtL) ++ "[" ++ show w ++ "]"
-        UserDef idenL  -> lexInfo idenL
+        Record idnL fs -> "Record " ++ lexInfo idnL ++ showFields fs
+        Union  idnL fs -> "Union "  ++ lexInfo idnL ++ showFields fs
+        Array  dtL siz -> show (lexInfo dtL) ++ "[" ++ show (lexInfo siz) ++ "]"
         Void           -> "()"
         TypeError      -> error "DataType TypeError should never be shown"
         where

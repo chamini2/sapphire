@@ -40,15 +40,15 @@ import           Prelude       hiding (concatMap, foldr)
 
     -- Types
     --"Void"          { Lex TkVoidType    _ }
-    "Int"           { Lex TkIntType     _ }
-    "Float"         { Lex TkFloatType   _ }
-    "Bool"          { Lex TkBoolType    _ }
-    "Char"          { Lex TkCharType    _ }
-    "String"        { Lex TkStringType  _ }
-    "Range"         { Lex TkRangeType   _ }
+    --"Int"           { Lex TkIntType     _ }
+    --"Float"         { Lex TkFloatType   _ }
+    --"Bool"          { Lex TkBoolType    _ }
+    --"Char"          { Lex TkCharType    _ }
+    --"String"        { Lex TkStringType  _ }
+    --"Range"         { Lex TkRangeType   _ }
+    --"Type"          { Lex TkTypeType    _ }
     "Union"         { Lex TkUnionType   _ }
     "Record"        { Lex TkRecordType  _ }
-    "Type"          { Lex TkTypeType    _ }
 
     -- Statements
     -- -- Declarations
@@ -168,7 +168,7 @@ Statement :: { Lexeme Statement }
     --| Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
-    | VariableList ":" DataType     { (StDeclarationList $ fmap (\iden -> Declaration iden $3 CatVariable <$ iden) $1) <$ $1 }
+    | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
     | "Record" TypeId "as" FieldList "end"      { StStructDefinition (Record $2 $4 <$ $1) <$ $1 }
     | "Union"  TypeId "as" FieldList "end"      { StStructDefinition (Union  $2 $4 <$ $1) <$ $1 }
 
@@ -221,15 +221,8 @@ VariableList :: { Seq (Lexeme Identifier) }
 -- Definitions
 
 DataType :: { Lexeme DataType }
-    : "Int"                         { Int           <$ $1 }
-    | "Float"                       { Float         <$ $1 }
-    | "Bool"                        { Bool          <$ $1 }
-    | "Char"                        { Char          <$ $1 }
-    | "String"                      { String        <$ $1 }
-    | "Range"                       { Range         <$ $1 }
-    | "Type"                        { Type          <$ $1 }
-    | TypeId                        { UserDef $1    <$ $1 }
-    --| DataType "[" Expression "]"   { Array $1 $3 0 <$ $1 }
+    : TypeId                 { DataType $1 <$ $1 }
+    | DataType "[" int "]"   { Array $1 (unTkInt `fmap` $3) <$ $1 }
 
 ---------------------------------------
 -- Structures
