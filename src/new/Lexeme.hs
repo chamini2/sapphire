@@ -1,5 +1,7 @@
 module Lexeme
-    ( Lexeme(..) ) where
+    ( Lexeme(..)
+    , fillLex
+    ) where
 
 --import qualified Data.Data     as DD (Data)
 --import qualified Data.Typeable as DT (Typeable)
@@ -19,3 +21,8 @@ instance Show a => Show (Lexeme a) where
 
 instance Functor Lexeme where
     fmap f (Lex a p) = Lex (f a) p
+
+----------------------------------------
+
+fillLex :: a -> Lexeme a
+fillLex = flip Lex defaultPosn
