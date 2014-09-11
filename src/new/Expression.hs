@@ -8,14 +8,14 @@ module Expression
     , Access(..)
     , AccessHistory(..)
 
-    , Thread
-    , Zipper
+    , AccessZipper
+    --, Thread
     , focusAccess
     , defocusAccess
-    , inArrayAccess
-    , inStructAccess
-    , inAccess
-    , backAccess
+    --, inArrayAccess
+    --, inStructAccess
+    --, inAccess
+    --, backAccess
     , topAccess
     , deepAccess
     ) where
@@ -157,12 +157,11 @@ instance Show Access where
  - Access        = acc
  - AccessHistory = acc'
  -
- - acc = (var * identifier) + (arr * acc * expression) + (str * acc * identifier)
+ - acc = identifier + (acc * expression) + (acc * identifier)
  - expression = A
  - identifier = B
  -
- - acc = (1 * B) + (1 * acc * A) + (1 * acc * B)
- - acc = B       + (acc * A)     + (acc * B)
+ - acc = B + (acc * A) + (acc * B)
  -
  - acc' = A + B
  -}
@@ -173,45 +172,45 @@ data AccessHistory = HistoryArray  (Lexeme Expression)
 
 type Thread = [Lexeme AccessHistory]
 
-type Zipper = (Lexeme Access, Thread)
+type AccessZipper = (Lexeme Access, Thread)
 
 ----------------------------------------
 
-focusAccess :: Lexeme Access -> Zipper
+focusAccess :: Lexeme Access -> AccessZipper
 focusAccess accL = (accL, [])
 
-defocusAccess :: Zipper -> Lexeme Access
-defocusAccess (accL, _) = accL
+defocusAccess :: AccessZipper -> Lexeme Access
+defocusAccess = fst
 
-inArrayAccess :: Zipper -> Maybe Zipper
-inArrayAccess (histL@(Lex acc _), thrd) = case acc of
-    ArrayAccess accL indexL -> Just (accL, (HistoryArray indexL <$ histL) : thrd)
-    _                       -> Nothing
+inArrayAccess :: AccessZipper -> Maybe AccessZipper
+inArrayAccess (hstL, thrd) = case lexInfo hstL of
+    ArrayAccess accL idxL -> Just (accL, (HistoryArray idxL <$ hstL) : thrd)
+    _                     -> Nothing
 
-inStructAccess :: Zipper -> Maybe Zipper
-inStructAccess (histL@(Lex acc _), thrd) = case acc of
-    StructAccess accL fieldL -> Just (accL, (HistoryStruct fieldL <$ histL) : thrd)
+inStructAccess :: AccessZipper -> Maybe AccessZipper
+inStructAccess (hstL, thrd) = case lexInfo hstL of
+    StructAccess accL fldL -> Just (accL, (HistoryStruct fldL <$ hstL) : thrd)
     _                        -> Nothing
 
-inAccess :: Zipper -> Maybe Zipper
-inAccess zpp@(accL,_) = case lexInfo accL of
-    VariableAccess _   -> Nothing
-    ArrayAccess    _ _ -> inArrayAccess zpp
-    StructAccess   _ _ -> inStructAccess zpp
+inAccess :: AccessZipper -> Maybe AccessZipper
+inAccess zpp = case lexInfo $ fst zpp of
+    VariableAccess _ -> Nothing
+    ArrayAccess  _ _ -> inArrayAccess zpp
+    StructAccess _ _ -> inStructAccess zpp
 
-backAccess :: Zipper -> Maybe Zipper
+backAccess :: AccessZipper -> Maybe AccessZipper
 backAccess (accL, thrd) = case thrd of
-    []                      -> Nothing
+    []                        -> Nothing
     hstL@(Lex hist _) : hstLs -> case hist of
-        HistoryArray  indexL -> Just (ArrayAccess  accL indexL <$ hstL, hstLs)
-        HistoryStruct fieldL -> Just (StructAccess accL fieldL <$ hstL, hstLs)
+        HistoryArray  idxL -> Just (ArrayAccess  accL idxL <$ hstL, hstLs)
+        HistoryStruct fldL -> Just (StructAccess accL fldL <$ hstL, hstLs)
 
-topAccess :: Zipper -> Zipper
+topAccess :: AccessZipper -> AccessZipper
 topAccess zpp = case snd zpp of
-    []     -> zpp
+    []    -> zpp
     _ : _ -> topAccess $ fromJust $ backAccess zpp
 
-deepAccess :: Zipper -> Zipper
-deepAccess zpp@(accL, _) = case lexInfo accL of
+deepAccess :: AccessZipper -> AccessZipper
+deepAccess zpp = case lexInfo $ fst zpp of
     VariableAccess _ -> zpp
     _                -> deepAccess $ fromJust $ inAccess zpp
