@@ -26,9 +26,9 @@ import           Prelude       hiding (lex, null)
 
 %wrapper "monadUserState"
 
-$newline   = [\n\r]
+$newline = [\n\r]
 
-@spaces    = ($white # $newline)|\\$newline
+@spaces  = ($white # $newline)|\\$newline
 
 @skip = [\; $white]+
 
@@ -40,8 +40,8 @@ $alpha = [$small $large]
 
 $idchar = [$alpha $digit]
 
-@inside_string          = ($printable # [\"\\] | \\[abfnrtv])
-@inside_multilinestring = (@inside_string | $newline | \" | \"\")
+@inside_string          = ($printable # ["\\] | \\[abfnrtv])
+@inside_multilinestring = (@inside_string | $newline )
 
 @varid  = $small $idchar*
 @typeid = $large $idchar*
@@ -52,8 +52,8 @@ $idchar = [$alpha $digit]
 
 @string                 = \"@inside_string*\"
 @string_error           = \"@inside_string*
-@multiline_string       = \"\"\"@inside_multilinestring\"\"\"
-@multiline_string_error = \"\"\"@inside_multilinestring
+@multiline_string       = \"\"\"(@inside_multilinestring | \"@inside_multilinestring | \"\"@inside_multilinestring)*\"\"\"
+@multiline_string_error = \"\"\"(@inside_multilinestring | \"@inside_multilinestring | \"\"@inside_multilinestring)*
 
 --------------------------------------------------------------------------------
 
@@ -64,110 +64,112 @@ tokens :-
         "#".*           ;
 
         -- Language
-        @skip           { lex' TkNewLine        }
-        "end"           { lex' TkEnd            }
-        "return"        { lex' TkReturn         }
-        ";"             { lex' TkSemicolon      }
-        ","             { lex' TkComma          }
+        @skip                   { lex' TkNewLine        }
+        "end"                   { lex' TkEnd            }
+        "return"                { lex' TkReturn         }
+        ";"                     { lex' TkSemicolon      }
+        ","                     { lex' TkComma          }
 
         -- -- Brackets
-        "("             { lex' TkLParen         }
-        ")"             { lex' TkRParen         }
-        "["             { lex' TkLBrackets      }
-        "]"             { lex' TkRBrackets      }
+        "("                     { lex' TkLParen         }
+        ")"                     { lex' TkRParen         }
+        "["                     { lex' TkLBrackets      }
+        "]"                     { lex' TkRBrackets      }
 
         -- Types
-        --"Int"           { lex' TkIntType        }
-        --"Float"         { lex' TkFloatType      }
-        --"Bool"          { lex' TkBoolType       }
-        --"Char"          { lex' TkCharType       }
-        --"String"        { lex' TkStringType     }
-        --"Range"         { lex' TkRangeType      }
-        --"Type"          { lex' TkTypeType       }
-        "Union"         { lex' TkUnionType      }
-        "Record"        { lex' TkRecordType     }
+        --"Int"                   { lex' TkIntType        }
+        --"Float"                 { lex' TkFloatType      }
+        --"Bool"                  { lex' TkBoolType       }
+        --"Char"                  { lex' TkCharType       }
+        --"String"                { lex' TkStringType     }
+        --"Range"                 { lex' TkRangeType      }
+        --"Type"                  { lex' TkTypeType       }
+        "record"                { lex' TkRecordType     }
+        "union"                 { lex' TkUnionType      }
 
         -- Statements
         -- -- Declarations
-        "="             { lex' TkAssign         }
-        "def"           { lex' TkDef            }
-        "as"            { lex' TkAs             }
-        ":"             { lex' TkSignature      }
-        "->"            { lex' TkArrow          }
-        "."             { lex' TkDot            }
+        "="                     { lex' TkAssign         }
+        "def"                   { lex' TkDef            }
+        "as"                    { lex' TkAs             }
+        ":"                     { lex' TkSignature      }
+        "->"                    { lex' TkArrow          }
+        "."                     { lex' TkDot            }
 
         -- -- In/Out
-        "read"          { lex' TkRead           }
-        "print"         { lex' TkPrint          }
+        "read"                  { lex' TkRead           }
+        "print"                 { lex' TkPrint          }
 
         -- -- Conditionals
-        "if"            { lex' TkIf             }
-        "then"          { lex' TkThen           }
-        "elif"          { lex' TkElif           }
-        "else"          { lex' TkElse           }
+        "if"                    { lex' TkIf             }
+        "then"                  { lex' TkThen           }
+        "elif"                  { lex' TkElif           }
+        "else"                  { lex' TkElse           }
 
-        "unless"        { lex' TkUnless         }
+        "unless"                { lex' TkUnless         }
 
-        "case"          { lex' TkCase           }
-        "when"          { lex' TkWhen           }
-        "otherwise"     { lex' TkOtherwise      }
+        "case"                  { lex' TkCase           }
+        "when"                  { lex' TkWhen           }
+        "otherwise"             { lex' TkOtherwise      }
 
         -- -- Loops
-        "for"           { lex' TkFor            }
-        "in"            { lex' TkIn             }
-        ".."            { lex' TkFromTo         }
-        "do"            { lex' TkDo             }
+        "for"                   { lex' TkFor            }
+        "in"                    { lex' TkIn             }
+        ".."                    { lex' TkFromTo         }
+        "do"                    { lex' TkDo             }
 
-        "while"         { lex' TkWhile          }
-        "until"         { lex' TkUntil          }
-        "repeat"        { lex' TkRepeat         }
+        "while"                 { lex' TkWhile          }
+        "until"                 { lex' TkUntil          }
+        "repeat"                { lex' TkRepeat         }
 
-        "break"         { lex' TkBreak          }
-        "continue"      { lex' TkContinue       }
+        "break"                 { lex' TkBreak          }
+        "continue"              { lex' TkContinue       }
 
         -- Expressions/Operators
         -- -- Literals
-        @int            { lex  (TkInt . read)   }
-        "true"          { lex' (TkBool True)    }
-        "false"         { lex' (TkBool False)   }
-        @float          { lex  (TkFloat . read) }
-        @char           { lex  (TkChar . read)  }
+        @int                    { lex  (TkInt . read)   }
+        "true"                  { lex' (TkBool True)    }
+        "false"                 { lex' (TkBool False)   }
+        @float                  { lex  (TkFloat . read) }
+        @char                   { lex  (TkChar . read)  }
         -- -- -- Filtering newlines
-        @string         { lex  (TkString . init . tail . filterBackSlash) }
+        @string                 { lex  (TkString . dropQuotationMarks 1 1 . filterBackSlash) }
+        @multiline_string       { lex  (TkString . dropQuotationMarks 3 3 . filterBackSlash) }
 
         -- -- Arithmetic
-        "+"             { lex' TkPlus           }
-        "-"             { lex' TkMinus          }
-        "*"             { lex' TkTimes          }
-        "/"             { lex' TkDivide         }
-        "%"             { lex' TkModulo         }
-        "^"             { lex' TkPower          }
+        "+"                     { lex' TkPlus           }
+        "-"                     { lex' TkMinus          }
+        "*"                     { lex' TkTimes          }
+        "/"                     { lex' TkDivide         }
+        "%"                     { lex' TkModulo         }
+        "^"                     { lex' TkPower          }
 
         -- -- Boolean
-        "or"            { lex' TkOr             }
-        "and"           { lex' TkAnd            }
-        "not"           { lex' TkNot            }
+        "or"                    { lex' TkOr             }
+        "and"                   { lex' TkAnd            }
+        "not"                   { lex' TkNot            }
 
-        "=="            { lex' TkEqual          }
-        "/="            { lex' TkUnequal        }
+        "=="                    { lex' TkEqual          }
+        "/="                    { lex' TkUnequal        }
 
-        "<"             { lex' TkLess           }
-        ">"             { lex' TkGreat          }
-        "<="            { lex' TkLessEq         }
-        ">="            { lex' TkGreatEq        }
+        "<"                     { lex' TkLess           }
+        ">"                     { lex' TkGreat          }
+        "<="                    { lex' TkLessEq         }
+        ">="                    { lex' TkGreatEq        }
 
-        "@"             { lex' TkBelongs        }
+        "@"                     { lex' TkBelongs        }
 
         -- -- String
-        --"++"            { lex' TkConcat         }
+        --"++"                    { lex' TkConcat         }
 
         -- -- Identifiers
-        @varid          { lex TkVarId           }
-        @typeid         { lex TkTypeId          }
+        @varid                  { lex TkVarId           }
+        @typeid                 { lex TkTypeId          }
 
         -- Errors
-        .               { lex (TkError . head) }
-        @string_error   { lex (TkStringError . tail . filterBackSlash) }
+        .                       { lex (TkError . head)  }
+        @string_error           { lex (TkStringError . dropQuotationMarks 1 0 . filterBackSlash) }
+        @multiline_string_error { lex (TkStringError . dropQuotationMarks 3 0 . filterBackSlash) }
 
 {
 
@@ -184,7 +186,7 @@ data Token
     -- Types
 --    | TkIntType | TkFloatType | TkBoolType | TkCharType
 --    | TkStringType | TkRangeType | TkTypeType
-    | TkUnionType | TkRecordType
+    | TkRecordType | TkUnionType
 
     -- Statements
     -- -- Declarations
@@ -251,8 +253,8 @@ instance Show Token where
         --TkStringType    -> "type 'String'"
         --TkRangeType     -> "type 'Range'"
         --TkTypeType      -> "type 'Type'"
-        TkUnionType     -> "type 'Union'"
-        TkRecordType    -> "type 'Record'"
+        TkRecordType    -> "type 'record'"
+        TkUnionType     -> "type 'union'"
         TkAssign        -> "'='"
         TkDef           -> "'def'"
         TkAs            -> "'as'"
@@ -344,6 +346,8 @@ filterBackSlash = foldr func []
                 'v' -> '\v' : tail str
             | otherwise = c : str
 
+dropQuotationMarks :: Int -> Int -> String -> String
+dropQuotationMarks l r = reverse . drop r . reverse . drop l
 
 toPosition :: AlexPosn -> Position
 toPosition (AlexPn _ row col) = Posn (row, col)
