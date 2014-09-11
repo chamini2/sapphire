@@ -16,6 +16,7 @@ module Program
 
     -- From Lexeme
     , Lexeme(..)
+    , fillLex
 
     -- From Position
     , Position(..)
@@ -25,6 +26,17 @@ module Program
     , DataType(..)
     , Field
     --, getFields
+    , DataTypeHistory
+
+    , DataTypeZipper
+    --, Thread
+    , focusDataType
+    , defocusDataType
+    --, inDataType
+    --, backDataType
+    , topDataType
+    , deepDataType
+    , putDataType
 
     -- From Expression
     , Expression(..)
@@ -32,6 +44,20 @@ module Program
     , Unary(..)
     --, binaryOperation
     --, unaryOperation
+
+    , Access(..)
+    , AccessHistory(..)
+
+    , AccessZipper
+    --, Thread
+    , focusAccess
+    , defocusAccess
+    --, inArrayAccess
+    --, inStructAccess
+    --, inAccess
+    --, backAccess
+    , topAccess
+    , deepAccess
     ) where
 
 
