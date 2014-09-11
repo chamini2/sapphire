@@ -6,7 +6,8 @@ module Scope
     , outerScope
     ) where
 
-data Scope = Scope { serial :: ScopeNum } deriving (Show)
+newtype Scope = Scope { serial :: ScopeNum }
+    deriving (Show)
 
 {- |
     The outermost scope in the program has a default value of 0
@@ -20,5 +21,6 @@ initialScope = Scope { serial = 0 }
 outerScope :: Scope
 outerScope = Scope { serial = -1 }
 
+----------------------------------------
 
 type ScopeNum = Int
