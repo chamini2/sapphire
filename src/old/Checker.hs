@@ -480,6 +480,7 @@ getsSymInfoWithoutError (Lex iden _) f = do
 {- |
     Gets an Access' attribute if said symbol exists in the table, otherwise Nothing.
 -}
+-- The 'forall a .' binds the 'a' in this signature with the one in 'matchType'
 getsSymInfoAccess :: forall a . Lexeme Access -> (SymInfo -> a) -> Checker (Maybe a, Identifier, Lexeme Identifier)
 getsSymInfoAccess accL@(Lex acc posn) f = do
     let zipper@(topL, ths)   = deepAccess $ focusAccess accL

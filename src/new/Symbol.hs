@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module Symbol
     ( Symbol(..)
     , emptySymInfo
@@ -17,9 +16,9 @@ module Symbol
 
 import           Program
 import           Scope
+import           Stack
 
 import           Data.Sequence (Seq, empty)
-import qualified Data.Typeable as DT
 
 type Initialized     = Bool
 type Used            = Bool
@@ -29,32 +28,35 @@ type Offset          = Int
 type Width           = Int
 
 data Symbol = SymInfo
-                { dataType :: DataType
-                , category :: Category
-                , offset   :: Offset
-                , width    :: Width
-                , used     :: Used
-                , scopeNum :: ScopeNum
-                , defPosn  :: Position
+                { dataType   :: Lexeme DataType
+                , category   :: Category
+                , offset     :: Offset
+                , width      :: Width
+                , used       :: Used
+                , scopeNum   :: ScopeNum
+                , scopeStack :: Stack Scope
+                , defPosn    :: Position
                 }
             | SymType
-                { dataType :: DataType
-                , langDef  :: LanguageDefined
-                , width    :: Width
-                , used     :: Used
-                , scopeNum :: ScopeNum
-                , defPosn  :: Position
+                { dataType   :: Lexeme DataType
+                , langDef    :: LanguageDefined
+                , width      :: Width
+                , used       :: Used
+                , scopeNum   :: ScopeNum
+                , scopeStack :: Stack Scope
+                , defPosn    :: Position
                 }
             | SymFunction
                 { paramTypes :: Seq (Lexeme DataType)
-                , returnType :: DataType
+                , returnType :: Lexeme DataType
                 , body       :: StBlock
                 , width      :: Width
                 , used       :: Used
-                , scopeNum :: ScopeNum
+                , scopeNum   :: ScopeNum
+                , scopeStack :: Stack Scope
                 , defPosn    :: Position
                 }
-            deriving (Show, DT.Typeable)
+            deriving (Show)
 
 --instance Show Symbol where
 --    show (SymInfo dt ct v sn dp i u p o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP ++ showO
@@ -85,35 +87,40 @@ data SymbolCategory = CatInfo
 
 emptySymInfo :: Symbol
 emptySymInfo = SymInfo
-    { dataType = Void
-    , category = CatVariable
-    , offset   = 0
-    , width    = 0
-    , used     = False
-    , scopeNum = -1
-    , defPosn  = defaultPosn
+    { dataType   = fillLex Void
+    , category   = CatVariable
+    , offset     = 0
+    , width      = 0
+    , used       = False
+    , scopeNum   = -1
+    , scopeStack = singletonStack outerScope
+    , defPosn    = defaultPosn
     }
 
 emptySymType :: Symbol
 emptySymType = SymType
-    { dataType = Void
-    , langDef  = False
-    , width    = 0
-    , used     = False
-    , scopeNum = -1
-    , defPosn  = defaultPosn
+    { dataType   = fillLex Void
+    , langDef    = False
+    , width      = 0
+    , used       = False
+    , scopeNum   = -1
+    , scopeStack = singletonStack outerScope
+    , defPosn    = defaultPosn
     }
 
 emptySymFunction :: Symbol
 emptySymFunction = SymFunction
     { paramTypes = empty
-    , returnType = Void
+    , returnType = fillLex Void
     , body       = empty
     , width      = 0
     , used       = False
     , scopeNum   = -1
+    , scopeStack = singletonStack outerScope
     , defPosn    = defaultPosn
     }
+
+----------------------------------------
 
 symbolCategory :: Symbol -> SymbolCategory
 symbolCategory sym = case sym of

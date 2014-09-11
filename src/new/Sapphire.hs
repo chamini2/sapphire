@@ -1,8 +1,8 @@
 module Main where
 
 --import           Checker             (CheckState (..), Checker, checkProgram, getErrors, runProgramChecker)
-import           Parser
 import           Definition
+import           Parser
 
 --import           Control.Monad       (guard, void)
 --import           Control.Monad.Trans (lift)
@@ -23,7 +23,7 @@ main = do
 printProgram :: Definition () -> IO ()
 printProgram def = do
     let (state, writer) = runProgramDefinition def
-        DefState symTableST _ _ astST = state
+        --DefState symTableST _ _ astST = state
     print state
     mapM_ print writer
 
