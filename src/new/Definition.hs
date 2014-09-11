@@ -4,18 +4,21 @@ import           Error
 import           Program
 import           SymbolTable
 
-import           Control.Arrow     ((&&&))
-import           Control.Monad.RWS hiding (forM, forM_, mapM, mapM_)
-import           Data.Foldable     as DF (forM_, mapM_)
-import           Data.Function     (on)
-import           Data.Functor      ((<$), (<$>))
-import qualified Data.Map          as DM (Map, fromList, toList)
-import           Data.Sequence     as DS (Seq, empty, singleton)
-import           Prelude           as P hiding (mapM_)
+import           Control.Arrow             ((&&&))
+import           Control.Monad.RWS         hiding (forM, forM_, mapM, mapM_)
+import           Control.Monad.Trans.Maybe (runMaybeT, MaybeT)
+import           Data.Foldable             as DF (forM_, mapM_)
+import           Data.Function             (on)
+import           Data.Functor              ((<$), (<$>))
+import qualified Data.Map                  as DM (Map, fromList, toList)
+import           Data.Maybe                (fromMaybe, isJust, fromJust)
+import           Data.Sequence             as DS (Seq, empty, singleton)
+import           Data.Traversable          (forM)
+import           Prelude                   as P hiding (mapM_)
 
 --------------------------------------------------------------------------------
 
-type Definition a = RWS SapphireReader DefWriter DefState a
+type Definition = RWS SapphireReader DefWriter DefState
 
 --------------------------------------------------------------------------------
 -- Reader
@@ -110,7 +113,7 @@ defaultArchitecture = Arch
         , (Float   , 32)
         , (Char    , 8)
         , (Bool    , 8)
-        {-, (Pointer , 32)-}
+        --, (Pointer , 32)
         ]
     }
 
@@ -168,30 +171,31 @@ getsSymbol idn f = do
 --modifySymbol :: Identifier -> (Symbol -> Symbol) -> Definition ()
 --modifySymbol idn f = do
 --    maySymI <- getsSymbol idn scopeNum
---    -- forM_ maySymI (modifySymbolWithScope idn f)
 --    case maySymI of
 --        Nothing -> return ()
 --        Just symScopeN -> modifySymbolWithScope idn f symScopeN
 
---modifySymbolWithScope :: Identifier -> (Symbol -> Symbol) -> ScopeNum -> Definition ()
---modifySymbolWithScope idn f scope = do
---    tab <- gets table
---    maySymI <- getSymbol idn
---    case maySymI of
---        Just _  -> modify (\s -> s { table = updateWithScope idn scope f tab })
---        Nothing -> return ()
+modifySymbolWithScope :: Identifier -> (Symbol -> Symbol) -> ScopeNum -> Definition ()
+modifySymbolWithScope idn f scope = do
+    tab <- gets table
+    maySymI <- getSymbol idn
+    case maySymI of
+        Just _  -> modify (\s -> s { table = updateWithScope idn scope f tab })
+        Nothing -> return ()
 
 --------------------------------------------------------------------------------
 
 processDeclaration :: Lexeme Declaration -> Definition Bool
 processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
     current <- currentScope
+    stk     <- gets stack
     let idn = lexInfo idnL
         info = emptySymInfo
-            { dataType = lexInfo dtL
-            , category = cat
-            , scopeNum = current
-            , defPosn  = dclP
+            { dataType   = dtL
+            , category   = cat
+            , scopeNum   = current
+            , defPosn    = dclP
+            , scopeStack = stk
             }
     maySymI <- getsSymbol idn (\s -> (scopeNum s, defPosn s, symbolCategory s))
     case maySymI of
@@ -203,22 +207,27 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
 
 --------------------------------------------------------------------------------
 
-initializeTable :: Definition ()
-initializeTable = asks arch >>= \arc -> forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
-        let info = emptySymType
-                { dataType = dt
-                , langDef  = True
-                , used     = True
-                , width    = wth
-                }
-        addSymbol (show dt) info
-
 definitionProgram :: Seq Error -> Program -> Definition ()
 definitionProgram lexErrors program@(Program block) = do
     initializeTable
     modify $ \s -> s { ast = program }
     tell lexErrors
     definitionStatements block
+    fixDataTypes
+    --fixDataTypes        -- I think we need to run it twice, to update things that may not have the "latest" DataType
+    -- OK, we can't run it twice.
+    -- We should avoid using a DataType before is defined then, or make sure it's being processed first
+
+initializeTable :: Definition ()
+initializeTable = asks arch >>=
+    \arc -> forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
+        let info = emptySymType
+                { dataType = fillLex dt
+                , langDef  = True
+                , used     = True
+                , width    = wth
+                }
+        addSymbol (show dt) info
 
 definitionStatements :: StBlock -> Definition ()
 definitionStatements = mapM_ definitionStatement
@@ -228,32 +237,36 @@ definitionStatement (Lex st stP) = case st of
 
     StVariableDeclaration dclL -> void $ processDeclaration dclL
 
-    StStructDefinition (Lex dt dtP) -> do
+    StStructDefinition dtL -> do
         current <- currentScope
-        let idn = case dt of
+        stk     <- gets stack
+        let idn = case lexInfo dtL of
                 Record idnL _ -> lexInfo idnL
                 Union  idnL _ -> lexInfo idnL
             info = emptySymType
-                { dataType = dt
-                , defPosn  = dtP
-                , scopeNum = current
+                { dataType   = dtL
+                , defPosn    = lexPosn dtL
+                , scopeNum   = current
+                , scopeStack = stk
                 }
         maySymI <- getsSymbol idn (langDef &&& defPosn)
         case maySymI of
             Nothing -> addSymbol idn info
             Just (symLangD, symDefP)
-                | symLangD  -> tellSError dtP (TypeIsLanguageDefined idn)
-                | otherwise -> tellSError dtP (TypeAlreadyDefined idn symDefP)
+                | symLangD  -> tellSError (lexPosn dtL) (TypeIsLanguageDefined idn)
+                | otherwise -> tellSError (lexPosn dtL) (TypeAlreadyDefined idn symDefP)
 
     StFunctionDef idnL (Sign parms dtL) block -> do
         current <- currentScope
+        stk     <- gets stack
         let idn = lexInfo idnL
             info = emptySymFunction
                 { paramTypes = dclDataType . lexInfo <$> parms      -- fmap (dclDataType . lexInfo) parms
-                , returnType = lexInfo dtL
+                , returnType = dtL
                 , body       = block
                 , defPosn    = lexPosn idnL
                 , scopeNum   = current
+                , scopeStack = stk
                 }
         maySymI <- getsSymbol idn (\s -> (scopeNum s, defPosn s, symbolCategory s))
         case maySymI of
@@ -265,7 +278,11 @@ definitionStatement (Lex st stP) = case st of
 
         enterScope
         mapM_ processDeclaration parms
+
+        enterScope
         definitionStatements block
+        exitScope
+
         exitScope
 
     StIf _ success failure -> do
@@ -305,3 +322,67 @@ definitionStatement (Lex st stP) = case st of
         exitScope
 
     _ -> return ()
+
+--------------------------------------------------------------------------------
+
+fixDataTypes :: Definition ()
+fixDataTypes = do
+    tab <- gets table
+    forM_ (accessible tab) $ \(idn, syms) ->
+        forM_ syms $ \sym -> do
+            currentTab <- gets table
+            case symbolCategory sym of
+                -- Variables, Parameters
+                CatInfo     -> void $ runMaybeT $ do
+                    newDtL <- getUpdatedDataType (scopeStack sym) (defPosn sym) (dataType sym)
+                    lift $ modifySymbolWithScope idn (\s -> s { dataType = newDtL}) (scopeNum sym)
+
+                CatType     -> do
+                    let symDtL    = dataType   sym
+                        symPosn   = defPosn    sym
+                    -- We only need to check the user-defined types
+                    unless (langDef sym) $ do
+                        let (strIdn, flds) = case lexInfo symDtL of
+                                Record idnL fields -> (lexInfo idnL, fields)
+                                Union  idnL fields -> (lexInfo idnL, fields)
+                        -- Fields
+                        newFlds <- runMaybeT $ forM flds $ \(fldIdnL, fldDtL) -> do
+                            -- We need the field's data type identifier for errors
+                            let fldDtIdn = (\(DataType idnL) -> lexInfo idnL) . lexInfo . defocusDataType . deepDataType $ focusDataType fldDtL
+                                symDtP   = defPosn . fromJust $ lookupWithScope fldDtIdn (scopeStack sym) currentTab
+
+                            newFldDtL <- getUpdatedDataType (scopeStack sym) (lexPosn fldIdnL) fldDtL
+
+                            -- When defining a field with type of the same strucutre we are defining (recursively)
+                            unless (strIdn /= fldDtIdn) . lift $ tellSError symPosn (RecursiveStruct strIdn (lexInfo fldIdnL))
+                            guard  (strIdn /= fldDtIdn)
+
+                            -- When the Field uses a type defined afterwards
+                            unless (symPosn > symDtP) . lift $ tellSError (lexPosn fldIdnL) (TypeNotYetDefined strIdn (lexInfo fldIdnL) fldDtIdn symDtP)
+                            guard  (symPosn > symDtP)
+
+                            return (fldIdnL, newFldDtL)
+
+                        let newDtL = case lexInfo symDtL of
+                                Record strIdnL _ -> Record strIdnL (fromMaybe flds newFlds) <$ symDtL
+                                Union  strIdnL _ -> Union  strIdnL (fromMaybe flds newFlds) <$ symDtL
+                        modifySymbolWithScope idn (\s -> s { dataType = newDtL }) (scopeNum sym)
+
+                CatFunction -> return ()
+
+getUpdatedDataType :: Stack Scope -> Position -> Lexeme DataType -> MaybeT Definition (Lexeme DataType)
+getUpdatedDataType stk posn dtL = do
+    currentTab <- gets table
+    let maySym = lookupWithScope deepDtIdn stk currentTab
+        newDeepDtL = lexInfo (dataType (fromJust maySym)) <$ deepDtIdnL
+        newDtL     = defocusDataType . topDataType $ putDataType newDeepDtL deepZpp
+
+    -- When the DataType was not found in the SymbolTable
+    unless (isJust maySym) . lift $ tellSError posn (UndefinedType deepDtIdn)
+    guard  (isJust maySym)
+
+    return newDtL
+    where
+        deepZpp             = deepDataType $ focusDataType dtL
+        DataType deepDtIdnL = lexInfo $ defocusDataType deepZpp
+        deepDtIdn           = lexInfo deepDtIdnL
