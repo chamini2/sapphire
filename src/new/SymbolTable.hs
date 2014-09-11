@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {- |
     Symbol table based on the LeBlanc-Cook symbol table abstraction
  -}
@@ -136,8 +137,8 @@ update var f (SymTable m) = SymTable $ DM.alter func var m
 {- |
     Updates the Symbol of a given identifier, in a given scope.
 -}
-updateWithScope :: Identifier -> ScopeNum -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
-updateWithScope var sc f (SymTable m) = SymTable $ DM.alter func var m
+updateWithScope :: Identifier -> (Symbol -> Symbol) -> ScopeNum -> SymbolTable -> SymbolTable
+updateWithScope var f sc (SymTable m) = SymTable $ DM.alter func var m
     where
         func = maybe failure (Just . foldr foldFunc empty)
         failure = error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
@@ -148,5 +149,9 @@ updateWithScope var sc f (SymTable m) = SymTable $ DM.alter func var m
 {- |
     Returns all the variables
  -}
-accessible :: SymbolTable -> Seq (Identifier, Seq Symbol)
-accessible (SymTable m) = fromList $ DM.toList m
+accessible :: SymbolTable -> Seq (Identifier, Symbol)
+accessible (SymTable m) = fromList . sortIt . expand $ DM.toList m
+    where
+        expand = concatMap (\(idn, syms) -> fmap (idn,) (toList syms))
+        sortIt = sortBy (compare `on` (defPosn . snd))
+--accessible (SymTable m) = fromList . sortBy (compare `on` (defPosn . snd)) $ DM.toList m
