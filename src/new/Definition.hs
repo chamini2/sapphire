@@ -10,15 +10,15 @@ import           SymbolTable
 
 import           Control.Arrow             ((&&&))
 import           Control.Monad.RWS         hiding (forM, forM_, mapM, mapM_)
-import           Control.Monad.Trans.Maybe (runMaybeT, MaybeT)
-import           Data.Foldable             as DF (forM_, mapM_, any, all)
+import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import           Data.Foldable             as DF (all, any, forM_, mapM_)
 import           Data.Function             (on)
 import           Data.Functor              ((<$), (<$>))
 import qualified Data.Map                  as DM (Map, fromList, toList)
-import           Data.Maybe                (isJust, fromJust, isNothing)
+import           Data.Maybe                (fromJust, isJust, isNothing)
 import           Data.Sequence             as DS (Seq, empty, singleton)
 import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (mapM_, any, all)
+import           Prelude                   as P hiding (all, any, mapM_)
 
 --------------------------------------------------------------------------------
 

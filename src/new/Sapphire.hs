@@ -6,10 +6,10 @@ import           Parser
 
 --import           Control.Monad       (guard, void)
 --import           Control.Monad.Trans (lift)
-import           Data.Foldable       (mapM_)
+import           Data.Foldable      (mapM_)
 --import           Data.Sequence       as DS (null)
-import           Prelude             as P hiding (mapM_)
-import           System.Environment  (getArgs)
+import           Prelude            as P hiding (mapM_)
+import           System.Environment (getArgs)
 
 main :: IO ()
 main = do

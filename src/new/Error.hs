@@ -2,7 +2,7 @@ module Error where
 
 import           Program
 
-import           Data.Function          (on)
+import           Data.Function (on)
 
 --------------------------------------------------------------------------------
 
