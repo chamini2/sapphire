@@ -47,8 +47,8 @@ import           Prelude       hiding (concatMap, foldr)
     --"String"        { Lex TkStringType  _ }
     --"Range"         { Lex TkRangeType   _ }
     --"Type"          { Lex TkTypeType    _ }
-    "Union"         { Lex TkUnionType   _ }
-    "Record"        { Lex TkRecordType  _ }
+    "record"        { Lex TkRecordType  _ }
+    "union"         { Lex TkUnionType   _ }
 
     -- Statements
     -- -- Declarations
@@ -164,13 +164,13 @@ MaybeNL :: { () }
     | MaybeNL newline       { }
 
 Statement :: { Lexeme Statement }
-    : {- λ, no-op -}            { Lex StNoop defaultPosn }
+    : {- λ, no-op -}            { fillLex StNoop }
     --| Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
     | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
-    | "Record" TypeId "as" FieldList "end"      { StStructDefinition (Record $2 $4 <$ $1) <$ $1 }
-    | "Union"  TypeId "as" FieldList "end"      { StStructDefinition (Union  $2 $4 <$ $1) <$ $1 }
+    | "record" TypeId "as" FieldList "end"      { StStructDefinition (Record $2 $4 <$ $1) <$ $1 }
+    | "union"  TypeId "as" FieldList "end"      { StStructDefinition (Union  $2 $4 <$ $1) <$ $1 }
 
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
@@ -202,7 +202,7 @@ Statement :: { Lexeme Statement }
     | "continue"        { StContinue <$ $1 }
 
     -- Error
-    | error Separator   { Lex StNoop defaultPosn }
+    | error Separator   { fillLex StNoop }
 
 ---------------------------------------
 -- Identifiers
@@ -376,7 +376,7 @@ expandStatement st = case lexInfo st of
 
 -- For the syntactic sugar of defining several fields of the same type using commas
 expandField :: (Seq (Lexeme Identifier), Lexeme DataType) -> Seq (Lexeme Identifier, Lexeme DataType)
-expandField (idens, dt) = fmap (,dt) idens
+expandField (idns, dt) = fmap (,dt) idns
 
 notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
