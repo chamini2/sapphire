@@ -36,7 +36,7 @@ instance Show LexerError where
     show lError = case lError of
         LexerError  msg  -> msg
         UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
-        StringError str  -> "missing matching \" for string " ++ show str
+        StringError str  -> "missing matching quotation mark for string " ++ show str
 
 ----------------------------------------
 
@@ -65,7 +65,9 @@ data StaticError
 --    -- Types
     | TypeAlreadyDefined    Identifier Position
     | TypeIsLanguageDefined Identifier
---    | UndefinedType         Identifier
+    | UndefinedType         Identifier
+    | RecursiveStruct       Identifier Identifier
+    | TypeNotYetDefined     Identifier Identifier Identifier Position
 --    -- Functions
     | FunctionRedefinition     Identifier Position
 --    | FunctionNotDefined       Identifier
@@ -114,6 +116,8 @@ data StaticError
 --        TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
 --        LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
 --        UndefinedType        tname   -> "type '" ++ tname ++ "' has not been defined"
+        --RecursiveStruct      tname field -> "field '" ++ field ++ "' in type '" ++ tname ++ "' creates an infinite recursion in the structure"
+        --TypeNotYetDefined tname field struct posn -> "field '" ++ field ++ "' in type '" ++ tname ++ "' can't use the type '" ++ struct ++ "' because it is defined at '" ++ posn ++ "' (must be defined before usage inside structures)"
 --        -- Functions
 --        FunctionNotDefined    fname     -> "must define function '" ++ fname ++ "' before implementing it"
 --        ProcedureInExpression fname     -> "cannot use procedure '" ++ fname ++ "' inside an expression"
