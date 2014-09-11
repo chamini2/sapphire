@@ -1,4 +1,8 @@
-module Definition where
+module Definition
+    ( DefState(..)
+    , DefWriter
+    , processDefinition
+    )where
 
 import           Error
 import           Program
@@ -7,14 +11,14 @@ import           SymbolTable
 import           Control.Arrow             ((&&&))
 import           Control.Monad.RWS         hiding (forM, forM_, mapM, mapM_)
 import           Control.Monad.Trans.Maybe (runMaybeT, MaybeT)
-import           Data.Foldable             as DF (forM_, mapM_, any, all, concatMap)
+import           Data.Foldable             as DF (forM_, mapM_, any, all)
 import           Data.Function             (on)
 import           Data.Functor              ((<$), (<$>))
 import qualified Data.Map                  as DM (Map, fromList, toList)
-import           Data.Maybe                (fromMaybe, isJust, fromJust, isNothing)
+import           Data.Maybe                (isJust, fromJust, isNothing)
 import           Data.Sequence             as DS (Seq, empty, singleton)
 import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (mapM_, any, all, concatMap)
+import           Prelude                   as P hiding (mapM_, any, all)
 
 --------------------------------------------------------------------------------
 
@@ -91,9 +95,6 @@ initialReader = SapphireReader
     , arch   = defaultArchitecture
     }
 
-initialWriter :: DefWriter
-initialWriter = empty
-
 initialState :: DefState
 initialState = DefState
     { table     = emptyTable
@@ -120,6 +121,9 @@ defaultArchitecture = Arch
 --------------------------------------------------------------------------------
 -- Using the Monad
 
+processDefinition :: DefWriter -> Program -> (DefState, DefWriter)
+processDefinition w = runProgramDefinition . definitionProgram w
+
 runProgramDefinition :: Definition a -> (DefState, DefWriter)
 runProgramDefinition = (\(_,s,w) -> (s,w)) . runDefinition
 
@@ -127,7 +131,7 @@ runDefinitionWithReader :: SapphireReader -> Definition a -> (a, DefState, DefWr
 runDefinitionWithReader r = flip (flip runRWS r) initialState
 
 runDefinition :: Definition a -> (a, DefState, DefWriter)
-runDefinition = flip (flip runRWS initialReader) initialState
+runDefinition = runDefinitionWithReader initialReader
 
 getDefinition :: Definition a -> a
 getDefinition = (\(v,_,_) -> v) . runDefinition
@@ -158,8 +162,8 @@ currentScope = gets (serial . top . stack)
 addSymbol :: Identifier -> Symbol -> Definition ()
 addSymbol idn info = modify $ \s -> s { table = insert idn info (table s) }
 
-getSymbol :: Identifier -> Definition (Maybe Symbol)
-getSymbol = flip getsSymbol id
+--getSymbol :: Identifier -> Definition (Maybe Symbol)
+--getSymbol = flip getsSymbol id
 
 getsSymbol :: Identifier -> (Symbol -> a) -> Definition (Maybe a)
 getsSymbol idn f = do
@@ -207,16 +211,17 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
 
 --------------------------------------------------------------------------------
 
-definitionProgram :: Seq Error -> Program -> Definition ()
-definitionProgram lexErrors program@(Program block) = do
+definitionProgram :: DefWriter -> Program -> Definition ()
+definitionProgram w program@(Program block) = do
     initializeTable
     modify $ \s -> s { ast = program }
-    tell lexErrors
+    tell w
     definitionStatements block
     fixDataTypes
     --fixDataTypes        -- I think we need to run it twice, to update things that may not have the "latest" DataType
     -- OK, we can't run it twice.
     -- We should avoid using a DataType before is defined then, or make sure it's being processed first
+    -- This hasn't been resolved
 
 initializeTable :: Definition ()
 initializeTable = asks arch >>=
