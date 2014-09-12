@@ -1,52 +1,32 @@
 module Definition
     ( DefState(..)
-    , DefWriter
     , processDefinition
+
+    , Definition
+    , definitionProgram
+    , runProgramDefinition
+    --, processDefinition
     )where
 
 import           Error
 import           Program
 import           SymbolTable
+import           RWS
 
 import           Control.Arrow             ((&&&))
 import           Control.Monad.RWS         hiding (forM, forM_, mapM, mapM_)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Data.Foldable             as DF (all, any, forM_, mapM_)
-import           Data.Function             (on)
 import           Data.Functor              ((<$), (<$>))
-import qualified Data.Map                  as DM (Map, fromList, toList)
+import qualified Data.Map                  as DM (toList)
 import           Data.Maybe                (fromJust, isJust, isNothing)
-import           Data.Sequence             as DS (Seq, empty, singleton)
+import           Data.Sequence             as DS (Seq, empty, filter)
 import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (all, any, mapM_)
+import           Prelude                   as P hiding (all, any, mapM_, filter)
 
 --------------------------------------------------------------------------------
 
-type Definition = RWS SapphireReader DefWriter DefState
-
---------------------------------------------------------------------------------
--- Reader
-
-data SapphireReader = SapphireReader
-    { flags :: Seq Flag
-    , arch  :: Architecture
-    }
-
-data Flag = OutputFile FilePath | SupressWarnings | AllWarnings
-    deriving (Eq)
-
-data Architecture = Arch
-    { archName :: String
-    , widths   :: DM.Map DataType Width
-    } deriving (Show)
-
-instance Eq Architecture where
-    (==) = (==) `on` archName
-
---------------------------------------------------------------------------------
--- Writer
-
-type DefWriter = Seq Error
+type Definition = RWS SappReader SappWriter DefState
 
 --------------------------------------------------------------------------------
 -- State
@@ -56,9 +36,6 @@ data DefState = DefState
     , stack   :: Stack Scope
     , scopeId :: ScopeNum
     , ast     :: Program
-    --, loopLvl   :: NestedLevel
-    --, funcStack :: Stack (DataType, Lexeme Identifier, ScopeNum)
-    --, offsStack :: Stack Offset
     }
 
 instance Show DefState where
@@ -69,31 +46,8 @@ instance Show DefState where
             showC = "Scope Number:\t" ++ show c ++ "\n"
             showA = show a ++ "\n"
 
-type NestedLevel = Int
-
---------------------------------------------------------------------------------
--- Monad functions
-
-tellLError :: Position -> LexerError -> Definition ()
-tellLError posn err = tell (singleton $ LError posn err)
-
-tellPError :: Position -> ParseError -> Definition ()
-tellPError posn err = tell (singleton $ PError posn err)
-
-tellSError :: Position -> StaticError -> Definition ()
-tellSError posn err = tell (singleton $ SError posn err)
-
-tellWarn :: Position -> Warning -> Definition ()
-tellWarn posn err = tell (singleton $ Warn posn err)
-
 ----------------------------------------
--- Initials
-
-initialReader :: SapphireReader
-initialReader = SapphireReader
-    { flags  = empty
-    , arch   = defaultArchitecture
-    }
+-- Initial
 
 initialState :: DefState
 initialState = DefState
@@ -101,42 +55,56 @@ initialState = DefState
     , stack     = initialStack
     , scopeId   = 0
     , ast       = Program DS.empty
-    --, loopLvl   = 0
-    --, funcStack = singletonStack (Void, Lex "sapphire" (0,0), -1)
-    --, offsStack = singletonStack 0
     }
 
-defaultArchitecture :: Architecture
-defaultArchitecture = Arch
-    { archName = "mips"
-    , widths = DM.fromList
-        [ (Int     , 32)
-        , (Float   , 32)
-        , (Char    , 8)
-        , (Bool    , 8)
-        --, (Pointer , 32)
-        ]
-    }
+--------------------------------------------------------------------------------
+-- Building the Monad
+
+definitionProgram :: SappWriter -> Program -> Definition ()
+definitionProgram w program@(Program block) = do
+    initializeTable
+    modify $ \s -> s { ast = program }
+    tell w
+    definitionStatements block
+
+    tab <- liftM accessible $ gets table
+    -- First we define every DataType in the program,
+    -- Then we get said DataTypes for the variables/parameters
+    fixDataTypes $ filter ((==) CatType . symbolCategory . snd) tab
+    fixDataTypes $ filter ((/=) CatType . symbolCategory . snd) tab
+
+----------------------------------------
+
+initializeTable :: Definition ()
+initializeTable = asks arch >>=
+    \arc -> forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
+        let info = emptySymType
+                { dataType = fillLex dt
+                , langDef  = True
+                , used     = True
+                , width    = wth
+                }
+        addSymbol (show dt) info
 
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processDefinition :: DefWriter -> Program -> (DefState, DefWriter)
+processDefinition :: SappWriter -> Program -> (DefState, SappWriter)
 processDefinition w = runProgramDefinition . definitionProgram w
 
-runProgramDefinition :: Definition a -> (DefState, DefWriter)
+runProgramDefinition :: Definition a -> (DefState, SappWriter)
 runProgramDefinition = (\(_,s,w) -> (s,w)) . runDefinition
 
-runDefinitionWithReader :: SapphireReader -> Definition a -> (a, DefState, DefWriter)
+runDefinitionWithReader :: SappReader -> Definition a -> (a, DefState, SappWriter)
 runDefinitionWithReader r = flip (flip runRWS r) initialState
 
-runDefinition :: Definition a -> (a, DefState, DefWriter)
+runDefinition :: Definition a -> (a, DefState, SappWriter)
 runDefinition = runDefinitionWithReader initialReader
 
 getDefinition :: Definition a -> a
 getDefinition = (\(v,_,_) -> v) . runDefinition
 
-getWriter :: Definition a -> DefWriter
+getWriter :: Definition a -> SappWriter
 getWriter = (\(_,_,w) -> w) . runDefinition
 
 getState :: Definition a -> DefState
@@ -144,6 +112,9 @@ getState = (\(_,s,_) -> s) . runDefinition
 
 --------------------------------------------------------------------------------
 -- Monad handling
+
+----------------------------------------
+-- Scope
 
 enterScope :: Definition ()
 enterScope = do
@@ -158,6 +129,7 @@ currentScope :: Definition ScopeNum
 currentScope = gets (serial . top . stack)
 
 ----------------------------------------
+-- Symbol
 
 addSymbol :: Identifier -> Symbol -> Definition ()
 addSymbol idn info = modify $ \s -> s { table = insert idn info (table s) }
@@ -170,8 +142,6 @@ getsSymbol idn f = do
     (tab, stk) <- gets (table &&& stack)
     return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
 
-----------------------------------------
-
 --modifySymbol :: Identifier -> (Symbol -> Symbol) -> Definition ()
 --modifySymbol idn f = do
 --    maySymI <- getsSymbol idn scopeNum
@@ -182,12 +152,11 @@ getsSymbol idn f = do
 modifySymbolWithScopeNStack :: Identifier -> (Symbol -> Symbol) -> ScopeNum -> Stack Scope -> Definition ()
 modifySymbolWithScopeNStack idn f scope stk = do
     tab <- gets table
-    let maySymI = lookupWithScope idn stk tab
-    case maySymI of
-        Nothing -> return ()
-        Just _  -> modify (\s -> s { table = updateWithScope idn f scope tab })
+    let exists = isJust $ lookupWithScope idn stk tab
+    when exists $ modify $ \s -> s { table = updateWithScope idn f scope tab }
 
 --------------------------------------------------------------------------------
+-- Declaration
 
 processDeclaration :: Lexeme Declaration -> Definition Bool
 processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
@@ -201,7 +170,7 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
             , defPosn    = dclP
             , scopeStack = stk
             }
-    maySymI <- getsSymbol idn (\s -> (scopeNum s, defPosn s, symbolCategory s))
+    maySymI <- getsSymbol idn $ \s -> (scopeNum s, defPosn s, symbolCategory s)
     case maySymI of
         Nothing -> addSymbol idn info >> return True
         Just (symScopeN, symDefP, symCat)
@@ -210,29 +179,7 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
             | otherwise             -> addSymbol idn info >> return True
 
 --------------------------------------------------------------------------------
-
-definitionProgram :: DefWriter -> Program -> Definition ()
-definitionProgram w program@(Program block) = do
-    initializeTable
-    modify $ \s -> s { ast = program }
-    tell w
-    definitionStatements block
-    fixDataTypes
-    --fixDataTypes        -- I think we need to run it twice, to update things that may not have the "latest" DataType
-    -- OK, we can't run it twice.
-    -- We should avoid using a DataType before is defined then, or make sure it's being processed first
-    -- This hasn't been resolved
-
-initializeTable :: Definition ()
-initializeTable = asks arch >>=
-    \arc -> forM_ (DM.toList $ widths arc) $ \(dt, wth) -> do
-        let info = emptySymType
-                { dataType = fillLex dt
-                , langDef  = True
-                , used     = True
-                , width    = wth
-                }
-        addSymbol (show dt) info
+-- Statements
 
 definitionStatements :: StBlock -> Definition ()
 definitionStatements = mapM_ definitionStatement
@@ -329,68 +276,69 @@ definitionStatement (Lex st stP) = case st of
     _ -> return ()
 
 --------------------------------------------------------------------------------
+-- DataType processing
 
-fixDataTypes :: Definition ()
-fixDataTypes = do
-    tab <- gets table
-    forM_ (accessible tab) $ \(idn, sym) -> do
-        currentTab <- gets table
-        case symbolCategory sym of
-            -- Variables and Parameters
-            CatInfo     -> void $ runMaybeT $ do
-                newDtL <- getUpdatedDataType (scopeStack sym) (defPosn sym) (dataType sym)
-                lift $ modifySymbolWithScopeNStack idn (\s -> s { dataType = newDtL}) (scopeNum sym) (scopeStack sym)
+fixDataTypes :: Seq (Identifier, Symbol) -> Definition ()
+fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
+    currentTab <- gets table
+    case symbolCategory sym of
 
-            CatType     -> do
-                let symDtL  = dataType sym
-                    symPosn = defPosn  sym
-                -- We only need to check the user-defined types
-                unless (langDef sym) $ do
-                    let (strIdn, flds) = case lexInfo symDtL of
-                            Record idnL fields -> (lexInfo idnL, fields)
-                            Union  idnL fields -> (lexInfo idnL, fields)
-                    -- Fields
-                    newFlds <- forM flds $ \(fldIdnL, fldDtL) -> runMaybeT $ do
-                        -- We need the field's data type identifier for errors
-                        let fldDtIdn = (\(DataType idnL) -> lexInfo idnL) . lexInfo . defocusDataType . deepDataType $ focusDataType fldDtL
-                            symDtP   = defPosn . fromJust $ lookupWithScope fldDtIdn (scopeStack sym) currentTab
+        -- Variables and Parameters
+        CatInfo     -> void $ runMaybeT $ do
+            newDtL <- getUpdatedDataType (scopeStack sym) (defPosn sym) (dataType sym)
+            lift $ modifySymbolWithScopeNStack idn (\s -> s { dataType = newDtL}) (scopeNum sym) (scopeStack sym)
 
-                        newFldDtL <- getUpdatedDataType (scopeStack sym) (lexPosn fldIdnL) fldDtL
+        CatType     -> do
+            let symDtL  = dataType sym
+                symPosn = defPosn  sym
+            -- We only need to check the user-defined types
+            unless (langDef sym) $ do
+                let (strIdn, flds) = case lexInfo symDtL of
+                        Record idnL fields -> (lexInfo idnL, fields)
+                        Union  idnL fields -> (lexInfo idnL, fields)
+                -- Fields
+                newFlds <- forM flds $ \(fldIdnL, fldDtL) -> runMaybeT $ do
+                    -- We need the field's data type identifier for errors
+                    let fldDtIdn = (\(DataType idnL) -> lexInfo idnL) . lexInfo . defocusDataType . deepDataType $ focusDataType fldDtL
+                        symDtP   = defPosn . fromJust $ lookupWithScope fldDtIdn (scopeStack sym) currentTab
 
-                        -- Error when defining a field with type of the same strucutre we are defining (recursively)
-                        unless (strIdn /= fldDtIdn) . lift $ tellSError (lexPosn fldIdnL) (RecursiveStruct strIdn (lexInfo fldIdnL))
-                        guard  (strIdn /= fldDtIdn)
+                    newFldDtL <- getUpdatedDataType (scopeStack sym) (lexPosn fldIdnL) fldDtL
 
-                        -- Error when it uses a type defined afterwards
-                        unless (symPosn > symDtP) . lift $ tellSError (lexPosn fldIdnL) (TypeNotYetDefined strIdn (lexInfo fldIdnL) fldDtIdn symDtP)
-                        guard  (symPosn > symDtP)
+                    -- Error when defining a field with type of the same strucutre we are defining (recursively)
+                    unless (strIdn /= fldDtIdn) . lift $ tellSError (lexPosn fldIdnL) (RecursiveStruct strIdn (lexInfo fldIdnL))
+                    guard  (strIdn /= fldDtIdn)
 
-                        return (fldIdnL, newFldDtL)
+                    -- Error when it uses a type defined afterwards
+                    unless (symPosn > symDtP) . lift $ tellSError (lexPosn fldIdnL) (TypeNotYetDefined strIdn (lexInfo fldIdnL) fldDtIdn symDtP)
+                    guard  (symPosn > symDtP)
 
-                    unless (any isNothing newFlds) $ do
-                        let newDtL = case lexInfo symDtL of
-                                Record strIdnL _ -> Record strIdnL (fmap fromJust newFlds) <$ symDtL
-                                Union  strIdnL _ -> Union  strIdnL (fmap fromJust newFlds) <$ symDtL
-                        modifySymbolWithScopeNStack idn (\s -> s { dataType = newDtL }) (scopeNum sym) (scopeStack sym)
+                    return (fldIdnL, newFldDtL)
 
-            CatFunction -> do
-                let symStk  = scopeStack sym
-                    symPosn = defPosn sym
-                mayRetDtL    <- runMaybeT $ getUpdatedDataType symStk symPosn (returnType sym)
-                mayParamDtLs <- forM (paramTypes sym) $ \paramDtL ->
-                    runMaybeT $ getUpdatedDataType symStk symPosn paramDtL
+                unless (any isNothing newFlds) $ do
+                    let newDtL = case lexInfo symDtL of
+                            Record strIdnL _ -> Record strIdnL (fmap fromJust newFlds) <$ symDtL
+                            Union  strIdnL _ -> Union  strIdnL (fmap fromJust newFlds) <$ symDtL
+                    modifySymbolWithScopeNStack idn (\s -> s { dataType = newDtL }) (scopeNum sym) (scopeStack sym)
 
-                when (all isJust mayParamDtLs && isJust mayRetDtL) $ do
-                    let retDtL    = fromJust mayRetDtL
-                        paramDtLs = fmap fromJust mayParamDtLs
-                    modifySymbolWithScopeNStack idn (\s -> s { returnType = retDtL, paramTypes = paramDtLs}) (scopeNum sym) (scopeStack sym)
+        CatFunction -> do
+            let symStk  = scopeStack sym
+                symPosn = defPosn sym
+            mayRetDtL    <- runMaybeT $ getUpdatedDataType symStk symPosn (returnType sym)
+            mayParamDtLs <- forM (paramTypes sym) $ \paramDtL ->
+                runMaybeT $ getUpdatedDataType symStk symPosn paramDtL
+
+            when (all isJust mayParamDtLs && isJust mayRetDtL) $ do
+                let retDtL    = fromJust mayRetDtL
+                    paramDtLs = fmap fromJust mayParamDtLs
+                modifySymbolWithScopeNStack idn (\s -> s { returnType = retDtL, paramTypes = paramDtLs}) (scopeNum sym) (scopeStack sym)
+
+----------------------------------------
 
 getUpdatedDataType :: Stack Scope -> Position -> Lexeme DataType -> MaybeT Definition (Lexeme DataType)
-getUpdatedDataType stk posn dtL = if lexInfo dtL == Void
-    then return dtL
+getUpdatedDataType stk posn dtL = if lexInfo dtL == Void then return dtL
     else do
-        currentTab <- gets table
-        let maySym = lookupWithScope deepDtIdn stk currentTab
+        tab <- gets table
+        let maySym = lookupWithScope deepDtIdn stk tab
             newDeepDtL = lexInfo (dataType (fromJust maySym)) <$ deepDtIdnL
             newDtL     = defocusDataType . topDataType $ putDataType newDeepDtL deepZpp
 
