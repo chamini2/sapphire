@@ -6,7 +6,7 @@ ifeq (run,$(firstword $(MAKECMDGOALS)))
   $(eval $(RUN_ARGS):;@:)
 endif
 
-main: clean happy
+main: smallclean happy
 	@# ghc -O2 Sapphire.hs
 	ghc Sapphire.hs
 
@@ -30,8 +30,10 @@ ghci:
 file:
 	./Sapphire ../examples/sapphire/ejemplo.sp
 
-clean:
-	@rm *.hi *.o 2> /dev/null || true
+smallclean:
 	@rm Lexer.hs 2> /dev/null || true
 	@rm Parser.hs 2> /dev/null || true
 	@rm Sapphire 2> /dev/null || true
+
+clean: smallclean
+	@rm *.hi *.o 2> /dev/null || true

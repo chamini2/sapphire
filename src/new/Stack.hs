@@ -5,6 +5,7 @@ module Stack
     , push
 
     , initialStack
+    , emptyStack
     , singletonStack
     ) where
 
@@ -49,6 +50,9 @@ pop (Stack (_ : s)) = Stack s
 -}
 initialStack :: Stack Scope
 initialStack = Stack [ initialScope, outerScope ]
+
+emptyStack :: Stack a
+emptyStack = Stack [ ]
 
 singletonStack :: a -> Stack a
 singletonStack n = Stack [ n ]

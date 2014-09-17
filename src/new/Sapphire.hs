@@ -2,12 +2,13 @@ module Main where
 
 --import           Checker             (CheckState (..), Checker, checkProgram, getErrors, runProgramChecker)
 import           Definition
+import           TypeChecker
 import           Parser
 
---import           Control.Monad       (guard, void)
+import           Control.Monad       (when)
 --import           Control.Monad.Trans (lift)
 import           Data.Foldable      (mapM_)
---import           Data.Sequence       as DS (null)
+import           Data.Sequence      as DS (null)
 import           Prelude            as P hiding (mapM_)
 import           System.Environment (getArgs)
 
@@ -17,15 +18,14 @@ main = do
     input <- if P.null args
         then getContents
         else readFile $ head args
-    printProgram $ uncurry definitionProgram $ parseProgram input
+    let (defS, defW) = uncurry processDefinition $ parseProgram input
+    print defS
+    mapM_ print defW
+    when (DS.null defW) $ do
+        let (typS, typW) = processTypeChecker defW (table defS) (ast defS)
+        print typS
+        mapM_ print typW
     putStrLn "done."
-
-printProgram :: Definition () -> IO ()
-printProgram def = do
-    let (state, writer) = runProgramDefinition def
-        --DefState symTableST _ _ astST = state
-    print state
-    mapM_ print writer
 
 
 --printProgram :: Checker () -> IO ()
