@@ -20,7 +20,9 @@ instance Ord Position where
             else compare c1 c2
 
 instance Show Position where
-    show (Posn (r, c)) = show r ++ "," ++ show c
+    show (Posn tuple) = case tuple of
+        (0,0) -> "in the language"
+        (r,c) -> "at " ++ show r ++ "," ++ show c
 
 defaultPosn :: Position
 defaultPosn = Posn (0,0)
