@@ -1,10 +1,10 @@
 module Definition
-( DefState(..)
---, Definition
---, buildDefinition
---, runProgramDefinition
-, processDefinition
-) where
+    ( DefState(..)
+    --, Definition
+    --, buildDefinition
+    --, runProgramDefinition
+    , processDefinition
+    ) where
 
 import           Error
 import           Program
@@ -93,8 +93,8 @@ buildDefinition w program@(Program block) = do
 ----------------------------------------
 
 initializeTable :: Definition ()
-initializeTable = asks arch >>=
-    \arc -> forM_ (DM.toList $ types arc) $ \(dt, byt) -> do
+initializeTable = asks (DM.toList . types . arch) >>= \tuples -> forM_ tuples $
+    \(dt, byt) -> do
         let info = emptySymType
                 { dataType = fillLex dt
                 , langDef  = True
@@ -279,7 +279,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
         -- Variables and Parameters
         CatInfo     -> void $ runMaybeT $ do
             newDtL <- getUpdatedDataType (scopeStack sym) (defPosn sym) (dataType sym)
-            modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym -> sym { dataType = newDtL})
+            modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { dataType = newDtL})
 
         CatType     -> do
             let symDtL  = dataType sym
@@ -309,7 +309,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     let newDtL = case lexInfo symDtL of
                             Record strIdnL _ -> Record strIdnL (fmap fromJust newFlds) <$ symDtL
                             Union  strIdnL _ -> Union  strIdnL (fmap fromJust newFlds) <$ symDtL
-                    modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym -> sym { dataType = newDtL })
+                    modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { dataType = newDtL })
 
         CatFunction -> do
             let symStk  = scopeStack sym
@@ -321,7 +321,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
             when (all isJust mayParamDtLs && isJust mayRetDtL) $ do
                 let retDtL    = fromJust mayRetDtL
                     paramDtLs = fmap fromJust mayParamDtLs
-                modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym -> sym { returnType = retDtL, paramTypes = paramDtLs})
+                modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs})
 
 ----------------------------------------
 

@@ -21,8 +21,8 @@ import           Lexeme
 import           Control.Monad   (liftM)
 import           Data.List       (intercalate, foldl')
 import           Data.List.Split (splitOn)
-import           Data.Sequence   (Seq, (|>), empty, null)
-import           Prelude         hiding (lex, null)
+import           Data.Sequence   (Seq, (|>), empty)
+import           Prelude         hiding (lex)
 
 }
 
@@ -349,12 +349,12 @@ dropQuotationMarks :: Int -> Int -> String -> String
 dropQuotationMarks l r = reverse . drop r . reverse . drop l
 
 toPosition :: AlexPosn -> Position
-toPosition (AlexPn _ row col) = Posn (row, col)
+toPosition (AlexPn _ r c) = Posn (r, c)
 
 alexEOF :: Alex (Lexeme Token)
 alexEOF = liftM (Lex TkEOF) alexGetPosn
 
--- Unfortunately, we have to extract the matching bit of string ourselves...
+-- Unfortunately, we have to extract the matching bit of string ourselves
 lex :: (String -> Token) -> AlexAction (Lexeme Token)
 lex f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
 

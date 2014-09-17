@@ -13,24 +13,19 @@ import           SappMonad
 import           SymbolTable
 
 import           Control.Arrow             ((&&&))
+import           Control.Monad             (guard, liftM, unless, void, when,
+                                            (>=>))
+import           Control.Monad.RWS         (RWS, lift, runRWS)
 import           Control.Monad.State       (gets, modify)
-import           Control.Monad.Writer      (tell)
-import           Control.Monad.RWS         (RWS, runRWS, lift)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Control.Monad             (void, liftM, unless, guard, when, (>=>))
-import           Data.Foldable             as DF (mapM_, all, and, forM_)
---import           Data.Foldable             as DF (all, any, forM_, mapM_)
+import           Control.Monad.Writer      (tell)
+import           Data.Foldable             as DF (all, and, forM_, mapM_)
 import           Data.Functor              ((<$>))
---import           Data.Functor              ((<$), (<$>))
---import qualified Data.Map                  as DM (toList)
-import           Data.Maybe                (fromJust, isJust, fromMaybe)
---import           Data.Maybe                (fromJust, isJust, isNothing)
+import           Data.Maybe                (fromJust, fromMaybe, isJust)
 import           Data.Sequence             as DS (Seq, empty, length, zipWith)
---import           Data.Sequence             as DS (Seq, empty, filter)
 import           Data.Traversable          (mapM)
---import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (mapM_, all, and, exp, mapM, length, zipWith)
---import           Prelude                   as P hiding (all, any, filter, mapM_)
+import           Prelude                   as P hiding (all, and, exp, length,
+                                                 mapM, mapM_, zipWith)
 
 --------------------------------------------------------------------------------
 

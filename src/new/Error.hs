@@ -16,10 +16,10 @@ data Error
 
 instance Show Error where
     show cError = case cError of
-        LError p e -> "Lexer error on "   ++ show p ++ ": \n\t" ++ show e ++ "\n"
-        PError p e -> "Parsing error on " ++ show p ++ ": \n\t" ++ show e ++ "\n"
-        SError p e -> "Static error on "  ++ show p ++ ": \n\t" ++ show e ++ "\n"
-        Warn   p w -> "Warning on "       ++ show p ++ ": \n\t" ++ show w ++ "\n"
+        LError p e -> "Lexer error "   ++ show p ++ ": \n\t" ++ show e ++ "\n"
+        PError p e -> "Parsing error " ++ show p ++ ": \n\t" ++ show e ++ "\n"
+        SError p e -> "Static error "  ++ show p ++ ": \n\t" ++ show e ++ "\n"
+        Warn   p w -> "Warning "       ++ show p ++ ": \n\t" ++ show w ++ "\n"
 
 instance Eq Error where
     (==) = (==) `on` errorPos
@@ -119,23 +119,23 @@ data StaticError
 --        --ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' is 'impure'"
 --        ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' must be an 'Int' literal"
 --        -- Types
---        TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined at " ++ show p
+--        TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined " ++ show p
 --        LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
 --        UndefinedType        tname   -> "type '" ++ tname ++ "' has not been defined"
         --RecursiveStruct      tname field -> "field '" ++ field ++ "' in type '" ++ tname ++ "' creates an infinite recursion in the structure"
-        --TypeNotYetDefined tname field struct posn -> "field '" ++ field ++ "' in type '" ++ tname ++ "' can't use the type '" ++ struct ++ "' because it is defined at '" ++ posn ++ "' (must be defined before usage inside structures)"
+        --TypeNotYetDefined tname field struct posn -> "field '" ++ field ++ "' in type '" ++ tname ++ "' can't use the type '" ++ struct ++ "' because it is defined '" ++ posn ++ "' (must be defined before usage inside structures)"
 --        -- Functions
 --        FunctionNotDefined    fname     -> "must define function '" ++ fname ++ "' before implementing it"
 --        ProcedureInExpression fname     -> "cannot use procedure '" ++ fname ++ "' inside an expression"
 --        FunctionAsStatement   fname     -> "cannot use function '" ++ fname ++ "' as a statement"
 --        UsedNotImplemented    fname     -> "function '" ++ fname ++ "' is used but never implemented"
---        ImpInDefScope         fname p   -> "must implement function '" ++ fname ++ "' in same scope that it is defined, at " ++ show p
---        AlreadyImplemented    fname p   -> "function '" ++ fname ++ "' has already been implemented at " ++ show p
+--        ImpInDefScope         fname p   -> "must implement function '" ++ fname ++ "' in same scope that it is defined, " ++ show p
+--        AlreadyImplemented    fname p   -> "function '" ++ fname ++ "' has already been implemented " ++ show p
 --        LanguageImplemented   fname     -> "cannot reimplement language implemented function '"++ fname ++ "'"
 --        FunctionArguments     fname e g -> "function '" ++ fname ++ "' expects arguments (" ++ showSign e ++ "), but was given (" ++ showSign g ++ ")"
 --            where
 --                showSign = intercalate ", " . map show . toList
---        FunctionAlreadyDefined   fname p -> "function '" ++ fname ++ "' has already been defined at " ++ show p
+--        FunctionAlreadyDefined   fname p -> "function '" ++ fname ++ "' has already been defined " ++ show p
 --        LanguageFunctionRedefine fname   -> "cannot redefine a language defined function '" ++ fname ++ "'"
 --        NoReturn                 fname   -> "function '" ++ fname ++ "' does not have a return statement"
 --        -- Statements
@@ -152,7 +152,7 @@ data StaticError
 --        -- General
 --        WrongCategory iden e g -> "using '" ++ iden ++ "' as if it is a " ++ show e ++ ", but it is a " ++ show g
 --        NotDefined  iden       -> "identifier '" ++ iden ++ "' has not been defined"
---        AlreadyDeclared var p  -> "identifier '" ++ var ++ "' has already been declared at " ++ show p
+--        AlreadyDeclared var p  -> "identifier '" ++ var ++ "' has already been declared " ++ show p
 
 ----------------------------------------
 
