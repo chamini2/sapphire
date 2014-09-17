@@ -1,8 +1,10 @@
 module Error where
 
 import           Program
+import           SymbolTable
 
 import           Data.Function (on)
+import           Data.Sequence (Seq)
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +36,7 @@ data LexerError
 
 instance Show LexerError where
     show lError = case lError of
-        LexerError  msg  -> msg
+        LexerError msg   -> msg
         UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
         StringError str  -> "missing matching quotation mark for string " ++ show str
 
@@ -54,49 +56,51 @@ instance Show ParseError where
 data StaticError
     = StaticError String
     -- Variables
---    = VariableNotInitialized Identifier
---    | InvalidAssignType      Identifier DataType DataType
---    | VariableNonArray       Identifier DataType
---    | VariableNonStruct      Identifier DataType
---    | StructNoField          Identifier Identifier
---    | IndexDataType          Expression DataType
+--    | VariableNotInitialized Identifier
+    | InvalidAssignType      Identifier DataType DataType
 --    | ArraySizeDataType      Expression DataType
 --    | ImpureArraySize        Expression
---    -- Types
+    -- Types
     | TypeAlreadyDefined    Identifier Position
     | TypeIsLanguageDefined Identifier
     | UndefinedType         Identifier
     | RecursiveStruct       Identifier Identifier
     | TypeNotYetDefined     Identifier Identifier Identifier Position
---    -- Functions
+    | AccessNonArray        Identifier DataType
+    | IndexDataType         Expression DataType
+    | AccessNonStruct       Identifier DataType
+    | StructNoField         DataType   Identifier
+    | ReadNonReadable       DataType   Identifier
+    | CaseNonCaseable       DataType
+    -- Functions
     | FunctionRedefinition     Identifier Position
 --    | FunctionNotDefined       Identifier
---    | ProcedureInExpression    Identifier
---    | FunctionAsStatement      Identifier
+    | ProcedureInExpression    Identifier
+    | FunctionAsStatement      Identifier
 --    | UsedNotImplemented       Identifier
 --    | ImpInDefScope            Identifier Position
 --    | AlreadyImplemented       Identifier Position
 --    | LanguageImplemented      Identifier
---    | FunctionArguments        Identifier (Seq DataType) (Seq DataType)
+    | FunctionArguments        Identifier (Seq DataType) (Seq DataType)
 --    | FunctionAlreadyDefined   Identifier Position
 --    | LanguageFunctionRedefine Identifier
 --    | NoReturn                 Identifier
---    -- Statements
---    | ConditionDataType DataType
---    | CaseWhenDataType  DataType DataType
---    | ForInDataType     DataType
---    | BreakOutsideLoop
---    | ContinueOutsideLoop
---    | ReturnProcedure            DataType Identifier
---    | ReturnType        DataType DataType Identifier
---    -- Operators
---    | BinaryTypes Binary (DataType, DataType)
---    | UnaryTypes  Unary  DataType
---    -- General
---    | WrongCategory   Identifier Category Category
---    | NotDefined      Identifier
+    -- Statements
+    | ConditionDataType DataType
+    | PrintNonString    DataType
+    | CaseWhenDataType  DataType DataType
+    | ForInDataType     DataType
+    | BreakOutsideLoop
+    | ContinueOutsideLoop
+    | ReturnInProcedure          DataType Identifier
+    | ReturnType        DataType DataType Identifier
+    -- Operators
+    | BinaryTypes Binary (DataType, DataType)
+    | UnaryTypes  Unary  DataType
+    -- General
+    | WrongCategory   Identifier SymbolCategory SymbolCategory
+    | NotDefined      Identifier
     | AlreadyDeclared Identifier Position
---    | StaticError     String
     deriving Show
 
 --instance Show StaticError where
@@ -108,6 +112,8 @@ data StaticError
 --        VariableNonArray       var dt    -> "variable '" ++ var ++ "' of type '" ++ show dt ++ "' is being used as an array"
 --        VariableNonStruct      var dt    -> "variable '" ++ var ++ "' of type '" ++ show dt ++ "' is being used as a structure"
 --        StructNoField          str fn    -> "structure '" ++ str ++ "' has no field named '" ++ fn ++ "'"
+        --ReadNonReadable        dt  idn   -> "variable '" ++ idn ++ "' of type '" ++ show dt ++ "' cannot be used for the 'read' statement"
+        --CaseNonCaseable        dt  idn   -> "variable '" ++ idn ++ "' of type '" ++ show dt ++ "' cannot be used as the expression of a 'case' statement"
 --        IndexDataType          expr dt   -> "index expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
 --        ArraySizeDataType      expr dt   -> "array size expression '" ++ showIndex expr ++ "' is of type '" ++ show dt ++ "', but 'Int' was expected"
 --        --ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' is 'impure'"
