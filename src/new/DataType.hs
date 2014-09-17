@@ -1,7 +1,13 @@
 module DataType
     ( DataType(..)
     , Field
-    , getFields
+
+    , isScalar
+    , isValid
+    , isArray
+    , isStruct
+    , arrayInnerDataType
+    , fieldInStruct
 
     , DataTypeHistory
     , DataTypeZipper
@@ -9,7 +15,7 @@ module DataType
     , focusDataType
     , defocusDataType
     --, inDataType
-    --, backDataType
+    , backDataType
     , topDataType
     , deepDataType
     , putDataType
@@ -18,8 +24,8 @@ module DataType
 import           Identifier
 import           Lexeme
 
-import           Data.Foldable as DF (toList)
-import           Data.Functor  ((<$))
+import           Data.Foldable as DF (toList, find)
+import           Data.Functor  ((<$), (<$>))
 import           Data.List     (intercalate)
 import           Data.Maybe    (fromJust)
 import           Data.Sequence as DS (Seq)
@@ -52,13 +58,41 @@ instance Show DataType where
         where
             showFields fs = " {" ++ intercalate ", " (toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show (lexInfo d)) fs) ++ "}"
 
+----------------------------------------
+
 type Field = (Lexeme Identifier, Lexeme DataType)
 
-getFields :: DataType -> Seq Field
-getFields dt = case dt of
-    Record _ flds -> flds
-    Union  _ flds -> flds
-    _               -> error "Language.getFields: should not attempt to get fields from non-structure DataType"
+--------------------------------------------------------------------------------
+
+isScalar :: DataType -> Bool
+isScalar = flip elem [Int , Float , Bool , Char]
+
+isValid :: DataType -> Bool
+isValid dt = case dt of
+    TypeError -> False
+    _         -> True
+
+isArray :: DataType -> Bool
+isArray dt = case dt of
+    Array _ _ -> True
+    _         -> False
+
+isStruct :: DataType -> Bool
+isStruct dt = case dt of
+    Record _ _ -> True
+    Union  _ _ -> True
+    _          -> False
+
+arrayInnerDataType :: DataType -> DataType
+arrayInnerDataType dt = case dt of
+    Array dtL _ -> lexInfo dtL
+    _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
+
+fieldInStruct :: DataType -> Identifier -> Maybe (Lexeme DataType)
+fieldInStruct dt idn = case dt of
+    Record _ flds -> snd <$> find ((idn==) . lexInfo . fst) flds
+    Union  _ flds -> snd <$> find ((idn==) . lexInfo . fst) flds
+    _             -> error "Language.fieldInStruct: should not attempt to get fields from a non-structure DataType"
 
 --------------------------------------------------------------------------------
 
