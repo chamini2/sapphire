@@ -25,15 +25,21 @@ module Program
     -- From DataType
     , DataType(..)
     , Field
-    --, getFields
-    , DataTypeHistory
 
+    , isScalar
+    , isValid
+    , isArray
+    , isStruct
+    , arrayInnerDataType
+    , fieldInStruct
+
+    , DataTypeHistory
     , DataTypeZipper
     --, Thread
     , focusDataType
     , defocusDataType
     --, inDataType
-    --, backDataType
+    , backDataType
     , topDataType
     , deepDataType
     , putDataType
@@ -42,8 +48,8 @@ module Program
     , Expression(..)
     , Binary(..)
     , Unary(..)
-    --, binaryOperation
-    --, unaryOperation
+    , binaryOperation
+    , unaryOperation
 
     , Access(..)
     , AccessHistory(..)
@@ -55,7 +61,7 @@ module Program
     --, inArrayAccess
     --, inStructAccess
     --, inAccess
-    --, backAccess
+    , backAccess
     , topAccess
     , deepAccess
     ) where

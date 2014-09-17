@@ -11,6 +11,7 @@ import           Error         (Error)
 
 --import           Control.Arrow (first)
 --import           Data.Foldable as DF (concatMap, foldr)
+import           Data.Maybe    (fromJust, isJust)
 import           Data.Functor
 import           Data.Sequence as DS hiding (length)
 import           Prelude       hiding (concatMap, foldr)
@@ -20,10 +21,9 @@ import           Prelude       hiding (concatMap, foldr)
 %tokentype { Lexeme Token }
 %monad { Alex }
 %lexer { lexWrap } { Lex TkEOF _ }
-%error { happyError }
+%error { parseError }
 
 %token
-
 
     -- Language
     newline         { Lex TkNewLine     _ }
@@ -165,7 +165,7 @@ MaybeNL :: { () }
 
 Statement :: { Lexeme Statement }
     : {- λ, no-op -}            { fillLex StNoop }
-    --| Access "=" Expression     { StAssign $1 $3 <$ $1 }
+    | Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
     | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
@@ -185,24 +185,41 @@ Statement :: { Lexeme Statement }
     | "case" Expression MaybeNL WhenList "otherwise" StatementList "end"            { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
-    --| "read"             Expression         ","         AccessList                  { StRead  $2 <$ $1 }
-    --| "read" "(" MaybeNL Expression MaybeNL "," MaybeNL AccessList MaybeNL ")"      { StRead  $2 <$ $1 }
+    | "read"              String         "," Access         { StReadString (Just $2) $4 <$ $1 }
+    | "read"  "(" MaybeNL String MaybeNL "," AccessNL ")"   { StReadString (Just $4) $7 <$ $1 }
+    | "read"      Access                                    { StReadString Nothing   $2 <$ $1 }
+    | "read"  "(" AccessNL ")"                              { StReadString Nothing   $3 <$ $1 }
     | "print"     ExpressionList            { StPrintList $2 <$ $1 }
     | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
 
     -- Loops
-    | "while" Expression "do" StatementList "end"                                              { StLoop empty $2          $4    <$ $1 }
-    | "until" Expression "do" StatementList "end"                                              { StLoop empty (notExp $2) $4    <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "while" Expression                                  { StLoop $2    $6          empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "until" Expression                                  { StLoop $2    (notExp $6) empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"         { StLoop $2    $6          $8    <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"         { StLoop $2    (notExp $6) $8    <$ $1 }
-    | "for" VariableId "in" Expression "do" StatementList "end"                                { StFor $2 $4 $6 <$ $1 }
+    | "while" Expression "do" StatementList "end"                                           { StLoop empty $2          $4    <$ $1 }
+    | "until" Expression "do" StatementList "end"                                           { StLoop empty (notExp $2) $4    <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "while" Expression                               { StLoop $2    $6          empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "until" Expression                               { StLoop $2    (notExp $6) empty <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"      { StLoop $2    $6          $8    <$ $1 }
+    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"      { StLoop $2    (notExp $6) $8    <$ $1 }
+    | "for" VariableId "in" Expression "do" StatementList "end"                             { StFor  $2    $4          $6    <$ $1 }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
 
     -- Error
     | error Separator   { fillLex StNoop }
+
+---------------------------------------
+-- Access
+
+-- This parses 'array[0].field[1]' as '(((array)[0]).field)[1]'
+Access :: { Lexeme Access }
+    : VariableId                    { VariableAccess $1    <$ $1 }
+    | Access "[" Expression "]"     { ArrayAccess    $1 $3 <$ $1 }
+    -- This allows stuff like 'a . x = 0', accessing the field 'x' of variable 'a'
+    | Access "." VariableId         { StructAccess   $1 $3 <$ $1 }
+
+AccessNL :: { Lexeme Access }
+    : MaybeNL VariableId MaybeNL                { VariableAccess $2    <$ $2 }
+    | AccessNL "[" ExpressionNL "]" MaybeNL     { ArrayAccess    $1 $3 <$ $1 }
+    | AccessNL "." MaybeNL VariableId MaybeNL   { StructAccess   $1 $4 <$ $1 }
 
 ---------------------------------------
 -- Identifiers
@@ -222,7 +239,7 @@ VariableList :: { Seq (Lexeme Identifier) }
 
 DataType :: { Lexeme DataType }
     : TypeId                 { DataType $1 <$ $1 }
-    | DataType "[" int "]"   { Array $1 (unTkInt `fmap` $3) <$ $1 }
+    | DataType "[" Int "]"   { Array $1 $3 <$ $1 }
 
 ---------------------------------------
 -- Structures
@@ -272,19 +289,34 @@ When :: { Lexeme When }
 ---------------------------------------
 -- Expressions
 
+Int :: { Lexeme Int }
+    : int           { unTkInt    `fmap` $1 }
+
+Float :: { Lexeme Float }
+    : float         { unTkFloat  `fmap` $1 }
+
+Bool :: { Lexeme Bool }
+    : "true"        { unTkBool   `fmap` $1 }
+    | "false"       { unTkBool   `fmap` $1 }
+
+Char :: { Lexeme Char }
+    : char          { unTkChar   `fmap` $1 }
+
+String :: { Lexeme String }
+    : string        { unTkString `fmap` $1 }
+    --: string        { LitString (unTkString `fmap` $1) (length . unTkString $ lexInfo $1) <$ $1 }
+
 Expression :: { Lexeme Expression }
-    -- Variable
-    --: Access                        { Variable $1 <$ $1 }
-    -- Function call
-    : VariableId "(" MaybeExpressionListNL ")"      { FunctionCall $1 $3 <$ $1 }
     -- Literals
-    | int                           { LitInt    (unTkInt    `fmap` $1) <$ $1 }
-    | float                         { LitFloat  (unTkFloat  `fmap` $1) <$ $1 }
-    | "true"                        { LitBool   (unTkBool   `fmap` $1) <$ $1 }
-    | "false"                       { LitBool   (unTkBool   `fmap` $1) <$ $1 }
-    | char                          { LitChar   (unTkChar   `fmap` $1) <$ $1 }
-    | string                        { LitString (unTkString `fmap` $1) <$ $1 }
-    --| string                        { LitString (unTkString `fmap` $1) (length . unTkString $ lexInfo $1) <$ $1 }
+    : Int           { LitInt    $1 <$ $1 }
+    | Float         { LitFloat  $1 <$ $1 }
+    | Bool          { LitBool   $1 <$ $1 }
+    | Char          { LitChar   $1 <$ $1 }
+    | String        { LitString $1 <$ $1 }
+    -- Variable
+    | Access                        { Variable $1 <$ $1 }
+    -- Function call
+    | VariableId "(" MaybeExpressionListNL ")"      { FunctionCall $1 $3 <$ $1 }
     -- Operators
     | Expression "+"   Expression   { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
     | Expression "-"   Expression   { ExpBinary (OpMinus   <$ $2) $1 $3 <$ $1 }
@@ -307,18 +339,16 @@ Expression :: { Lexeme Expression }
     | "(" ExpressionNL ")"          { lexInfo $2 <$ $1 }
 
 ExpressionNL :: { Lexeme Expression }
-    -- Variable
-    --: MaybeNL Access MaybeNL            { Variable $2 <$ $2 }
-    -- Function call
-    --| MaybeNL VariableId "(" MaybeExpressionListNL ")" MaybeNL      { FunctionCall $2 $4 <$ $2 }
     -- Literals
-    --| MaybeNL int     MaybeNL           { LitInt    (unTkInt    `fmap` $2)                                    <$ $2 }
-    : MaybeNL int     MaybeNL           { LitInt    (unTkInt    `fmap` $2) <$ $2 }
-    | MaybeNL float   MaybeNL           { LitFloat  (unTkFloat  `fmap` $2) <$ $2 }
-    | MaybeNL "true"  MaybeNL           { LitBool   (unTkBool   `fmap` $2) <$ $2 }
-    | MaybeNL "false" MaybeNL           { LitBool   (unTkBool   `fmap` $2) <$ $2 }
-    | MaybeNL char    MaybeNL           { LitChar   (unTkChar   `fmap` $2) <$ $2 }
-    | MaybeNL string  MaybeNL           { LitString (unTkString `fmap` $2) <$ $2 }
+    : MaybeNL Int    MaybeNL    { LitInt    $2 <$ $2 }
+    | MaybeNL Float  MaybeNL    { LitFloat  $2 <$ $2 }
+    | MaybeNL Bool   MaybeNL    { LitBool   $2 <$ $2 }
+    | MaybeNL Char   MaybeNL    { LitChar   $2 <$ $2 }
+    | MaybeNL String MaybeNL    { LitString $2 <$ $2 }
+    -- Variable
+    | AccessNL                  { Variable $1 <$ $1 }
+    -- Function call
+    | MaybeNL VariableId "(" MaybeExpressionListNL ")" MaybeNL      { FunctionCall $2 $4 <$ $2 }
     --| MaybeNL string  MaybeNL           { LitString (unTkString `fmap` $2) (length . unTkString $ lexInfo $2) <$ $2 }
     -- Operators
     | ExpressionNL "+"   ExpressionNL   { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
@@ -349,10 +379,6 @@ ExpressionListNL :: { Seq (Lexeme Expression) }
     : MaybeNL Expression MaybeNL                        { singleton $2 }
     | ExpressionListNL "," MaybeNL Expression MaybeNL   { $1 |> $4     }
 
---MaybeExpressionList :: { Seq (Lexeme Expression) }
---    :                       { empty }
---    | ExpressionList        { $1    }
-
 MaybeExpressionListNL :: { Seq (Lexeme Expression) }
     : MaybeNL               { empty }
     | ExpressionListNL      { $1    }
@@ -364,15 +390,19 @@ MaybeExpressionListNL :: { Seq (Lexeme Expression) }
 -- Functions
 
 expandStatement :: Lexeme Statement -> StBlock
-expandStatement st = case lexInfo st of
+expandStatement stL = case lexInfo stL of
     -- Removes no-op statements from statement blocks
     StNoop -> empty
     -- For the syntactic sugar of defining several variables of the same type using commas
     StDeclarationList dcls -> fmap (\dcl -> StVariableDeclaration dcl <$ dcl) dcls
     -- For the syntactic sugar of printing several strings with the same print statement using commas
-    StPrintList exps -> fmap (\exp -> StPrint exp <$ st) exps
+    StPrintList exps -> fmap (\exp -> StPrint exp <$ stL) exps
+    -- For the syntactic sugar of printing a string before reading a value
+    StReadString mayStr accL -> if isJust mayStr
+        then fromList [ StPrint (LitString (fromJust mayStr) <$ (fromJust mayStr)) <$ stL, StRead accL <$ accL ]
+        else singleton $ StRead accL <$ accL
     -- No other statement needs compacting, yet
-    _      -> singleton st
+    _      -> singleton stL
 
 -- For the syntactic sugar of defining several fields of the same type using commas
 expandField :: (Seq (Lexeme Identifier), Lexeme DataType) -> Seq (Lexeme Identifier, Lexeme DataType)
@@ -398,8 +428,8 @@ lexWrap cont = do
             cont $ TkString str <$ t
         _         -> cont t
 
-happyError :: Lexeme Token -> Alex a
-happyError (Lex t p) = fail $ show p ++ ": Parse error on Token: " ++ show t ++ "\n"
+parseError :: Lexeme Token -> Alex a
+parseError (Lex t p) = fail $ show p ++ ": Parse error on Token: " ++ show t ++ "\n"
 
 parseProgram :: String -> (Seq Error, Program)
 parseProgram input = runAlex' input parse

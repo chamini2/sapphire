@@ -23,16 +23,17 @@ data Statement
     | StAssign (Lexeme Access) (Lexeme Expression)
     -- Definitions
     | StVariableDeclaration (Lexeme Declaration)
-    | StDeclarationList     (Seq (Lexeme Declaration))  -- Only used in Parser
+    | StDeclarationList     (Seq (Lexeme Declaration))      -- Only used in Parser
     | StStructDefinition    (Lexeme DataType)
     -- Functions
     | StReturn        (Lexeme Expression)
     | StFunctionDef   (Lexeme Identifier) Signature StBlock
     | StProcedureCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- I/O
-    | StRead     (Lexeme Access)
-    | StPrintList (Seq (Lexeme Expression))             -- Only used in Parser
-    | StPrint     (Lexeme Expression)
+    | StRead       (Lexeme Access)
+    | StReadString (Maybe (Lexeme String)) (Lexeme Access)  -- Only used in Parser
+    | StPrint      (Lexeme Expression)
+    | StPrintList  (Seq (Lexeme Expression))                -- Only used in Parser
     -- Conditional
     | StIf   (Lexeme Expression) StBlock StBlock
     | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock

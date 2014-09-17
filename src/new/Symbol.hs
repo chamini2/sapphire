@@ -1,14 +1,16 @@
+{-# LANGUAGE NamedFieldPuns #-}
 module Symbol
     ( Symbol(..)
     , emptySymInfo
     , emptySymType
     , emptySymFunction
+    , isProcedure
 
     , Initialized
     , Used
     , Pure
     , Offset
-    , Width
+    , Bytes
 
     , SymbolCategory(..)
     , symbolCategory
@@ -25,13 +27,13 @@ type Used            = Bool
 type Pure            = Bool
 type LanguageDefined = Bool
 type Offset          = Int
-type Width           = Int
+type Bytes           = Int
 
 data Symbol = SymInfo
                 { dataType   :: Lexeme DataType
                 , category   :: Category
                 , offset     :: Offset
-                , width      :: Width
+                , bytes      :: Bytes
                 , used       :: Used
                 , scopeNum   :: ScopeNum
                 , scopeStack :: Stack Scope
@@ -40,7 +42,7 @@ data Symbol = SymInfo
             | SymType
                 { dataType   :: Lexeme DataType
                 , langDef    :: LanguageDefined
-                , width      :: Width
+                , bytes      :: Bytes
                 , used       :: Used
                 , scopeNum   :: ScopeNum
                 , scopeStack :: Stack Scope
@@ -50,7 +52,8 @@ data Symbol = SymInfo
                 { paramTypes :: Seq (Lexeme DataType)
                 , returnType :: Lexeme DataType
                 , body       :: StBlock
-                , width      :: Width
+                , returned   :: Bool
+                , bytes      :: Bytes
                 , used       :: Used
                 , scopeNum   :: ScopeNum
                 , scopeStack :: Stack Scope
@@ -90,7 +93,7 @@ emptySymInfo = SymInfo
     { dataType   = fillLex Void
     , category   = CatVariable
     , offset     = 0
-    , width      = 0
+    , bytes      = 0
     , used       = False
     , scopeNum   = -1
     , scopeStack = singletonStack outerScope
@@ -101,7 +104,7 @@ emptySymType :: Symbol
 emptySymType = SymType
     { dataType   = fillLex Void
     , langDef    = False
-    , width      = 0
+    , bytes      = 0
     , used       = False
     , scopeNum   = -1
     , scopeStack = singletonStack outerScope
@@ -112,13 +115,21 @@ emptySymFunction :: Symbol
 emptySymFunction = SymFunction
     { paramTypes = empty
     , returnType = fillLex Void
+    , returned   = False
     , body       = empty
-    , width      = 0
+    , bytes      = 0
     , used       = False
     , scopeNum   = -1
     , scopeStack = singletonStack outerScope
     , defPosn    = defaultPosn
     }
+
+----------------------------------------
+
+isProcedure :: Symbol -> Bool
+isProcedure sym = case sym of
+    SymFunction { returnType } -> lexInfo returnType == Void
+    _ -> error "Symbol.isProcedure: asking if non-function symbol is procedure"
 
 ----------------------------------------
 
