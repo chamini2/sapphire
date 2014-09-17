@@ -15,7 +15,7 @@ module Expression
     --, inArrayAccess
     --, inStructAccess
     --, inAccess
-    --, backAccess
+    , backAccess
     , topAccess
     , deepAccess
     ) where
@@ -25,22 +25,23 @@ import           Identifier
 import           Lexeme
 
 --import qualified Data.Data     as DD (Data)
-import           Data.Functor  ((<$))
+import           Data.Foldable (find)
+import           Data.Functor  ((<$), (<$>))
 import           Data.Maybe    (fromJust)
 import           Data.Sequence as DS (Seq, fromList)
 --import qualified Data.Typeable as DT (Typeable)
 
 data Expression
-    -- Variable
-    = Variable (Lexeme Access)
-    -- Function call
-    | FunctionCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- Literals
-    | LitInt    (Lexeme Int)
+    = LitInt    (Lexeme Int)
     | LitFloat  (Lexeme Float)
     | LitBool   (Lexeme Bool)
     | LitChar   (Lexeme Char)
     | LitString (Lexeme String)
+    -- Variable
+    | Variable (Lexeme Access)
+    -- Function call
+    | FunctionCall (Lexeme Identifier) (Seq (Lexeme Expression))
 --    | LitRange  (Lexeme Range)
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression)
@@ -95,8 +96,11 @@ instance Show Binary where
 --        OpGreatEq -> "greater than or equal to"
 --        OpBelongs -> "belongs to Range"
 
-binaryOperation :: Binary -> Seq ((DataType, DataType), DataType)
-binaryOperation op = fromList $ case op of
+binaryOperation :: Binary -> (DataType, DataType) -> Maybe DataType
+binaryOperation op dts = snd <$> find ((dts==) . fst) (binaryOperator op)
+
+binaryOperator :: Binary -> Seq ((DataType, DataType), DataType)
+binaryOperator op = fromList $ case op of
     OpPlus    -> arithmetic
     OpMinus   -> arithmetic
     OpTimes   -> arithmetic
@@ -133,8 +137,11 @@ instance Show Unary where
 --        OpNegate -> "arithmetic negation"
 --        OpNot    -> "logical negation"
 
-unaryOperation :: Unary -> Seq (DataType, DataType)
-unaryOperation op = fromList $ case op of
+unaryOperation :: Unary -> DataType -> Maybe DataType
+unaryOperation op dt = snd <$> find ((dt==) . fst) (unaryOperator op)
+
+unaryOperator :: Unary -> Seq (DataType, DataType)
+unaryOperator op = fromList $ case op of
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
 
