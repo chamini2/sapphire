@@ -18,7 +18,7 @@ module SymbolTable
     , emptySymInfo
     , emptySymType
     , emptySymFunction
-    , isProcedure
+    --, isProcedure
 
     , Initialized
     , Used

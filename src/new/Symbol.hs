@@ -4,7 +4,7 @@ module Symbol
     , emptySymInfo
     , emptySymType
     , emptySymFunction
-    , isProcedure
+    --, isProcedure
 
     , Initialized
     , Used
@@ -53,6 +53,7 @@ data Symbol = SymInfo
                 , returnType :: Lexeme DataType
                 , body       :: StBlock
                 , returned   :: Bool
+                , langDef    :: LanguageDefined
                 , bytes      :: Bytes
                 , used       :: Used
                 , scopeNum   :: ScopeNum
@@ -117,6 +118,7 @@ emptySymFunction = SymFunction
     , returnType = fillLex Void
     , returned   = False
     , body       = empty
+    , langDef    = False
     , bytes      = 0
     , used       = False
     , scopeNum   = -1
@@ -126,10 +128,10 @@ emptySymFunction = SymFunction
 
 ----------------------------------------
 
-isProcedure :: Symbol -> Bool
-isProcedure sym = case sym of
-    SymFunction { returnType } -> lexInfo returnType == Void
-    _ -> error "Symbol.isProcedure: asking if non-function symbol is procedure"
+--isProcedure :: Symbol -> Bool
+--isProcedure sym = case sym of
+--    SymFunction { returnType } -> lexInfo returnType == Void
+--    _ -> error "Symbol.isProcedure: asking if non-function symbol is procedure"
 
 ----------------------------------------
 
