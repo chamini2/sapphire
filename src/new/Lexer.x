@@ -14,13 +14,15 @@ module Lexer
     , alexGetPosn
     ) where
 
-import           Error         (Error (LError), LexerError (..))
+import           Error           (Error (LError), LexerError (..))
 import           Position
 import           Lexeme
 
-import           Control.Monad (liftM)
-import           Data.Sequence (Seq, (|>), empty, null)
-import           Prelude       hiding (lex, null)
+import           Control.Monad   (liftM)
+import           Data.List       (intercalate, foldl')
+import           Data.List.Split (splitOn)
+import           Data.Sequence   (Seq, (|>), empty, null)
+import           Prelude         hiding (lex, null)
 
 }
 
@@ -28,7 +30,7 @@ import           Prelude       hiding (lex, null)
 
 $newline = [\n\r]
 
-@spaces  = ($white # $newline)|\\$newline
+@spaces  = ($white # $newline)
 
 @skip = [\; $white]+
 
@@ -40,15 +42,18 @@ $alpha = [$small $large]
 
 $idchar = [$alpha $digit]
 
-@inside_string          = ($printable # ["\\] | \\[abfnrtv])
+-- Alex won't work if we write it directly in the @inside_string
+$backslash = ["\\abfnrtv]
+
+@inside_string          = ($printable # ["\\] | \\$backslash)
 @inside_multilinestring = (@inside_string | $newline )
 
 @varid  = $small $idchar*
 @typeid = $large $idchar*
 
-@int              = $digit+
-@float            = $digit+(\.$digit+)?
-@char             = \'$printable\'
+@int    = $digit+
+@float  = $digit+(\.$digit+)?
+@char   = \'$printable\'
 
 @string                 = \"@inside_string*\"
 @string_error           = \"@inside_string*
@@ -133,8 +138,8 @@ tokens :-
         @float                  { lex  (TkFloat . read) }
         @char                   { lex  (TkChar . read)  }
         -- -- -- Filtering newlines
-        @string                 { lex  (TkString . dropQuotationMarks 1 1 . filterBackSlash) }
-        @multiline_string       { lex  (TkString . dropQuotationMarks 3 3 . filterBackSlash) }
+        @string                 { lex  (TkString . dropQuotationMarks 1 1 . backslash) }
+        @multiline_string       { lex  (TkString . dropQuotationMarks 3 3 . backslash) }
 
         -- -- Arithmetic
         "+"                     { lex' TkPlus           }
@@ -168,8 +173,8 @@ tokens :-
 
         -- Errors
         .                       { lex (TkError . head)  }
-        @string_error           { lex (TkStringError . dropQuotationMarks 1 0 . filterBackSlash) }
-        @multiline_string_error { lex (TkStringError . dropQuotationMarks 3 0 . filterBackSlash) }
+        @string_error           { lex (TkStringError . dropQuotationMarks 1 0 . backslash) }
+        @multiline_string_error { lex (TkStringError . dropQuotationMarks 3 0 . backslash) }
 
 {
 
@@ -331,20 +336,14 @@ addLexerError (Lex t p) = do
 
 ----------------------------------------
 
-filterBackSlash :: String -> String
-filterBackSlash = foldr func []
+backslash :: String -> String
+backslash str = foldl' (flip (uncurry replace)) str chars
     where
-        func :: Char -> String -> String
-        func c str
-            | c == '\\' = case head str of
-                'a' -> '\a' : tail str
-                'b' -> '\b' : tail str
-                'f' -> '\f' : tail str
-                'n' -> '\n' : tail str
-                'r' -> '\r' : tail str
-                't' -> '\t' : tail str
-                'v' -> '\v' : tail str
-            | otherwise = c : str
+        replace :: Char -> Char -> String -> String
+        replace new old = intercalate [new] . splitOn ['\\', old]
+        chars = [('\a', 'a'), ('\b', 'b'), ('\f', 'f'),
+                 ('\n', 'n'), ('\r', 'r'), ('\t', 't'),
+                 ('\v', 'v'), ('"', '"'), ('\\', '\\')]
 
 dropQuotationMarks :: Int -> Int -> String -> String
 dropQuotationMarks l r = reverse . drop r . reverse . drop l
