@@ -1,7 +1,9 @@
 {
 {-# OPTIONS -w #-}
 {-# LANGUAGE TupleSections #-}
-module Parser (parseProgram) where
+module Parser
+    ( parseProgram
+    ) where
 
 import           Lexer
 import           Program
@@ -9,10 +11,8 @@ import           Position
 import           Lexeme
 import           Error         (Error)
 
---import           Control.Arrow (first)
---import           Data.Foldable as DF (concatMap, foldr)
-import           Data.Maybe    (fromJust, isJust)
 import           Data.Functor
+import           Data.Maybe    (fromJust, isJust)
 import           Data.Sequence as DS hiding (length)
 import           Prelude       hiding (concatMap, foldr)
 }
@@ -204,7 +204,9 @@ Statement :: { Lexeme Statement }
     | "continue"        { StContinue <$ $1 }
 
     -- Error
-    | error Separator   { fillLex StNoop }
+    | error     {%
+                    addLexerError (fillLex (TkError 'c')) >> return (fillLex StNoop)
+                }
 
 ---------------------------------------
 -- Access
@@ -412,6 +414,9 @@ notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
 --------------------------------------------------------------------------------
+
+addParseError :: Lexeme Statement -> Alex ()
+addParseError (Lex st p) = undefined
 
 lexWrap :: (Lexeme Token -> Alex a) -> Alex a
 lexWrap cont = do
