@@ -18,12 +18,13 @@ module SymbolTable
     , emptySymInfo
     , emptySymType
     , emptySymFunction
+    , isProcedure
 
     , Initialized
     , Used
     , Pure
     , Offset
-    , Width
+    , Bytes
 
     , SymbolCategory(..)
     , symbolCategory
@@ -34,6 +35,7 @@ module SymbolTable
     , pop
     , push
     , initialStack
+    , emptyStack
     --, singletonStack
 
     -- From Scope
@@ -69,7 +71,7 @@ instance Show SymbolTable where
             list :: [(Identifier, [Symbol])]
             list = map (second toList) $ DM.toList m
             list' :: [(Identifier, Symbol)]
-            list' = concatMap (\(var,ss) -> zip (repeat var) ss) list
+            list' = concatMap (\(idn,ss) -> zip (repeat idn) ss) list
             list'' :: [(ScopeNum, [(Identifier, Symbol)])]
             list'' = map (\ls@((_,s):_) -> (scopeNum s,ls)) $ groupBy ((==) `on` (scopeNum . snd)) $ sortBy (compare `on` (scopeNum . snd)) list'
             list''' :: [(ScopeNum, [(Identifier, Symbol)])]
@@ -102,14 +104,14 @@ insert vn info (SymTable m) = SymTable $ DM.alter func vn m
     Looks up the symbol identified by var in the symbol table
  -}
 lookup :: Identifier -> SymbolTable -> Maybe Symbol
-lookup var (SymTable m) = do
-    is <- DM.lookup var m
+lookup idn (SymTable m) = do
+    is <- DM.lookup idn m
     case viewl is of
         EmptyL    -> Nothing
         info :< _ -> Just info
 
-toListFilter :: SymbolTable -> ScopeNum -> Seq (Identifier, Symbol)
-toListFilter st@(SymTable m) sc = fromList $ foldl' func [] $ DM.keys m
+toListFilter :: ScopeNum -> SymbolTable -> Seq (Identifier, Symbol)
+toListFilter sc st@(SymTable m) = fromList $ foldl' func [] $ DM.keys m
     where
         func ls idn = maybe ls (\j -> (idn, j) : ls) $ maySI idn
         maySI idn   = lookupWithScope idn (singletonStack (Scope sc)) st
@@ -118,30 +120,30 @@ toListFilter st@(SymTable m) sc = fromList $ foldl' func [] $ DM.keys m
     Looks up the symbol identifier in the specified scope in the symbol table
  -}
 lookupWithScope :: Identifier -> Stack Scope -> SymbolTable -> Maybe Symbol
-lookupWithScope var (Stack scopes) (SymTable m) = do
-    is <- DM.lookup var m
+lookupWithScope idn (Stack scopes) (SymTable m) = do
+    is <- DM.lookup idn m
     msum $ map ((\sc -> find ((sc==) . scopeNum) is) . serial) scopes
 
 {- |
-    Updates the Symbol of a given identifier.
+    Updates the Symbol of a given idntifier.
  -}
 update :: Identifier -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
-update var f (SymTable m) = SymTable $ DM.alter func var m
+update idn f (SymTable m) = SymTable $ DM.alter func idn m
     where
         func mayIs = case mayIs of
             Just is -> case viewl is of
                 i :< iss -> Just $ f i <| iss
-                _        -> error $ "SymbolTable.update: No value to update for '" ++ var ++ "'"
-            Nothing -> error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
+                _        -> error $ "SymbolTable.update: No value to update for '" ++ idn ++ "'"
+            Nothing -> error $ "SymbolTable.update: Identifier '" ++ idn ++ "' does not exist in symbol table"
 
 {- |
     Updates the Symbol of a given identifier, in a given scope.
 -}
-updateWithScope :: Identifier -> (Symbol -> Symbol) -> ScopeNum -> SymbolTable -> SymbolTable
-updateWithScope var f sc (SymTable m) = SymTable $ DM.alter func var m
+updateWithScope :: Identifier -> ScopeNum -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
+updateWithScope idn sc f (SymTable m) = SymTable $ DM.alter func idn m
     where
         func = maybe failure (Just . foldr foldFunc empty)
-        failure = error $ "SymbolTable.update: Identifier '" ++ var ++ "' does not exist in symbol table"
+        failure = error $ "SymbolTable.update: Identifier '" ++ idn ++ "' does not exist in symbol table"
         foldFunc i is = if scopeNum i == sc
             then f i <| is
             else   i <| is
