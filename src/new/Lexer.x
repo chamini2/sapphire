@@ -337,10 +337,10 @@ addLexerError (Lex t p) = do
 ----------------------------------------
 
 backslash :: String -> String
-backslash str = foldl' (flip (uncurry replace)) str chars
+backslash str = foldl' (flip replace) str chars
     where
-        replace :: Char -> Char -> String -> String
-        replace new old = intercalate [new] . splitOn ['\\', old]
+        replace :: (Char, Char) -> String -> String
+        replace (new, old) = intercalate [new] . splitOn ['\\', old]
         chars = [('\a', 'a'), ('\b', 'b'), ('\f', 'f'),
                  ('\n', 'n'), ('\r', 'r'), ('\t', 't'),
                  ('\v', 'v'), ('"', '"'), ('\\', '\\')]

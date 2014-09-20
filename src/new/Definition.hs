@@ -155,7 +155,7 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
     case maySymI of
         Nothing -> addSymbol idn info >> return True
         Just (symScopeN, symDefP, symCat)
-            | symCat == CatFunction -> tellSError dclP (FunctionRedefinition idn symDefP) >> return False
+            | symCat == CatFunction -> tellSError dclP (FunctionAlreadyDefined idn symDefP) >> return False
             | symScopeN == current  -> tellSError dclP (AlreadyDeclared idn symDefP)      >> return False
             | otherwise             -> addSymbol idn info >> return True
 
@@ -205,7 +205,7 @@ definitionStatement (Lex st posn) = case st of
         case maySymI of
             Nothing -> addSymbol idn info
             Just (symScopeN, symDefP, symCat)
-                | symCat == CatFunction -> tellSError posn (FunctionRedefinition idn symDefP)
+                | symCat == CatFunction -> tellSError posn (FunctionAlreadyDefined idn symDefP)
                 | symScopeN == current  -> tellSError posn (AlreadyDeclared idn symDefP)
                 | otherwise             -> addSymbol idn info
 

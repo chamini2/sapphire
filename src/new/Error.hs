@@ -73,7 +73,6 @@ data StaticError
     | ReadNonReadable       DataType   Identifier
     | CaseNonCaseable       DataType
     -- Functions
-    | FunctionRedefinition     Identifier Position
 --    | FunctionNotDefined       Identifier
     | ProcedureInExpression    Identifier
     | FunctionAsStatement      Identifier
@@ -82,7 +81,7 @@ data StaticError
 --    | AlreadyImplemented       Identifier Position
 --    | LanguageImplemented      Identifier
     | FunctionArguments        Identifier (Seq DataType) (Seq DataType)
---    | FunctionAlreadyDefined   Identifier Position
+    | FunctionAlreadyDefined   Identifier Position
 --    | LanguageFunctionRedefine Identifier
 --    | NoReturn                 Identifier
     -- Statements

@@ -128,10 +128,10 @@ emptySymFunction = SymFunction
 
 ----------------------------------------
 
---isProcedure :: Symbol -> Bool
---isProcedure sym = case sym of
---    SymFunction { returnType } -> lexInfo returnType == Void
---    _ -> error "Symbol.isProcedure: asking if non-function symbol is procedure"
+isProcedure :: Symbol -> Bool
+isProcedure sym = case sym of
+    SymFunction { returnType } -> lexInfo returnType == Void
+    _ -> error "Symbol.isProcedure: asking if non-function symbol is procedure"
 
 ----------------------------------------
 
