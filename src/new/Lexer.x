@@ -10,11 +10,12 @@ module Lexer
     , AlexUserState (..)
     , alexMonadScan
     , runAlex'
-    , addLexerError
+    , tellLError
+    , tellPError
     , alexGetPosn
     ) where
 
-import           Error           (Error (LError), LexerError (..))
+import           Error           (Error(LError, PError), LexerError(..), ParseError(..))
 import           Position
 import           Lexeme
 
@@ -315,7 +316,7 @@ instance Show Token where
 
 --------------------------------------------------------------------------------
 
-data AlexUserState = AlexUSt { lexerErrors :: Seq Error }
+data AlexUserState = AlexUSt { errors :: Seq Error }
 
 alexInitUserState :: AlexUserState
 alexInitUserState = AlexUSt empty
@@ -327,12 +328,11 @@ modifyUserState f = Alex $ \s -> let st = alex_ust s in Right (s {alex_ust = f s
 getUserState :: Alex AlexUserState
 getUserState = Alex (\s -> Right (s,alex_ust s))
 
-addLexerError :: Lexeme Token -> Alex ()
-addLexerError (Lex t p) = do
-    let err = case t of
-            TkError c       -> LError p $ UnexpectedChar c
-            TkStringError s -> LError p $ StringError s
-    modifyUserState $ \st -> st { lexerErrors = lexerErrors st |> err }
+tellLError :: Position -> LexerError -> Alex ()
+tellLError posn err = modifyUserState $ \st -> st { errors = errors st |> (LError posn err) }
+
+tellPError :: Position -> ParseError -> Alex ()
+tellPError posn err = modifyUserState $ \st -> st { errors = errors st |> (PError posn err) }
 
 ----------------------------------------
 
@@ -368,17 +368,17 @@ alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
 runAlex' :: String -> Alex a -> (Seq Error, a)
 runAlex' input (Alex f) =
     let Right (st,a) = f state
-        ust = lexerErrors (alex_ust st)
+        ust = errors (alex_ust st)
     in (ust,a)
     where
         state :: AlexState
         state = AlexState
-            { alex_pos = alexStartPos
-            , alex_inp = input
-            , alex_chr = '\n'
+            { alex_pos   = alexStartPos
+            , alex_inp   = input
+            , alex_chr   = '\n'
             , alex_bytes = []
-            , alex_ust = alexInitUserState
-            , alex_scd = 0
+            , alex_ust   = alexInitUserState
+            , alex_scd   = 0
             }
 
 }

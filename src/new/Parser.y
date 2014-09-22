@@ -9,7 +9,7 @@ import           Lexer
 import           Program
 import           Position
 import           Lexeme
-import           Error         (Error)
+import           Error         (Error, LexerError(..), ParseError(..))
 
 import           Data.Functor
 import           Data.Maybe    (fromJust, isJust)
@@ -205,7 +205,7 @@ Statement :: { Lexeme Statement }
 
     -- Error
     | error     {%
-                    addLexerError (fillLex (TkError 'c')) >> return (fillLex StNoop)
+                    return (fillLex StNoop)
                 }
 
 ---------------------------------------
@@ -228,13 +228,31 @@ AccessNL :: { Lexeme Access }
 
 VariableId :: { Lexeme Identifier }
     : varid         { unTkVarId `fmap` $1 }
+    | typeid        {% do
+                        let idnL = unTkTypeId `fmap` $1
+                        p <- alexGetPosn
+                        tellPError p (TypeIdInsteadOfVarId $ lexInfo idnL)
+                        return idnL
+                    }
 
 TypeId :: { Lexeme Identifier }
     : typeid        { unTkTypeId `fmap` $1 }
+    | varid         {% do
+                        let idnL = unTkVarId `fmap` $1
+                        p <- alexGetPosn
+                        tellPError p (VarIdInsteadOfTypeId $ lexInfo idnL)
+                        return idnL
+                    }
 
 VariableList :: { Seq (Lexeme Identifier) }
     : VariableId                    { singleton $1 }
     | VariableList "," VariableId   { $1     |> $3 }
+    | VariableList     VariableId   {% do
+                                        let idnLs = $1     |> $2
+                                        p <- alexGetPosn
+                                        tellPError p (ParseError "variables must be separated by commas")
+                                        return idnLs
+                                    }
 
 ---------------------------------------
 -- Definitions
@@ -385,7 +403,6 @@ MaybeExpressionListNL :: { Seq (Lexeme Expression) }
     : MaybeNL               { empty }
     | ExpressionListNL      { $1    }
 
-
 {
 
 --------------------------------------------------------------------------------
@@ -415,23 +432,19 @@ notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
 --------------------------------------------------------------------------------
 
-addParseError :: Lexeme Statement -> Alex ()
-addParseError (Lex st p) = undefined
-
 lexWrap :: (Lexeme Token -> Alex a) -> Alex a
 lexWrap cont = do
     t <- alexMonadScan
     case t of
         Lex (TkError c) p -> do
-            p <- alexGetPosn
-            addLexerError t
+            tellLError p (UnexpectedChar c)
             lexWrap cont
         Lex (TkStringError str) p -> do
-            p <- alexGetPosn
-            addLexerError t
+            tellLError p (StringError str)
             -- Simulates that the String was correctly constructed
             cont $ TkString str <$ t
-        _         -> cont t
+        -- Any other Token is part of the language
+        _ -> cont t
 
 parseError :: Lexeme Token -> Alex a
 parseError (Lex t p) = fail $ show p ++ ": Parse error on Token: " ++ show t ++ "\n"

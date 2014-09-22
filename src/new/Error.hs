@@ -45,11 +45,17 @@ instance Show LexerError where
 data ParseError
     = ParseError      String
     | UnexpectedToken String
+    -- Identifiers
+    | TypeIdInsteadOfVarId String
+    | VarIdInsteadOfTypeId String
 
 instance Show ParseError where
     show pError = case pError of
         ParseError msg      -> msg
         UnexpectedToken tok -> "unexpected token: '" ++ show tok ++ "'"
+        -- Identifiers
+        TypeIdInsteadOfVarId idn -> "identifier '" ++ idn ++ "' must start with a lowercase letter"
+        VarIdInsteadOfTypeId idn -> "type '" ++ idn ++ "' must start with an uppercase letter"
 
 ----------------------------------------
 
