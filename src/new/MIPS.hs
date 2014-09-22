@@ -1,10 +1,22 @@
 {-|
     MIPS code generation module
 -}
+module MIPS (
+      MIPSGenerator
+    , generateMIPS
+) 
+where
+
+import           Data.Sequence             as DS (Seq, empty, length)
+import           Data.Foldable             as DF (mapM_, all, and, forM_)
+import           Data.Traversable          (mapM)
+import           Prelude                   as P hiding (mapM_, mapM, all, and)
+
 
 {-|
     MIPS relative information and data types
 -}
+
 type Label = String
 
 {-|
@@ -51,43 +63,43 @@ data MIPSInstruction =
     | Div  Register Register Register
     | Rem  Register Register Register
     -- Load instructions
-    La
-    Lw
-    Li
+    | La
+    | Lw
+    | Li
     -- Store instructions
-    Seq Register Register Register
-    Sne Register Register Register
-    Slt Register Register Register 
-    Sgt Register Register Register 
-    Sle Register Register Register 
-    Sge Register Register Register 
-    Sa
-    Sw
+    | Seq Register Register Register
+    | Sne Register Register Register
+    | Slt Register Register Register 
+    | Sgt Register Register Register 
+    | Sle Register Register Register 
+    | Sge Register Register Register 
+    | Sa
+    | Sw
     -- Branch instructions
-    Beq  Register Register Label
-    Blt  Register Register Label
-    Bgez Register Label
+    | Beq  Register Register Label
+    | Blt  Register Register Label
+    | Bgez Register Label
     -- Jump instructions
-    Jal Register -- Jump to label
-    Jr  Register -- Return from function, resume at address $ra
+    | Jal Register -- Jump to label
+    | Jr  Register -- Return from function, resume at address $ra
 
 {-|
     MIPS code generator Monad
 
     State to carry information about registers allocation
+    Writer to store instructions sequentially
+    IO to output instruction into a .s file
 -}
-MIPSGenerator :: MIPS
 
-MIPSGeneratorState = MIPSGeneratorState
+type MIPSGenerator = RWST MIPSState MIPSReader MIPSWriter IO
+
+MIPSGeneratorState = MIPSGeneratorState 
+    { 
+    }
 
 initialState :: MIPSGeneratorState
 initialState = undefined
 
-TACInstructiontoMIPS
+TACInstructiontoMIPS :: TAC.Instruction
 
-TACExpressionToMIPS e = 
-
-{-|
-    TAC Printer
--}
-data TACPrinter = undefined
+TACExpressionToMIPS e = case e of
