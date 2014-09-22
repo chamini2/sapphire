@@ -56,7 +56,11 @@ instance Show DataType where
         Void            -> "()"
         TypeError       -> error "DataType TypeError should never be shown"
         where
-            showFields fs = " {" ++ intercalate ", " (toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show (lexInfo d)) fs) ++ "}"
+            showFields fs      = " {" ++ intercalate ", " (toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ minimalDataType (lexInfo d)) fs) ++ "}"
+            minimalDataType innerDt = case innerDt of
+                Record idnL _ -> "record " ++ lexInfo idnL
+                Union  idnL _ -> "union "  ++ lexInfo idnL
+                _             -> show innerDt
 
 ----------------------------------------
 
