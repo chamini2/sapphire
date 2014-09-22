@@ -18,14 +18,17 @@ main = do
     input <- if P.null args
         then getContents
         else readFile $ head args
-    let (defS, defW) = uncurry processDefinition $ parseProgram input
-    print defS
-    mapM_ print defW
-    -- When there were no Definition errors
-    when (DS.null defW) $ do
-        let (typS, typW) = processTypeChecker defW (table defS) (ast defS)
-        print typS
-        mapM_ print typW
+    let (readW, prog) = parseProgram input
+    mapM_ print readW
+    -- When there are no Lexing/Parsing errors
+    when (DS.null readW) $ do
+        let (defS, defW) = processDefinition readW prog
+        mapM_ print defW
+        -- When there are no Definition errors
+        when (DS.null defW) $ do
+            let (typS, typW) = processTypeChecker defW (table defS) (ast defS)
+            print typS
+            mapM_ print typW
     putStrLn "done."
 
 
