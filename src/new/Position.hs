@@ -22,7 +22,7 @@ instance Ord Position where
 instance Show Position where
     show (Posn tuple) = case tuple of
         (0,0) -> "in the language"
-        (r,c) -> "at " ++ show r ++ "," ++ show c
+        (r,c) -> "at " ++ show r ++ ":" ++ show c
 
 defaultPosn :: Position
 defaultPosn = Posn (0,0)
