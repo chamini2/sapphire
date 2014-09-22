@@ -48,6 +48,14 @@ data ParseError
     -- Identifiers
     | TypeIdInsteadOfVarId String
     | VarIdInsteadOfTypeId String
+    -- Lists
+    | VariableListComma
+    | FieldListComma
+    | ParameterListComma
+    -- Statements
+    | AssignmentMissingExpression
+    | AssignmentMissingAccess
+    | VariableDefinitionMissingColon
 
 instance Show ParseError where
     show pError = case pError of
@@ -56,6 +64,14 @@ instance Show ParseError where
         -- Identifiers
         TypeIdInsteadOfVarId idn -> "identifier '" ++ idn ++ "' must start with a lowercase letter"
         VarIdInsteadOfTypeId idn -> "type '" ++ idn ++ "' must start with an uppercase letter"
+        -- Lists
+        VariableListComma      -> "variables must be separated with commas"
+        FieldListComma         -> "fields must be separated with commas"
+        ParameterListComma     -> "parameters must be separated with commas"
+        -- Statements
+        AssignmentMissingExpression -> "assignment missing expression"
+        AssignmentMissingAccess     -> "assignment missing variable"
+        VariableDefinitionMissingColon -> "variable definition missing colon"
 
 ----------------------------------------
 

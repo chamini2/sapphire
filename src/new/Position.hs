@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module Position
     ( Position(..)
     , row
@@ -6,12 +5,9 @@ module Position
     , defaultPosn
     ) where
 
-import qualified Data.Data     as DD (Data)
-import qualified Data.Typeable as DT (Typeable)
-
 -- Posn (Row, Column)
 newtype Position = Posn (Int, Int)
-    deriving (Bounded, Eq, DD.Data, Read, DT.Typeable)
+    deriving (Bounded, Eq)
 
 instance Ord Position where
     compare (Posn (r1, c1)) (Posn (r2, c2)) =
@@ -22,6 +18,7 @@ instance Ord Position where
 instance Show Position where
     show (Posn tuple) = case tuple of
         (0,0) -> "in the language"
+        (r,0) -> "at " ++ show r
         (r,c) -> "at " ++ show r ++ ":" ++ show c
 
 defaultPosn :: Position

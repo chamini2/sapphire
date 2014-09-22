@@ -283,7 +283,6 @@ definitionStatement (Lex st posn) = case st of
     StContinue -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn BreakOutsideLoop
 
     _ -> return ()
-    --StNoop
     --StAssign
     --StReturn
     --StProcedureCall

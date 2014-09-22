@@ -12,7 +12,7 @@ module Lexer
     , runAlex'
     , tellLError
     , tellPError
-    , alexGetPosn
+    , alexGetPosition
     ) where
 
 import           Error           (Error(LError, PError), LexerError(..), ParseError(..))
@@ -352,7 +352,7 @@ toPosition :: AlexPosn -> Position
 toPosition (AlexPn _ r c) = Posn (r, c)
 
 alexEOF :: Alex (Lexeme Token)
-alexEOF = liftM (Lex TkEOF) alexGetPosn
+alexEOF = liftM (Lex TkEOF) alexGetPosition
 
 -- Unfortunately, we have to extract the matching bit of string ourselves
 lex :: (String -> Token) -> AlexAction (Lexeme Token)
@@ -362,8 +362,8 @@ lex f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
 lex' :: Token -> AlexAction (Lexeme Token)
 lex' = lex . const
 
-alexGetPosn :: Alex Position
-alexGetPosn = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
+alexGetPosition :: Alex Position
+alexGetPosition = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
 
 runAlex' :: String -> Alex a -> (Seq Error, a)
 runAlex' input (Alex f) =

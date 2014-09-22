@@ -19,7 +19,7 @@ type StBlock    = Seq (Lexeme Statement)
 
 data Statement
     -- Language
-    = StNoop
+    = StNoop                                                -- Only used in Parser
     | StAssign (Lexeme Access) (Lexeme Expression)
     -- Definitions
     | StVariableDeclaration (Lexeme Declaration)

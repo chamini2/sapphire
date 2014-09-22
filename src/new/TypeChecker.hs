@@ -224,7 +224,6 @@ typeCheckStatement (Lex st posn) = case st of
         exitScope
 
     _ -> return ()
-    --StNoop
     --StVariableDeclaration
     --StStructDefinition
     --StBreak
