@@ -54,14 +54,6 @@ instance SappState DefState where
     putScopeId sc  s = s { scopeId = sc  }
     putAst     as  s = s { ast     = as  }
 
-instance Show DefState where
-    show (DefState t s c a _) = showT ++ showS ++ showC ++ showA
-        where
-            showT = show t ++ "\n"
-            showS = "Scope Stack:\n"  ++ show s ++ "\n"
-            showC = "Scope Number:\t" ++ show c ++ "\n"
-            showA = show a ++ "\n"
-
 ----------------------------------------
 -- Initial
 
