@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, UndecidableInstances, OverlappingInstances #-}
 module SappMonad where
 
 import           Error
@@ -10,7 +10,7 @@ import           Control.Monad.State  (MonadState, gets, modify)
 import           Control.Monad.Writer (MonadWriter, tell)
 import           Data.Function        (on)
 import           Data.Functor         ((<$>))
-import qualified Data.Map             as DM (Map, fromList)
+import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
 import           Data.Sequence        as DS (Seq, empty, singleton)
 
@@ -33,7 +33,7 @@ data Flag = OutputFile FilePath | SupressWarnings | AllWarnings
 
 data Architecture = Arch
     { archName :: String
-    , types    :: DM.Map DataType Bytes
+    , types    :: Map.Map DataType Bytes
     } deriving (Show)
 
 ----------------------------------------
@@ -54,7 +54,7 @@ initialReader = SappReader
 defaultArchitecture :: Architecture
 defaultArchitecture = Arch
     { archName = "mips"
-    , types = DM.fromList
+    , types = Map.fromList
         [ (Int     , 4)
         , (Float   , 4)
         , (Char    , 1)
@@ -81,21 +81,31 @@ class SappState s where
     putScopeId :: ScopeNum    -> s -> s
     putAst     :: Program     -> s -> s
 
+----------------------------------------
+-- Instances
+
+instance SappState s => Show s where
+    show st = showT ++ showS ++ showI ++ showA
+        where
+            showT = show (getTable st) ++ "\n"
+            showS = "Scope Stack:\n"  ++ show (getStack st) ++ "\n"
+            showI = "Scope Number:\t" ++ show (getScopeId st) ++ "\n"
+            showA = show (getAst st) ++ "\n"
 
 --------------------------------------------------------------------------------
 -- Error reporting
 
 tellLError :: MonadWriter (Seq Error) m => Position -> LexerError -> m ()
-tellLError posn err = tell (singleton $ LError posn err)
+tellLError posn = tell . singleton . LError posn
 
 tellPError :: MonadWriter (Seq Error) m => Position -> ParseError -> m ()
-tellPError posn err = tell (singleton $ PError posn err)
+tellPError posn = tell . singleton . PError posn
 
 tellSError :: MonadWriter (Seq Error) m => Position -> StaticError -> m ()
-tellSError posn err = tell (singleton $ SError posn err)
+tellSError posn = tell . singleton . SError posn
 
 tellWarn :: MonadWriter (Seq Error) m => Position -> Warning -> m ()
-tellWarn posn err = tell (singleton $ Warn posn err)
+tellWarn posn = tell . singleton . Warn posn
 
 --------------------------------------------------------------------------------
 -- Scope Handling

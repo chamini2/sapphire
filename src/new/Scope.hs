@@ -7,7 +7,9 @@ module Scope
     ) where
 
 newtype Scope = Scope { serial :: ScopeNum }
-    deriving (Show)
+
+instance Show Scope where
+    show = show . serial
 
 {- |
     The outermost scope in the program has a default value of 0

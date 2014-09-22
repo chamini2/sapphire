@@ -11,13 +11,14 @@ module Stack
 
 import           Scope
 
-import           Data.Foldable as DF (Foldable (..), concatMap)
+import           Data.Foldable as DF (Foldable (..))
+import           Data.List     (intercalate)
 import           Prelude       as P hiding (concatMap)
 
 newtype Stack a = Stack [a]
 
 instance Show a => Show (Stack a) where
-    show (Stack s) = drop 1 $ concatMap ((++) "\n\t" . show) s
+    show (Stack s) = intercalate ", " $ map show $ reverse s
 
 instance Functor Stack where
     fmap f (Stack s) = Stack $ map f s
