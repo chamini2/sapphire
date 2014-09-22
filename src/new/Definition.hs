@@ -12,19 +12,20 @@ import           SappMonad
 import           SymbolTable
 
 import           Control.Arrow             ((&&&))
-import           Control.Monad             (liftM, void, unless, when)
-import           Control.Monad.State       (gets, modify)
+import           Control.Monad             (liftM, unless, void, when)
 import           Control.Monad.Reader      (asks)
-import           Control.Monad.Writer      (tell)
 import           Control.Monad.RWS         (RWS, runRWS)
+import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Data.Foldable             as DF (all, forM_, mapM_)
-import           Data.Functor              ((<$), (<$>))
-import qualified Data.Map                  as DM (toList)
+import           Control.Monad.Writer      (listen, tell)
+import           Data.Foldable             as DF (all, foldlM, forM_, mapM_, foldl')
+import           Data.Functor              ((<$))
+import qualified Data.Map.Strict           as Map (toList)
 import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             as DS (Seq, empty, filter)
+import           Data.Sequence             as DS (Seq, empty, filter, null)
 import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (all, filter, mapM_)
+import           Prelude                   as P hiding (all, filter, mapM_,
+                                                 null)
 
 --------------------------------------------------------------------------------
 
@@ -76,16 +77,19 @@ buildDefinition w program@(Program block) = do
     tell w
     definitionStatements block
 
-    tab <- liftM accessible $ gets table
-    -- First we define every DataType in the program,
-    -- Then we get said DataTypes for the variables/parameters
-    fixDataTypes $ filter ((==) CatType . symbolCategory . snd) tab
-    fixDataTypes $ filter ((/=) CatType . symbolCategory . snd) tab
+    ((), defW) <- listen (return ())
+
+    when (null defW) $ do
+        tab <- liftM allSymbols $ gets table
+        -- First we define every DataType in the program,
+        -- Then we get said DataTypes for the variables/parameters
+        fixDataTypes $ filter ((==) CatType . symbolCategory . snd) tab
+        fixDataTypes $ filter ((/=) CatType . symbolCategory . snd) tab
 
 ----------------------------------------
 
 initializeTable :: Definition ()
-initializeTable = asks (DM.toList . types . arch) >>= \tuples -> forM_ tuples $
+initializeTable = asks (Map.toList . types . arch) >>= \tuples -> forM_ tuples $
     \(dt, byt) -> do
         let info = emptySymType
                 { dataType = fillLex dt
@@ -163,16 +167,43 @@ definitionStatement (Lex st posn) = case st of
     StVariableDeclaration dclL -> void $ processDeclaration dclL
 
     StStructDefinition dtL -> do
+        let (idn, flds) = case lexInfo dtL of
+                Record idnL structFlds -> (lexInfo idnL, structFlds)
+                Union  idnL structFlds -> (lexInfo idnL, structFlds)
+
+        enterScope
         current <- currentScope
         stk     <- gets stack
-        let idn = case lexInfo dtL of
-                Record idnL _ -> lexInfo idnL
-                Union  idnL _ -> lexInfo idnL
-            info = emptySymType
-                { dataType   = dtL
+
+        -- Fields SymbolTable
+        fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
+            let info = emptySymInfo
+                    { dataType   = fldDtL
+                    , category   = CatField
+                    , scopeNum   = current
+                    , defPosn    = fldP
+                    , scopeStack = stk
+                    }
+                maySymI = lookupWithScope fldIdn stk fldsTab
+            case maySymI of
+                Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
+                Nothing   -> return $ insert fldIdn info fldsTab
+
+        exitScope
+        newCurrent <- currentScope
+        newStk     <- gets stack
+
+        let newFlds = fmap (\(fldIdn, fldSym) -> (Lex fldIdn (defPosn fldSym), dataType fldSym)) $ allSymbols fldsTab
+            newDtL  = case lexInfo dtL of
+                Record idnL _ -> Record idnL newFlds <$ dtL
+                Union  idnL _ -> Union  idnL newFlds <$ dtL
+
+        let info = emptySymType
+                { dataType   = newDtL
+                , fields     = Just fldsTab
                 , defPosn    = lexPosn dtL
-                , scopeNum   = current
-                , scopeStack = stk
+                , scopeNum   = newCurrent
+                , scopeStack = newStk
                 }
         maySymI <- getsSymbol idn (langDef &&& defPosn)
         case maySymI of
@@ -186,7 +217,7 @@ definitionStatement (Lex st posn) = case st of
         stk     <- gets stack
         let idn = lexInfo idnL
             info = emptySymFunction
-                { paramTypes = dclDataType . lexInfo <$> parms      -- fmap (dclDataType . lexInfo) parms
+                { paramTypes = fmap (dclDataType . lexInfo) parms
                 , returnType = dtL
                 , body       = block
                 , defPosn    = lexPosn idnL
@@ -276,32 +307,44 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
         CatType     -> do
             let symDtL  = dataType sym
                 symPosn = defPosn  sym
+                symTab  = fields   sym
             -- We only need to check the user-defined types
             unless (langDef sym) $ do
                 let (strIdn, flds) = case lexInfo symDtL of
-                        Record idnL fields -> (lexInfo idnL, fields)
-                        Union  idnL fields -> (lexInfo idnL, fields)
+                        Record idnL structFlds -> (lexInfo idnL, structFlds)
+                        Union  idnL structFlds -> (lexInfo idnL, structFlds)
+
                 -- Fields
-                newFlds <- forM flds $ \(fldIdnL, fldDtL) -> runMaybeT $ do
+                -- CHANGE TO USE THE SYMBOLTABLE STORED IN THE SYMBOL
+                newFlds <- forM flds $ \(fldIdnL@(Lex _ fldP), fldDtL) -> runMaybeT $ do
                     -- We need the field's data type identifier for errors
-                    let fldDtIdn = (\(DataType idnL) -> lexInfo idnL) . lexInfo . defocusDataType . deepDataType $ focusDataType fldDtL
+                    let fldDtIdn = (\(DataType (Lex dtIdn _)) -> dtIdn) . lexInfo . defocusDataType . deepDataType $ focusDataType fldDtL
                         symDtP   = defPosn . fromJust $ lookupWithScope fldDtIdn (scopeStack sym) currentTab
 
-                    newFldDtL <- getUpdatedDataType (scopeStack sym) (lexPosn fldIdnL) fldDtL
+                    newFldDtL <- getUpdatedDataType (scopeStack sym) fldP fldDtL
 
                     -- Error when defining a field with type of the same strucutre we are defining (recursively)
-                    unlessGuard (strIdn /= fldDtIdn) $ tellSError (lexPosn fldIdnL) (RecursiveStruct strIdn (lexInfo fldIdnL))
+                    unlessGuard (strIdn /= fldDtIdn) $ tellSError fldP (RecursiveStruct strIdn (lexInfo fldIdnL))
 
                     -- Error when it uses a type defined afterwards
-                    unlessGuard (symPosn > symDtP) $ tellSError (lexPosn fldIdnL) (TypeNotYetDefined strIdn (lexInfo fldIdnL) fldDtIdn symDtP)
+                    unlessGuard (symPosn > symDtP) $ tellSError fldP (TypeNotYetDefined strIdn (lexInfo fldIdnL) fldDtIdn symDtP)
 
                     return (fldIdnL, newFldDtL)
+
+                let newSymTab = foldSymbolTable newFlds symTab
 
                 when (all isJust newFlds) $ do
                     let newDtL = case lexInfo symDtL of
                             Record strIdnL _ -> Record strIdnL (fmap fromJust newFlds) <$ symDtL
                             Union  strIdnL _ -> Union  strIdnL (fmap fromJust newFlds) <$ symDtL
-                    modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { dataType = newDtL })
+                    modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { dataType = newDtL, fields = newSymTab })
+            where
+                foldSymbolTable :: Seq (Maybe (Lexeme Identifier, Lexeme DataType)) -> Maybe SymbolTable -> Maybe SymbolTable
+                foldSymbolTable newFlds = fmap (\symTab -> foldl' func symTab newFlds)
+                func :: SymbolTable -> Maybe (Lexeme Identifier, Lexeme DataType) -> SymbolTable
+                func tab = maybe tab
+                    (\(fldIdnL, fldDtL) ->
+                        update (lexInfo fldIdnL) (\sym' -> sym' { dataType = fldDtL }) tab)
 
         CatFunction -> do
             let symStk  = scopeStack sym
