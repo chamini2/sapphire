@@ -15,7 +15,7 @@ data Error
     | Warn   Position Warning
 
 instance Show Error where
-    show cError = case cError of
+    show sappError = case sappError of
         LError p e -> "Lexer error "   ++ show p ++ ": \n\t" ++ show e ++ "\n"
         PError p e -> "Parsing error " ++ show p ++ ": \n\t" ++ show e ++ "\n"
         SError p e -> "Static error "  ++ show p ++ ": \n\t" ++ show e ++ "\n"
@@ -60,7 +60,7 @@ data ParseError
 instance Show ParseError where
     show pError = case pError of
         ParseError msg      -> msg
-        UnexpectedToken tok -> "unexpected token: '" ++ show tok ++ "'"
+        UnexpectedToken tok -> "unexpected token '" ++ show tok ++ "'"
         -- Identifiers
         TypeIdInsteadOfVarId idn -> "identifier '" ++ idn ++ "' must start with a lowercase letter"
         VarIdInsteadOfTypeId idn -> "type '" ++ idn ++ "' must start with an uppercase letter"
@@ -69,8 +69,8 @@ instance Show ParseError where
         FieldListComma         -> "fields must be separated with commas"
         ParameterListComma     -> "parameters must be separated with commas"
         -- Statements
-        AssignmentMissingExpression -> "assignment missing expression"
-        AssignmentMissingAccess     -> "assignment missing variable"
+        AssignmentMissingExpression    -> "assignment missing expression"
+        AssignmentMissingAccess        -> "assignment missing variable"
         VariableDefinitionMissingColon -> "variable definition missing colon"
 
 ----------------------------------------

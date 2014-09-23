@@ -155,6 +155,10 @@ StatementList :: { StBlock }
     : Statement                             { expandStatement $1       }
     | StatementList Separator Statement     { $1 >< expandStatement $3 }
 
+--StatementList :: { StBlock }
+--    : Statement Separator                   { expandStatement $1       }
+--    | StatementList Statement Separator     { $1 >< expandStatement $2 }
+
 Separator :: { () }
     : ";"           { }
     | newline       { }
@@ -259,16 +263,16 @@ Statement :: { Lexeme Statement }
                                                                         }
 
     -- -- Conditionals
-    | "case" Expression MaybeNL          "end"                                      {% do
-                                                                                        let const = StNoop <$ $1
-                                                                                        tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
-                                                                                        return const
-                                                                                    }
-    | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
-                                                                                        let const = StNoop <$ $1
-                                                                                        tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
-                                                                                        return const
-                                                                                    }
+--    | "case" Expression MaybeNL          "end"                                      {% do
+--                                                                                        let const = StNoop <$ $1
+--                                                                                        tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
+--                                                                                        return const
+--                                                                                    }
+--    | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
+--                                                                                        let const = StNoop <$ $1
+--                                                                                        tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
+--                                                                                        return const
+--                                                                                    }--
 
     -- -- I/O
 --    | "read"              String         "," Access         { StReadString (Just $2) $4 <$ $1 }

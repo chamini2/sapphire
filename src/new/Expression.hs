@@ -32,6 +32,8 @@ import           Data.Sequence as DS (Seq, fromList)
 --import qualified Data.Typeable as DT (Typeable)
 
 data Expression
+    -- Error
+--    = NoExpression                              -- Only used in Parser
     -- Literals
     = LitInt    (Lexeme Int)
     | LitFloat  (Lexeme Float)
