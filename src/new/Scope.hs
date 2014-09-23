@@ -2,11 +2,12 @@ module Scope
     ( Scope(..)
     , ScopeNum
 
-    , initialScope
-    , outerScope
+    , topScope
+    , langScope
     ) where
 
 newtype Scope = Scope { serial :: ScopeNum }
+    deriving (Eq)
 
 instance Show Scope where
     show = show . serial
@@ -14,14 +15,14 @@ instance Show Scope where
 {- |
     The outermost scope in the program has a default value of 0
 -}
-initialScope :: Scope
-initialScope = Scope { serial = 0 }
+topScope :: Scope
+topScope = Scope { serial = 0 }
 
 {-
     The scope that contanis all the language definitions
 -}
-outerScope :: Scope
-outerScope = Scope { serial = -1 }
+langScope :: Scope
+langScope = Scope { serial = -1 }
 
 ----------------------------------------
 

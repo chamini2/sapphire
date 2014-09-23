@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, FlexibleInstances, UndecidableInstances, OverlappingInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module SappMonad where
 
 import           Error
@@ -71,7 +71,7 @@ type SappWriter = Seq Error
 --------------------------------------------------------------------------------
 -- State
 
-class SappState s where
+class Show s => SappState s where
     getTable   :: s -> SymbolTable
     getStack   :: s -> Stack Scope
     getScopeId :: s -> ScopeNum
@@ -84,27 +84,27 @@ class SappState s where
 ----------------------------------------
 -- Instances
 
-instance SappState s => Show s where
-    show st = showT ++ showS ++ showI ++ showA
-        where
-            showT = show (getTable st) ++ "\n"
-            showS = "Scope Stack:\n"  ++ show (getStack st) ++ "\n"
-            showI = "Scope Number:\t" ++ show (getScopeId st) ++ "\n"
-            showA = show (getAst st) ++ "\n"
+showSappState :: SappState s => s -> String
+showSappState st = showT ++ showS ++ showA
+    where
+        showT = show (getTable st) ++ "\n"
+        showS = "Scope Stack:\n"  ++ show (getStack st) ++ "\n"
+        --showI = "Scope Number:\t" ++ show (getScopeId st) ++ "\n"
+        showA = show (getAst st) ++ "\n"
 
 --------------------------------------------------------------------------------
 -- Error reporting
 
-tellLError :: MonadWriter (Seq Error) m => Position -> LexerError -> m ()
+tellLError :: MonadWriter SappWriter m => Position -> LexerError -> m ()
 tellLError posn = tell . singleton . LError posn
 
-tellPError :: MonadWriter (Seq Error) m => Position -> ParseError -> m ()
+tellPError :: MonadWriter SappWriter m => Position -> ParseError -> m ()
 tellPError posn = tell . singleton . PError posn
 
-tellSError :: MonadWriter (Seq Error) m => Position -> StaticError -> m ()
+tellSError :: MonadWriter SappWriter m => Position -> StaticError -> m ()
 tellSError posn = tell . singleton . SError posn
 
-tellWarn :: MonadWriter (Seq Error) m => Position -> Warning -> m ()
+tellWarn :: MonadWriter SappWriter m => Position -> Warning -> m ()
 tellWarn posn = tell . singleton . Warn posn
 
 --------------------------------------------------------------------------------
@@ -112,9 +112,9 @@ tellWarn posn = tell . singleton . Warn posn
 
 enterScope :: (SappState s, MonadState s m) => m ()
 enterScope = do
-    currentId <- gets getScopeId
-    let scope = Scope { serial = currentId + 1 }
-    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId (currentId + 1) s
+    scp <- gets getScopeId
+    let scope = Scope { serial = scp + 1 }
+    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId (scp + 1) s
 
 exitScope :: (SappState s, MonadState s m) => m ()
 exitScope = modify $ \s -> putStack (pop $ getStack s) s
@@ -150,26 +150,20 @@ getsSymbolWithStack idn stk f = do
     tab <- gets getTable
     return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
 
-modifySymbolWithScopeNStack :: (SappState s, MonadState s m)
-                            => Identifier -> ScopeNum -> Stack Scope -> (Symbol -> Symbol) -> m ()
-modifySymbolWithScopeNStack idn scope stk f = do
+modifySymbolWithScope :: (SappState s, MonadState s m)
+                      => Identifier -> Stack Scope -> (Symbol -> Symbol) -> m ()
+modifySymbolWithScope idn stk f = do
     tab <- gets getTable
     exists <- liftM isJust $ getsSymbolWithStack idn stk f
-    when exists $ modify $ \s -> putTable (updateWithScope idn scope f tab) s
-
-modifySymbolWithScope :: (SappState s, MonadState s m)
-                      => Identifier -> ScopeNum -> (Symbol -> Symbol) -> m ()
-modifySymbolWithScope idn scope f = do
-    stk <- gets getStack
-    modifySymbolWithScopeNStack idn scope stk f
+    when exists $ modify $ \s -> putTable (updateWithScope idn stk f tab) s
 
 modifySymbol :: (SappState s, MonadState s m)
              => Identifier -> (Symbol -> Symbol) -> m ()
 modifySymbol idn f = do
-    mayScopeN <- getsSymbol idn scopeNum
-    case mayScopeN of
-        Nothing -> return ()
-        Just symScopeN -> modifySymbolWithScope idn symScopeN f
+    mayStk <- getsSymbol idn scopeStack
+    case mayStk of
+        Nothing        -> return ()
+        Just stk -> modifySymbolWithScope idn stk f
 
 ----------------------------------------
 -- Used

@@ -6,19 +6,19 @@ module Stack
 
     , initialStack
     , emptyStack
-    , singletonStack
+    , langStack
     ) where
 
 import           Scope
 
 import           Data.Foldable as DF (Foldable (..))
-import           Data.List     (intercalate)
 import           Prelude       as P hiding (concatMap)
 
 newtype Stack a = Stack [a]
+    deriving (Eq)
 
 instance Show a => Show (Stack a) where
-    show (Stack s) = intercalate ", " $ map show $ reverse s
+    show (Stack s) = show s
 
 instance Functor Stack where
     fmap f (Stack s) = Stack $ map f s
@@ -50,7 +50,10 @@ pop (Stack (_ : s)) = Stack s
     The scope stack has the inital scope by default.
 -}
 initialStack :: Stack Scope
-initialStack = Stack [ initialScope, outerScope ]
+initialStack = Stack [ topScope, langScope ]
+
+langStack :: Stack Scope
+langStack = singletonStack langScope
 
 emptyStack :: Stack a
 emptyStack = Stack [ ]

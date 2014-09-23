@@ -8,13 +8,13 @@ module SymbolTable
     , insert
     , lookup
     , lookupWithScope
-    , toListFilter
+    --, toListFilter
     , update
     , updateWithScope
     , allSymbols
 
-    -- From Symbol
     , Symbol(..)
+    , scopeNum
     , emptySymInfo
     , emptySymType
     , emptySymFunction
@@ -41,8 +41,8 @@ module SymbolTable
     -- From Scope
     , Scope(..)
     , ScopeNum
-    --, initialScope
-    --, outerScope
+    , topScope
+    --, langScope
     ) where
 
 import           Program
@@ -50,11 +50,11 @@ import           Scope
 import           Stack
 
 import           Control.Arrow   (second)
-import           Data.Foldable   as DF (concatMap, find, foldl', foldr, msum,
+import           Data.Foldable   as DF (concatMap, find, foldr, msum,
                                         toList)
 import           Data.Function   (on)
 import           Data.List       (groupBy, sortBy, intercalate)
-import qualified Data.Map.Strict as Map (Map, alter, empty, keys, lookup,
+import qualified Data.Map.Strict as Map (Map, alter, empty, lookup,
                                          toList)
 import           Data.Sequence   as DS (Seq, ViewL (..), empty, fromList,
                                         singleton, viewl, (<|))
@@ -111,7 +111,6 @@ data Symbol = SymInfo
                 , offset     :: Offset
                 , bytes      :: Bytes
                 , used       :: Used
-                , scopeNum   :: ScopeNum
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
                 }
@@ -121,7 +120,6 @@ data Symbol = SymInfo
                 , langDef    :: LanguageDefined
                 , bytes      :: Bytes
                 , used       :: Used
-                , scopeNum   :: ScopeNum
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
                 }
@@ -133,24 +131,23 @@ data Symbol = SymInfo
                 , langDef    :: LanguageDefined
                 , bytes      :: Bytes
                 , used       :: Used
-                , scopeNum   :: ScopeNum
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
                 }
 
 instance Show Symbol where
     show sym = case sym of
-        SymInfo dt cat off by u scp stk p -> intercalate ", " [showScp scp, showP p, showCat, showDT, showU u, showBy by, showOff, showStk stk]
+        SymInfo dt cat off by u stk p           -> intercalate ", " [showP p, showCat, showDT, showU u, showBy by, showOff, showStk stk]
             where
                 showCat = show cat
                 showDT  = show $ lexInfo dt
                 showOff = "offset is " ++ show off
-        SymType dt flds lDef by u scp stk p -> intercalate ", " [showScp scp, showP p, showLDef, showDT, showU u, showBy by, showStk stk, showFlds]
+        SymType dt flds lDef by u stk p         -> intercalate ", " [showP p, showLDef, showDT, showU u, showBy by, showStk stk, showFlds]
             where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showDT    = show $ lexInfo dt
                 showFlds  = maybe "NO Symbol Table" ((++) "\n" . showTable 3) flds
-        SymFunction prms rt _ _ lDef by u scp stk p -> intercalate ", " [showScp scp, showP p, showLDef, showSign, showU u, showBy by, showStk stk]
+        SymFunction prms rt _ _ lDef by u stk p -> intercalate ", " [showP p, showLDef, showSign, showU u, showBy by, showStk stk]
             where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showSign = "(" ++ intercalate "," (map (show . lexInfo) $ toList prms) ++ ") -> " ++ show (lexInfo rt)
@@ -160,6 +157,9 @@ instance Show Symbol where
             showU u     = if u then "used" else "NOT used"
             showBy by   = show by ++ " bytes"
             showStk stk = "stack: " ++ show stk
+
+scopeNum :: Symbol -> ScopeNum
+scopeNum = serial . top . scopeStack
 
 --instance Show Symbol where
 --    show (SymInfo dt ct v sn dp i u p o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP ++ showO
@@ -186,6 +186,17 @@ data SymbolCategory = CatInfo
                     | CatFunction
                     deriving (Eq, Show)
 
+-- For sorting Types, Variables, Functions
+instance Ord SymbolCategory where
+    compare x y = case (x, y) of
+        (CatInfo, CatInfo)         -> EQ
+        (CatType, CatType)         -> EQ
+        (CatFunction, CatFunction) -> EQ
+        (CatType, _)     -> GT
+        (_, CatFunction) -> GT
+        (_, CatType)     -> LT
+        (CatFunction, _) -> LT
+
 --------------------------------------------------------------------------------
 
 {- |
@@ -203,8 +214,7 @@ emptySymInfo = SymInfo
     , offset     = 0
     , bytes      = 0
     , used       = False
-    , scopeNum   = -1
-    , scopeStack = singletonStack outerScope
+    , scopeStack = langStack
     , defPosn    = defaultPosn
     }
 
@@ -215,8 +225,7 @@ emptySymType = SymType
     , langDef    = False
     , bytes      = 0
     , used       = False
-    , scopeNum   = -1
-    , scopeStack = singletonStack outerScope
+    , scopeStack = langStack
     , defPosn    = defaultPosn
     }
 
@@ -229,8 +238,7 @@ emptySymFunction = SymFunction
     , langDef    = False
     , bytes      = 0
     , used       = False
-    , scopeNum   = -1
-    , scopeStack = singletonStack outerScope
+    , scopeStack = langStack
     , defPosn    = defaultPosn
     }
 
@@ -297,22 +305,22 @@ update idn f = SymTable . Map.alter func idn . getMap
 {- |
     Updates the Symbol of a given identifier, in a given scope.
 -}
-updateWithScope :: Identifier -> ScopeNum -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
+updateWithScope :: Identifier -> Stack Scope -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
 updateWithScope idn sc f = SymTable . Map.alter func idn . getMap
     where
         func = maybe failure (Just . foldr foldFunc empty)
         failure = error $ "SymbolTable.update: Identifier '" ++ idn ++ "' does not exist in symbol table"
-        foldFunc i is = if scopeNum i == sc
+        foldFunc i is = if scopeStack i == sc
             then f i <| is
             else   i <| is
 
 ----------------------------------------
 
-toListFilter :: ScopeNum -> SymbolTable -> Seq (Identifier, Symbol)
-toListFilter sc st@(SymTable m) = fromList $ foldl' func [] $ Map.keys m
-    where
-        func ls idn = maybe ls (\j -> (idn, j) : ls) $ maySI idn
-        maySI idn   = lookupWithScope idn (singletonStack (Scope sc)) st
+--toListFilter :: ScopeNum -> SymbolTable -> Seq (Identifier, Symbol)
+--toListFilter sc st@(SymTable m) = fromList $ foldl' func [] $ Map.keys m
+--    where
+--        func ls idn = maybe ls (\j -> (idn, j) : ls) $ maySI idn
+--        maySI idn   = lookupWithScope idn (singletonStack (Scope sc)) st
 
 {- |
     Returns all the Symbols
@@ -320,6 +328,9 @@ toListFilter sc st@(SymTable m) = fromList $ foldl' func [] $ Map.keys m
 allSymbols :: SymbolTable -> Seq (Identifier, Symbol)
 allSymbols = fromList . sortIt . expand . Map.toList . getMap
     where
-        expand = concatMap (\(idn, syms) -> fmap (idn,) (toList syms))
-        sortIt = sortBy (compare `on` (defPosn . snd))
---accessible (SymTable m) = fromList . sortBy (compare `on` (defPosn . snd)) $ Map.toList m
+        expand   = concatMap (\(idn, syms) -> fmap (idn,) (toList syms))
+        sortIt   = sortBy comp
+        comp x y = case compOn symbolCategory x y of
+                EQ    -> compOn defPosn x y
+                other -> other
+        compOn f = compare `on` (f . snd)

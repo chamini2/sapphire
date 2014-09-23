@@ -26,6 +26,7 @@ module Program
     , DataType(..)
     , Field
 
+    , toIdentifier
     , isScalar
     , isValid
     , isArray

@@ -55,6 +55,9 @@ instance SappState TypeState where
     putScopeId sc  s = s { scopeId = sc  }
     putAst     as  s = s { ast     = as  }
 
+instance Show TypeState where
+    show = showSappState
+
 ----------------------------------------
 -- Initial
 
@@ -142,7 +145,7 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unlessGuard (retDt == expDt) $ tellSError posn (ReturnType retDt expDt idn)
 
-        modifySymbolWithScope idn funcScopeId (\s -> s { returned = True })
+        modifySymbol idn (\s -> s { returned = True })
 
     StFunctionDef (Lex idn _) _ block -> do
         dtL <- liftM fromJust $ getsSymbol idn returnType
@@ -232,6 +235,8 @@ typeCheckStatement (Lex st posn) = case st of
 typeCheckExpression :: Lexeme Expression -> TypeChecker DataType
 typeCheckExpression (Lex exp posn) = case exp of
 
+    --NoExpression -> return Void
+
     LitInt    _ -> return Int
     LitFloat  _ -> return Float
     LitBool   _ -> return Bool
@@ -274,12 +279,12 @@ checkArguments (Lex idn posn) args func = do
 
     unlessGuard (isJust maySymI) $ tellSError posn (NotDefined idn)
 
-    markUsed idn
-
     let (cat, Lex dt _, prms) = fromJust maySymI
 
     -- When is not a function
     unlessGuard (cat == CatFunction) $ tellSError posn (WrongCategory idn CatFunction cat)
+
+    markUsed idn
 
     if func
         -- When is a procedure, and should be a function

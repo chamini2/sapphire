@@ -55,6 +55,9 @@ instance SappState DefState where
     putScopeId sc  s = s { scopeId = sc  }
     putAst     as  s = s { ast     = as  }
 
+instance Show DefState where
+    show = showSappState
+
 ----------------------------------------
 -- Initial
 
@@ -62,7 +65,7 @@ initialState :: DefState
 initialState = DefState
     { table     = emptyTable
     , stack     = initialStack
-    , scopeId   = 0
+    , scopeId   = serial topScope
     , ast       = Program empty
     , loopLvl   = 0
     }
@@ -90,14 +93,14 @@ buildDefinition w program@(Program block) = do
 
 initializeTable :: Definition ()
 initializeTable = asks (Map.toList . types . arch) >>= \tuples -> forM_ tuples $
-    \(dt, byt) -> do
+    \(dt, by) -> do
         let info = emptySymType
                 { dataType = fillLex dt
                 , langDef  = True
                 , used     = True
-                , bytes    = byt
+                , bytes    = by
                 }
-        addSymbol (show dt) info
+        addSymbol (toIdentifier dt) info
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -137,22 +140,20 @@ exitLoop = modify (\s -> s { loopLvl = loopLvl s - 1 })
 
 processDeclaration :: Lexeme Declaration -> Definition Bool
 processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
-    current <- currentScope
-    stk     <- gets stack
+    stk <- gets stack
     let idn = lexInfo idnL
         info = emptySymInfo
             { dataType   = dtL
             , category   = cat
-            , scopeNum   = current
             , defPosn    = dclP
             , scopeStack = stk
             }
-    maySymI <- getsSymbol idn $ \sym -> (scopeNum sym, defPosn sym, symbolCategory sym)
+    maySymI <- getsSymbol idn $ \sym -> (scopeStack sym, defPosn sym, symbolCategory sym)
     case maySymI of
         Nothing -> addSymbol idn info >> return True
-        Just (symScopeN, symDefP, symCat)
+        Just (symStk, symDefP, symCat)
             | symCat == CatFunction -> tellSError dclP (FunctionAlreadyDefined idn symDefP) >> return False
-            | symScopeN == current  -> tellSError dclP (AlreadyDeclared idn symDefP)      >> return False
+            | symStk == stk         -> tellSError dclP (AlreadyDeclared idn symDefP)        >> return False
             | otherwise             -> addSymbol idn info >> return True
 
 --------------------------------------------------------------------------------
@@ -166,21 +167,24 @@ definitionStatement (Lex st posn) = case st of
 
     StVariableDeclaration dclL -> void $ processDeclaration dclL
 
-    StStructDefinition dtL -> do
+    StStructDefinition dtL -> void $ runMaybeT $ do
         let (idn, flds) = case lexInfo dtL of
                 Record idnL structFlds -> (lexInfo idnL, structFlds)
                 Union  idnL structFlds -> (lexInfo idnL, structFlds)
 
-        enterScope
         current <- currentScope
-        stk     <- gets stack
+
+        unlessGuard (current == serial topScope) $ tellSError posn (StaticError "top level structures only")
+
+        enterScope
+        stk <- gets stack
 
         -- Fields SymbolTable
         fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
             let info = emptySymInfo
                     { dataType   = fldDtL
                     , category   = CatField
-                    , scopeNum   = current
+                    , used       = True
                     , defPosn    = fldP
                     , scopeStack = stk
                     }
@@ -190,8 +194,7 @@ definitionStatement (Lex st posn) = case st of
                 Nothing   -> return $ insert fldIdn info fldsTab
 
         exitScope
-        newCurrent <- currentScope
-        newStk     <- gets stack
+        newStk <- gets stack
 
         let newFlds = fmap (\(fldIdn, fldSym) -> (Lex fldIdn (defPosn fldSym), dataType fldSym)) $ allSymbols fldsTab
             newDtL  = case lexInfo dtL of
@@ -202,7 +205,6 @@ definitionStatement (Lex st posn) = case st of
                 { dataType   = newDtL
                 , fields     = Just fldsTab
                 , defPosn    = lexPosn dtL
-                , scopeNum   = newCurrent
                 , scopeStack = newStk
                 }
         maySymI <- getsSymbol idn (langDef &&& defPosn)
@@ -213,23 +215,21 @@ definitionStatement (Lex st posn) = case st of
                 | otherwise -> tellSError (lexPosn dtL) (TypeAlreadyDefined idn symDefP)
 
     StFunctionDef idnL (Sign parms dtL) block -> do
-        current <- currentScope
-        stk     <- gets stack
+        stk <- gets stack
         let idn = lexInfo idnL
             info = emptySymFunction
                 { paramTypes = fmap (dclDataType . lexInfo) parms
                 , returnType = dtL
                 , body       = block
                 , defPosn    = lexPosn idnL
-                , scopeNum   = current
                 , scopeStack = stk
                 }
-        maySymI <- getsSymbol idn (\sym -> (scopeNum sym, defPosn sym, symbolCategory sym))
+        maySymI <- getsSymbol idn (\sym -> (scopeStack sym, defPosn sym, symbolCategory sym))
         case maySymI of
             Nothing -> addSymbol idn info
-            Just (symScopeN, symDefP, symCat)
+            Just (symStk, symDefP, symCat)
                 | symCat == CatFunction -> tellSError posn (FunctionAlreadyDefined idn symDefP)
-                | symScopeN == current  -> tellSError posn (AlreadyDeclared idn symDefP)
+                | symStk == stk         -> tellSError posn (AlreadyDeclared idn symDefP)
                 | otherwise             -> addSymbol idn info
 
         enterScope
@@ -301,7 +301,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
         -- Variables and Parameters
         CatInfo     -> void $ runMaybeT $ do
             newDtL <- getUpdatedDataType (scopeStack sym) (defPosn sym) (dataType sym)
-            modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { dataType = newDtL})
+            modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { dataType = newDtL})
 
         CatType     -> do
             let symDtL  = dataType sym
@@ -314,7 +314,6 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                         Union  idnL structFlds -> (lexInfo idnL, structFlds)
 
                 -- Fields
-                -- CHANGE TO USE THE SYMBOLTABLE STORED IN THE SYMBOL
                 newFlds <- forM flds $ \(fldIdnL@(Lex _ fldP), fldDtL) -> runMaybeT $ do
                     -- We need the field's data type identifier for errors
                     let fldDtIdn = (\(DataType (Lex dtIdn _)) -> dtIdn) . lexInfo . defocusDataType . deepDataType $ focusDataType fldDtL
@@ -336,7 +335,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     let newDtL = case lexInfo symDtL of
                             Record strIdnL _ -> Record strIdnL (fmap fromJust newFlds) <$ symDtL
                             Union  strIdnL _ -> Union  strIdnL (fmap fromJust newFlds) <$ symDtL
-                    modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { dataType = newDtL, fields = newSymTab })
+                    modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { dataType = newDtL, fields = newSymTab })
             where
                 foldSymbolTable :: Seq (Maybe (Lexeme Identifier, Lexeme DataType)) -> Maybe SymbolTable -> Maybe SymbolTable
                 foldSymbolTable newFlds = fmap (\symTab -> foldl' func symTab newFlds)
@@ -355,7 +354,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
             when (all isJust mayParamDtLs && isJust mayRetDtL) $ do
                 let retDtL    = fromJust mayRetDtL
                     paramDtLs = fmap fromJust mayParamDtLs
-                modifySymbolWithScopeNStack idn (scopeNum sym) (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs})
+                modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs})
 
 ----------------------------------------
 
@@ -368,6 +367,9 @@ getUpdatedDataType stk posn dtL = if lexInfo dtL == Void then return dtL
 
         -- Error when the DataType was not found in the SymbolTable
         unlessGuard (isJust mayDt) $ tellSError posn (UndefinedType deepDtIdn)
+
+        -- Mark the DataType as used
+        markUsed deepDtIdn
 
         return newDtL
     where

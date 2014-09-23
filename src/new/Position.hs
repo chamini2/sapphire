@@ -11,13 +11,14 @@ newtype Position = Posn (Int, Int)
 
 instance Ord Position where
     compare (Posn (r1, c1)) (Posn (r2, c2)) =
-        if r1 /= r2
-            then compare r1 r2
-            else compare c1 c2
+        case compare r1 r2 of
+            EQ    -> compare c1 c2
+            other -> other
 
 instance Show Position where
     show (Posn tuple) = case tuple of
         (0,0) -> "in the language"
+        -- When we only have the line number
         (r,0) -> "at " ++ show r
         (r,c) -> "at " ++ show r ++ ":" ++ show c
 
