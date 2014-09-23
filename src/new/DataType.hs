@@ -2,6 +2,7 @@ module DataType
     ( DataType(..)
     , Field
 
+    , toIdentifier
     , isScalar
     , isValid
     , isArray
@@ -67,6 +68,24 @@ instance Show DataType where
 type Field = (Lexeme Identifier, Lexeme DataType)
 
 --------------------------------------------------------------------------------
+
+toIdentifier :: DataType -> Identifier
+toIdentifier dt = case dt of
+    DataType idnL -> lexInfo idnL
+    Int    -> "Int"
+    Float  -> "Float"
+    Bool   -> "Bool"
+    Char   -> "Char"
+    Range  -> "Range"
+    Type   -> "Type"
+    String -> "String"
+    Record idnL _ -> lexInfo idnL
+    Union  idnL _ -> lexInfo idnL
+    Array dtL _   -> toIdentifier $ lexInfo dtL
+    Void      -> "()"
+    TypeError -> "Error"
+
+----------------------------------------
 
 isScalar :: DataType -> Bool
 isScalar = flip elem [Int , Float , Bool , Char]
