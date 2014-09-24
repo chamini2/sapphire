@@ -33,7 +33,7 @@ data Flag = OutputFile FilePath | SupressWarnings | AllWarnings
 
 data Architecture = Arch
     { archName :: String
-    , types    :: Map.Map DataType Bytes
+    , types    :: Map.Map DataType Width
     } deriving (Show)
 
 ----------------------------------------

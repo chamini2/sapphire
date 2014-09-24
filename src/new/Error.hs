@@ -86,8 +86,8 @@ data StaticError
     | TypeAlreadyDefined    Identifier Position
     | TypeIsLanguageDefined Identifier
     | UndefinedType         Identifier
-    | RecursiveStruct       Identifier Identifier
-    | TypeNotYetDefined     Identifier Identifier Identifier Position
+    | RecursiveStruct       Identifier
+    | TypeNotYetDefined     Identifier Identifier Position
     | AccessNonArray        Identifier DataType
     | IndexDataType         Expression DataType
     | AccessNonStruct       Identifier DataType

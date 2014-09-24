@@ -1,6 +1,5 @@
 module Main where
 
---import           Checker             (CheckState (..), Checker, checkProgram, getErrors, runProgramChecker)
 import           Definition
 import           TypeChecker
 import           Parser

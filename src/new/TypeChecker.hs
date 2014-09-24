@@ -324,9 +324,8 @@ accessDataType accL = do
 
     markUsed deepIdn
 
-    newDt <- constructDataType deepIdnL deepZpp dt
-
-    return (deepIdn, newDt)
+    dt' <- constructDataType deepIdnL deepZpp dt
+    return (deepIdn, dt')
 
 ----------------------------------------
 

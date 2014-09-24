@@ -1,6 +1,10 @@
-{-# LANGUAGE NamedFieldPuns, TupleSections  #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 {- |
-    Symbol table based on the LeBlanc-Cook symbol table abstraction
+    Symbol table based on the LeBlanc-Cook symbol table definition
  -}
 module SymbolTable
     ( SymbolTable
@@ -24,7 +28,7 @@ module SymbolTable
     , Used
     , Pure
     , Offset
-    , Bytes
+    , Width
 
     , SymbolCategory(..)
     , symbolCategory
@@ -49,21 +53,28 @@ import           Program
 import           Scope
 import           Stack
 
-import           Control.Arrow   (second)
-import           Data.Foldable   as DF (concatMap, find, foldr, msum,
-                                        toList)
-import           Data.Function   (on)
-import           Data.List       (groupBy, sortBy, intercalate)
-import qualified Data.Map.Strict as Map (Map, alter, empty, lookup,
+import           Control.Arrow    (second)
+import           Data.Foldable    as DF (Foldable, concatMap, find, foldr, msum,
                                          toList)
-import           Data.Sequence   as DS (Seq, ViewL (..), empty, fromList,
-                                        singleton, viewl, (<|))
-import           Prelude         as P hiding (concatMap, foldr, lookup)
+import           Data.Function    (on)
+import           Data.List        (groupBy, intercalate, sortBy)
+import qualified Data.Map.Strict  as Map (Map, alter, empty, lookup, toList)
+import           Data.Sequence    as DS (Seq, ViewL (..), empty, fromList,
+                                         singleton, viewl, (<|))
+import           Data.Traversable as DT (Traversable)
+import           Prelude          as P hiding (concatMap, foldr, lookup)
 
 {- |
     Symbol Table
 -}
-newtype SymbolTable = SymTable { getMap :: Map.Map Identifier (Seq Symbol) }
+newtype SymbolTable' a = SymTable
+    { getMap :: Map.Map Identifier a
+    } deriving (Functor, Foldable, Traversable)
+
+type SymbolTable = SymbolTable' (Seq Symbol)
+
+instance Show SymbolTable where
+    show = showTable 0
 
 showTable :: Int -> SymbolTable -> String
 showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) showSymbols
@@ -92,10 +103,6 @@ showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) sho
             showInf :: Identifier -> Symbol -> String
             showInf idn sym = "\n\t\t" ++ tabs ++ "'" ++ idn ++ "':\t" ++ show sym
 
-
-instance Show SymbolTable where
-    show = showTable 0
-
 --------------------------------------------------------------------------------
 
 type Initialized     = Bool
@@ -103,13 +110,13 @@ type Used            = Bool
 type Pure            = Bool
 type LanguageDefined = Bool
 type Offset          = Int
-type Bytes           = Int
+type Width           = Int
 
 data Symbol = SymInfo
                 { dataType   :: Lexeme DataType
                 , category   :: Category
                 , offset     :: Offset
-                , bytes      :: Bytes
+                , width      :: Width
                 , used       :: Used
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
@@ -118,7 +125,7 @@ data Symbol = SymInfo
                 { dataType   :: Lexeme DataType
                 , fields     :: Maybe SymbolTable
                 , langDef    :: LanguageDefined
-                , bytes      :: Bytes
+                , width      :: Width
                 , used       :: Used
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
@@ -129,7 +136,7 @@ data Symbol = SymInfo
                 , body       :: StBlock
                 , returned   :: Bool
                 , langDef    :: LanguageDefined
-                , bytes      :: Bytes
+                , width      :: Width
                 , used       :: Used
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
@@ -137,17 +144,17 @@ data Symbol = SymInfo
 
 instance Show Symbol where
     show sym = case sym of
-        SymInfo dt cat off by u stk p           -> intercalate ", " [showP p, showCat, showDT, showU u, showBy by, showOff, showStk stk]
+        SymInfo dt cat off by u stk p           -> intercalate ", " [showP p, showCat, showDT, showU u, showW by, showOff, showStk stk]
             where
                 showCat = show cat
                 showDT  = show $ lexInfo dt
                 showOff = "offset is " ++ show off
-        SymType dt flds lDef by u stk p         -> intercalate ", " [showP p, showLDef, showDT, showU u, showBy by, showStk stk, showFlds]
+        SymType dt flds lDef by u stk p         -> intercalate ", " [showP p, showLDef, showDT, showU u, showW by, showStk stk, showFlds]
             where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showDT    = show $ lexInfo dt
                 showFlds  = maybe "NO Symbol Table" ((++) "\n" . showTable 3) flds
-        SymFunction prms rt _ _ lDef by u stk p -> intercalate ", " [showP p, showLDef, showSign, showU u, showBy by, showStk stk]
+        SymFunction prms rt _ _ lDef by u stk p -> intercalate ", " [showP p, showLDef, showSign, showU u, showW by, showStk stk]
             where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showSign = "(" ++ intercalate "," (map (show . lexInfo) $ toList prms) ++ ") -> " ++ show (lexInfo rt)
@@ -155,7 +162,7 @@ instance Show Symbol where
             showScp scp = "scope " ++ show scp
             showP p     = "(" ++ show p ++ ")"
             showU u     = if u then "used" else "NOT used"
-            showBy by   = show by ++ " bytes"
+            showW by    = show by ++ " bytes"
             showStk stk = "stack: " ++ show stk
 
 scopeNum :: Symbol -> ScopeNum
@@ -186,16 +193,16 @@ data SymbolCategory = CatInfo
                     | CatFunction
                     deriving (Eq, Show)
 
--- For sorting Types, Variables, Functions
+-- To sort types first, variables second, and functions last in SymbolTable.allSymbols
 instance Ord SymbolCategory where
     compare x y = case (x, y) of
         (CatInfo, CatInfo)         -> EQ
         (CatType, CatType)         -> EQ
         (CatFunction, CatFunction) -> EQ
-        (CatType, _)     -> GT
-        (_, CatFunction) -> GT
-        (_, CatType)     -> LT
-        (CatFunction, _) -> LT
+        (CatType, _)     -> LT
+        (_, CatFunction) -> LT
+        (_, CatType)     -> GT
+        (CatFunction, _) -> GT
 
 --------------------------------------------------------------------------------
 
@@ -212,7 +219,7 @@ emptySymInfo = SymInfo
     { dataType   = fillLex Void
     , category   = CatVariable
     , offset     = 0
-    , bytes      = 0
+    , width      = 0
     , used       = False
     , scopeStack = langStack
     , defPosn    = defaultPosn
@@ -223,7 +230,7 @@ emptySymType = SymType
     { dataType   = fillLex Void
     , fields     = Nothing
     , langDef    = False
-    , bytes      = 0
+    , width      = 0
     , used       = False
     , scopeStack = langStack
     , defPosn    = defaultPosn
@@ -236,7 +243,7 @@ emptySymFunction = SymFunction
     , returned   = False
     , body       = empty
     , langDef    = False
-    , bytes      = 0
+    , width      = 0
     , used       = False
     , scopeStack = langStack
     , defPosn    = defaultPosn

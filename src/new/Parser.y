@@ -174,7 +174,7 @@ Statement :: { Lexeme Statement }
 
     -- Definitions
     | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
-    | Structure TypeId "as" FieldList "end"     { StStructDefinition ((lexInfo $1) $2 $4 <$ $1) <$ $1 }
+    | Structure TypeId "as" FieldList "end"     { StStructDefinition (Struct ((lexInfo $1) $2) $4 <$ $1) <$ $1 }
 
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
@@ -294,7 +294,7 @@ Statement :: { Lexeme Statement }
 ---------------------------------------
 -- Structures
 
-Structure :: { Lexeme (Lexeme Identifier -> Seq Field -> DataType) }
+Structure :: { Lexeme (Lexeme Identifier -> DataType) }
     : "record"      { Record <$ $1}
     | "union"       { Union  <$ $1}
 
