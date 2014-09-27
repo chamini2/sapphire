@@ -23,7 +23,6 @@ import           Control.Monad   (liftM)
 import           Data.List       (intercalate, foldl')
 import           Data.List.Split (splitOn)
 import           Data.Sequence   (Seq, (|>), empty)
-import           Prelude         hiding (lex)
 
 }
 
@@ -70,112 +69,112 @@ tokens :-
         "#".*           ;
 
         -- Language
-        @skip                   { lex' TkNewLine        }
-        "end"                   { lex' TkEnd            }
-        "return"                { lex' TkReturn         }
-        ";"                     { lex' TkSemicolon      }
-        ","                     { lex' TkComma          }
+        @skip                   { tok' TkNewLine        }
+        "end"                   { tok' TkEnd            }
+        "return"                { tok' TkReturn         }
+        ";"                     { tok' TkSemicolon      }
+        ","                     { tok' TkComma          }
 
         -- -- Brackets
-        "("                     { lex' TkLParen         }
-        ")"                     { lex' TkRParen         }
-        "["                     { lex' TkLBrackets      }
-        "]"                     { lex' TkRBrackets      }
+        "("                     { tok' TkLParen         }
+        ")"                     { tok' TkRParen         }
+        "["                     { tok' TkLBrackets      }
+        "]"                     { tok' TkRBrackets      }
 
         -- Types
-        --"Int"                   { lex' TkIntType        }
-        --"Float"                 { lex' TkFloatType      }
-        --"Bool"                  { lex' TkBoolType       }
-        --"Char"                  { lex' TkCharType       }
-        --"String"                { lex' TkStringType     }
-        --"Range"                 { lex' TkRangeType      }
-        --"Type"                  { lex' TkTypeType       }
-        "record"                { lex' TkRecordType     }
-        "union"                 { lex' TkUnionType      }
+        --"Int"                   { tok' TkIntType        }
+        --"Float"                 { tok' TkFloatType      }
+        --"Bool"                  { tok' TkBoolType       }
+        --"Char"                  { tok' TkCharType       }
+        --"String"                { tok' TkStringType     }
+        --"Range"                 { tok' TkRangeType      }
+        --"Type"                  { tok' TkTypeType       }
+        "record"                { tok' TkRecordType     }
+        "union"                 { tok' TkUnionType      }
 
         -- Statements
         -- -- Declarations
-        "="                     { lex' TkAssign         }
-        "def"                   { lex' TkDef            }
-        "as"                    { lex' TkAs             }
-        ":"                     { lex' TkSignature      }
-        "->"                    { lex' TkArrow          }
-        "."                     { lex' TkDot            }
+        "="                     { tok' TkAssign         }
+        "def"                   { tok' TkDef            }
+        "as"                    { tok' TkAs             }
+        ":"                     { tok' TkSignature      }
+        "->"                    { tok' TkArrow          }
+        "."                     { tok' TkDot            }
 
         -- -- In/Out
-        "read"                  { lex' TkRead           }
-        "print"                 { lex' TkPrint          }
+        "read"                  { tok' TkRead           }
+        "print"                 { tok' TkPrint          }
 
         -- -- Conditionals
-        "if"                    { lex' TkIf             }
-        "then"                  { lex' TkThen           }
-        "elif"                  { lex' TkElif           }
-        "else"                  { lex' TkElse           }
+        "if"                    { tok' TkIf             }
+        "then"                  { tok' TkThen           }
+        "elif"                  { tok' TkElif           }
+        "else"                  { tok' TkElse           }
 
-        "unless"                { lex' TkUnless         }
+        "unless"                { tok' TkUnless         }
 
-        "case"                  { lex' TkCase           }
-        "when"                  { lex' TkWhen           }
-        "otherwise"             { lex' TkOtherwise      }
+        "case"                  { tok' TkCase           }
+        "when"                  { tok' TkWhen           }
+        "otherwise"             { tok' TkOtherwise      }
 
         -- -- Loops
-        "for"                   { lex' TkFor            }
-        "in"                    { lex' TkIn             }
-        ".."                    { lex' TkFromTo         }
-        "do"                    { lex' TkDo             }
+        "for"                   { tok' TkFor            }
+        "in"                    { tok' TkIn             }
+        ".."                    { tok' TkFromTo         }
+        "do"                    { tok' TkDo             }
 
-        "while"                 { lex' TkWhile          }
-        "until"                 { lex' TkUntil          }
-        "repeat"                { lex' TkRepeat         }
+        "while"                 { tok' TkWhile          }
+        "until"                 { tok' TkUntil          }
+        "repeat"                { tok' TkRepeat         }
 
-        "break"                 { lex' TkBreak          }
-        "continue"              { lex' TkContinue       }
+        "break"                 { tok' TkBreak          }
+        "continue"              { tok' TkContinue       }
 
         -- Expressions/Operators
         -- -- Literals
-        @int                    { lex  (TkInt . read)   }
-        "true"                  { lex' (TkBool True)    }
-        "false"                 { lex' (TkBool False)   }
-        @float                  { lex  (TkFloat . read) }
-        @char                   { lex  (TkChar . read)  }
+        @int                    { tok  (TkInt . read)   }
+        "true"                  { tok' (TkBool True)    }
+        "false"                 { tok' (TkBool False)   }
+        @float                  { tok  (TkFloat . read) }
+        @char                   { tok  (TkChar . read)  }
         -- -- -- Filtering newlines
-        @string                 { lex  (TkString . dropQuotationMarks 1 1 . backslash) }
-        @multiline_string       { lex  (TkString . dropQuotationMarks 3 3 . backslash) }
+        @string                 { tok  (TkString . dropQuotationMarks 1 1 . backslash) }
+        @multiline_string       { tok  (TkString . dropQuotationMarks 3 3 . backslash) }
 
         -- -- Arithmetic
-        "+"                     { lex' TkPlus           }
-        "-"                     { lex' TkMinus          }
-        "*"                     { lex' TkTimes          }
-        "/"                     { lex' TkDivide         }
-        "%"                     { lex' TkModulo         }
-        "^"                     { lex' TkPower          }
+        "+"                     { tok' TkPlus           }
+        "-"                     { tok' TkMinus          }
+        "*"                     { tok' TkTimes          }
+        "/"                     { tok' TkDivide         }
+        "%"                     { tok' TkModulo         }
+        "^"                     { tok' TkPower          }
 
         -- -- Boolean
-        "or"                    { lex' TkOr             }
-        "and"                   { lex' TkAnd            }
-        "not"                   { lex' TkNot            }
+        "or"                    { tok' TkOr             }
+        "and"                   { tok' TkAnd            }
+        "not"                   { tok' TkNot            }
 
-        "=="                    { lex' TkEqual          }
-        "/="                    { lex' TkUnequal        }
+        "=="                    { tok' TkEqual          }
+        "/="                    { tok' TkUnequal        }
 
-        "<"                     { lex' TkLess           }
-        ">"                     { lex' TkGreat          }
-        "<="                    { lex' TkLessEq         }
-        ">="                    { lex' TkGreatEq        }
+        "<"                     { tok' TkLess           }
+        ">"                     { tok' TkGreat          }
+        "<="                    { tok' TkLessEq         }
+        ">="                    { tok' TkGreatEq        }
 
-        "@"                     { lex' TkBelongs        }
+        "@"                     { tok' TkBelongs        }
 
         -- -- String
-        --"++"                    { lex' TkConcat         }
+        --"++"                    { tok' TkConcat         }
 
         -- -- Identifiers
-        @varid                  { lex TkVarId           }
-        @typeid                 { lex TkTypeId          }
+        @varid                  { tok TkVarId           }
+        @typeid                 { tok TkTypeId          }
 
         -- Errors
-        .                       { lex (TkError . head)  }
-        @string_error           { lex (TkStringError . dropQuotationMarks 1 0 . backslash) }
-        @multiline_string_error { lex (TkStringError . dropQuotationMarks 3 0 . backslash) }
+        .                       { tok (TkError . head)  }
+        @string_error           { tok (TkStringError . dropQuotationMarks 1 0 . backslash) }
+        @multiline_string_error { tok (TkStringError . dropQuotationMarks 3 0 . backslash) }
 
 {
 
@@ -316,10 +315,10 @@ instance Show Token where
 
 --------------------------------------------------------------------------------
 
-data AlexUserState = AlexUSt { errors :: Seq Error }
+data AlexUserState = AlexUST { errors :: Seq Error }
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUSt empty
+alexInitUserState = AlexUST empty
 
 -- Some useful functions for the Alex monad (which is naturally an instance of state monad)
 modifyUserState :: (AlexUserState -> AlexUserState) -> Alex ()
@@ -355,12 +354,12 @@ alexEOF :: Alex (Lexeme Token)
 alexEOF = liftM (Lex TkEOF) alexGetPosition
 
 -- Unfortunately, we have to extract the matching bit of string ourselves
-lex :: (String -> Token) -> AlexAction (Lexeme Token)
-lex f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
+tok :: (String -> Token) -> AlexAction (Lexeme Token)
+tok f (p,_,_,s) i = return $ Lex (f $ take i s) (toPosition p)
 
 -- For constructing tokens that do not depend on the input
-lex' :: Token -> AlexAction (Lexeme Token)
-lex' = lex . const
+tok' :: Token -> AlexAction (Lexeme Token)
+tok' = tok . const
 
 alexGetPosition :: Alex Position
 alexGetPosition = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
