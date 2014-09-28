@@ -35,25 +35,15 @@ module Program
     , fieldInStruct
 
     , DataTypeHistory
-    -- , DataTypeZipper
-    -- --, Thread
-    -- , focusDataType
-    -- , defocusDataType
-    -- --, inDataType
-    -- -- , backDataType
-    -- , topDataType
-    -- , deepDataType
-    -- , putDataType
-
-    , DataTypeDimensionZipper
+    , DataTypeWidthZipper
     --, Thread
-    , focusDataTypeDimension
-    , defocusDataTypeDimension
-    --, inDataTypeDimension
-    -- , backDataTypeDimension
-    , topDataTypeDimension
-    , deepDataTypeDimension
-    , putDataTypeDimension
+    , focusDataType
+    , defocusDataType
+    --, inDataType
+    -- , backDataType
+    , topDataType
+    , deepDataType
+    , putDataType
 
     -- From Expression
     , Expression(..)

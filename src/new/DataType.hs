@@ -11,25 +11,15 @@ module DataType
     , fieldInStruct
 
     , DataTypeHistory
-    -- , DataTypeZipper
-    -- --, Thread
-    -- , focusDataType
-    -- , defocusDataType
-    -- --, inDataType
-    -- -- , backDataType
-    -- , topDataType
-    -- , deepDataType
-    -- , putDataType
-
-    , DataTypeDimensionZipper
+    , DataTypeWidthZipper
     --, Thread
-    , focusDataTypeDimension
-    , defocusDataTypeDimension
-    --, inDataTypeDimension
-    -- , backDataTypeDimension
-    , topDataTypeDimension
-    , deepDataTypeDimension
-    , putDataTypeDimension
+    , focusDataType
+    , defocusDataType
+    --, inDataType
+    -- , backDataType
+    , topDataType
+    , deepDataType
+    , putDataType
     ) where
 
 import           Identifier
@@ -154,70 +144,35 @@ data DataTypeHistory = HistoryDataType (Lexeme Int)
 
 type Thread = [Lexeme DataTypeHistory]
 
--- type DataTypeZipper = (Lexeme DataType, Thread)
-
--- ----------------------------------------
-
--- focusDataType :: Lexeme DataType -> DataTypeZipper
--- focusDataType dtL = (dtL, [])
-
--- defocusDataType :: DataTypeZipper -> Lexeme DataType
--- defocusDataType = fst
-
--- inDataType :: DataTypeZipper -> Maybe DataTypeZipper
--- inDataType (dtL, thrd) = case lexInfo dtL of
---     Array inDtL sizL -> Just (inDtL, (HistoryDataType sizL <$ dtL) : thrd)
---     _                -> Nothing
-
--- backDataType :: DataTypeZipper -> Maybe DataTypeZipper
--- backDataType (dtL, thrd) = case thrd of
---     []                                          -> Nothing
---     hstL@(Lex (HistoryDataType sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, hstLs)
-
--- topDataType :: DataTypeZipper -> DataTypeZipper
--- topDataType zpp = case snd zpp of
---     []    -> zpp
---     _ : _ -> topDataType $ fromJust $ backDataType zpp
-
--- deepDataType :: DataTypeZipper -> DataTypeZipper
--- deepDataType zpp = case lexInfo $ fst zpp of
---     Array _ _ -> deepDataType $ fromJust $ inDataType zpp
---     _         -> zpp
-
--- putDataType :: Lexeme DataType -> DataTypeZipper -> DataTypeZipper
--- putDataType dtL (_, thrd) = (dtL, thrd)
+type DataTypeWidthZipper = (Lexeme DataType, Int, Thread)
 
 ----------------------------------------
 
-type DataTypeDimensionZipper = (Lexeme DataType, Int, Thread)
+focusDataType :: Lexeme DataType -> DataTypeWidthZipper
+focusDataType dtL = (dtL, 1, [])
 
-----------------------------------------
+defocusDataType :: DataTypeWidthZipper -> (Lexeme DataType, Int)
+defocusDataType (dtL, dim, _) = (dtL, dim)
 
-focusDataTypeDimension :: Lexeme DataType -> DataTypeDimensionZipper
-focusDataTypeDimension dtL = (dtL, 1, [])
-
-defocusDataTypeDimension :: DataTypeDimensionZipper -> (Lexeme DataType, Int)
-defocusDataTypeDimension (dtL, dim, _) = (dtL, dim)
-
-inDataTypeDimension :: DataTypeDimensionZipper -> Maybe DataTypeDimensionZipper
-inDataTypeDimension (dtL, dim, thrd) = case lexInfo dtL of
+inDataType :: DataTypeWidthZipper -> Maybe DataTypeWidthZipper
+inDataType (dtL, dim, thrd) = case lexInfo dtL of
     Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataType sizL <$ dtL) : thrd)
     _                -> Nothing
 
-backDataTypeDimension :: DataTypeDimensionZipper -> Maybe DataTypeDimensionZipper
-backDataTypeDimension (dtL, dim, thrd) = case thrd of
+backDataType :: DataTypeWidthZipper -> Maybe DataTypeWidthZipper
+backDataType (dtL, dim, thrd) = case thrd of
     []                                          -> Nothing
     hstL@(Lex (HistoryDataType sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
 
-topDataTypeDimension :: DataTypeDimensionZipper -> DataTypeDimensionZipper
-topDataTypeDimension zpp@(_, _, thrd) = case thrd of
+topDataType :: DataTypeWidthZipper -> DataTypeWidthZipper
+topDataType zpp@(_, _, thrd) = case thrd of
     []    -> zpp
-    _ : _ -> topDataTypeDimension $ fromJust $ backDataTypeDimension zpp
+    _ : _ -> topDataType $ fromJust $ backDataType zpp
 
-deepDataTypeDimension :: DataTypeDimensionZipper -> DataTypeDimensionZipper
-deepDataTypeDimension zpp@(dtL, _, _) = case lexInfo dtL of
-    Array _ _ -> deepDataTypeDimension $ fromJust $ inDataTypeDimension zpp
+deepDataType :: DataTypeWidthZipper -> DataTypeWidthZipper
+deepDataType zpp@(dtL, _, _) = case lexInfo dtL of
+    Array _ _ -> deepDataType $ fromJust $ inDataType zpp
     _         -> zpp
 
-putDataTypeDimension :: Lexeme DataType -> DataTypeDimensionZipper -> DataTypeDimensionZipper
-putDataTypeDimension dtL (_, dim, thrd) = (dtL, dim, thrd)
+putDataType :: Lexeme DataType -> DataTypeWidthZipper -> DataTypeWidthZipper
+putDataType dtL (_, dim, thrd) = (dtL, dim, thrd)

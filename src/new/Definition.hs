@@ -317,7 +317,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     let fldSym   = index fldSymSeq 0
                         fldP     = defPosn fldSym
                         -- We need the field's data type identifier for errors
-                        fldDtIdn = toIdentifier . lexInfo . fst . defocusDataTypeDimension . deepDataTypeDimension . focusDataTypeDimension $ dataType fldSym
+                        fldDtIdn = toIdentifier . lexInfo . fst . defocusDataType . deepDataType . focusDataType $ dataType fldSym
                         -- We need the field's data type position for errors
                         symDtP   = defPosn . fromJust $ lookupWithScope fldDtIdn symStk currentTab
 
@@ -332,10 +332,17 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     let fldSym' = fldSym { dataType = fldDtL, width = fldWdt }
                     return $ singleton fldSym'
 
-                let symTab''  = fmap fromJust symTab'
-                    typeWidth = foldl' (\count (_, sym') -> width sym' + count) 0 $ allSymbols symTab''
+                let (symTab'' , typeWidth) = foldTable $ fmap fromJust symTab'
                 when (all isJust symTab') $
                     modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
+                where
+                    foldTable :: SymbolTable -> (SymbolTable, Width)
+                    foldTable symTab = foldl' func (symTab, 0) $ allSymbols symTab
+                    func :: (SymbolTable, Width) -> (Identifier, Symbol) -> (SymbolTable, Width)
+                    func (tab, accum) (fldIdn, fldSym) = (tab', accum')
+                        where
+                            accum' = accum + width fldSym
+                            tab'   = update fldIdn (\fldSym' -> fldSym' { offset = accum }) tab
 
         CatFunction -> do
             let symStk  = scopeStack sym
@@ -360,7 +367,7 @@ getUpdatedDataTypeWidth stk posn dtL = if lexInfo dtL == Void then return (dtL, 
         maySymI <- getsSymbolWithStack deepDtIdn stk (lexInfo . dataType &&& width)
         let (symDt, wdt) = fromJust maySymI
             deepDtL'     = symDt <$ deepDtIdnL
-            dtL'         = fst . defocusDataTypeDimension . topDataTypeDimension $ putDataTypeDimension deepDtL' deepZpp
+            dtL'         = fst . defocusDataType . topDataType $ putDataType deepDtL' deepZpp
 
         -- Error when the DataType was not found in the SymbolTable
         unlessGuard (isJust maySymI) $ tellSError posn (UndefinedType deepDtIdn)
@@ -370,7 +377,7 @@ getUpdatedDataTypeWidth stk posn dtL = if lexInfo dtL == Void then return (dtL, 
 
         return (dtL', wdt * dim)
     where
-        deepZpp             = deepDataTypeDimension $ focusDataTypeDimension dtL
-        (deepDtL, dim)      = defocusDataTypeDimension deepZpp
+        deepZpp             = deepDataType $ focusDataType dtL
+        (deepDtL, dim)      = defocusDataType deepZpp
         DataType deepDtIdnL = lexInfo deepDtL
         deepDtIdn           = lexInfo deepDtIdnL
