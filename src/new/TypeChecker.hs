@@ -135,13 +135,15 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
+    StStructDefinition _ ->  enterScope >> exitScope        -- For scopeStack maintenance
+
     StReturn expL -> void $ runMaybeT $ do
         expDt <- lift $ typeCheckExpression expL
         (idn, retDt, funcScopeId) <- lift currentFunction
 
         unlessGuard (retDt /= Void) $ if funcScopeId /= topScopeNum
             then tellSError posn (ReturnInProcedure expDt idn)
-            else tellSError posn (StaticError "can't return top level")
+            else tellSError posn (StaticError "can't return in top level")
 
         -- Checking for TypeError
         guard (isValid expDt)
@@ -167,7 +169,7 @@ typeCheckStatement (Lex st posn) = case st of
     StPrint exprL -> void $ runMaybeT $ do
         dt <- lift $ typeCheckExpression exprL
         guard (isValid dt)
-        unless (dt == String) $ tellSError posn (PrintNonString dt)
+        unless (dt == String || isScalar dt) $ tellSError posn (PrintNonString dt)
 
     StIf expL trueBlock falseBlock -> do
         expDt <- typeCheckExpression expL
@@ -230,7 +232,6 @@ typeCheckStatement (Lex st posn) = case st of
 
     _ -> return ()
     --StVariableDeclaration
-    --StStructDefinition
     --StBreak
     --StContinue
 
