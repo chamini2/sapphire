@@ -19,13 +19,13 @@ import           Control.Monad.RWS         (RWS, lift, runRWS)
 import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Control.Monad.Writer      (tell)
-import           Data.Foldable             as DF (all, and, forM_, mapM_)
+import           Data.Foldable             (all, and, forM_, mapM_)
 import           Data.Functor              ((<$>))
 import           Data.Maybe                (fromJust, fromMaybe, isJust)
-import           Data.Sequence             as DS (Seq, empty, length, zipWith)
+import           Data.Sequence             (Seq, empty, length, zipWith)
 import           Data.Traversable          (mapM)
-import           Prelude                   hiding (all, and, exp, length,
-                                                 mapM, mapM_, zipWith)
+import           Prelude                   hiding (all, and, exp, length, mapM,
+                                            mapM_, zipWith)
 import qualified Prelude                   as P (length)
 
 --------------------------------------------------------------------------------

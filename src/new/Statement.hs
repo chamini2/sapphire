@@ -11,7 +11,7 @@ import           Expression
 import           Identifier
 import           Lexeme
 
-import           Data.Sequence as DS (Seq)
+import           Data.Sequence (Seq)
 
 type StBlock    = Seq (Lexeme Statement)
 
@@ -55,8 +55,3 @@ data When = When (Seq (Lexeme Expression)) StBlock
 
 data Signature = Sign (Seq (Lexeme Declaration)) (Lexeme DataType)
     deriving (Show)
---data Signature = Sign
---    { signParameters :: Seq (Lexeme Declaration)
---    , signReturnType :: Lexeme DataType
---    } deriving (Show)
-

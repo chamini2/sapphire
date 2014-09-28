@@ -24,12 +24,10 @@ import           DataType
 import           Identifier
 import           Lexeme
 
---import qualified Data.Data     as DD (Data)
 import           Data.Foldable (find)
 import           Data.Functor  ((<$), (<$>))
 import           Data.Maybe    (fromJust)
-import           Data.Sequence as DS (Seq, fromList)
---import qualified Data.Typeable as DT (Typeable)
+import           Data.Sequence (Seq, fromList)
 
 data Expression
     -- Error

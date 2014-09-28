@@ -13,7 +13,7 @@ import           Error         (Error, LexerError(..), ParseError(..))
 
 import           Data.Functor
 import           Data.Maybe    (fromJust, isJust)
-import           Data.Sequence as DS hiding (length)
+import           Data.Sequence hiding (length)
 import           Prelude       hiding (concatMap, foldr)
 }
 

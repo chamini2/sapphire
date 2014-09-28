@@ -13,7 +13,7 @@ module Stack
 
 import           Scope
 
-import           Data.Foldable as DF (Foldable (..))
+import           Data.Foldable (Foldable (..))
 import           Prelude       hiding (concatMap, foldr)
 import qualified Prelude       as P (foldr)
 

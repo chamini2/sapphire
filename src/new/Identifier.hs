@@ -1,5 +1,6 @@
 module Identifier
-    ( Identifier ) where
+    ( Identifier
+    ) where
 
 -- General
 type Identifier  = String

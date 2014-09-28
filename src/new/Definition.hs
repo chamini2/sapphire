@@ -18,14 +18,16 @@ import           Control.Monad.RWS         (RWS, runRWS)
 import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Control.Monad.Writer      (listen, tell)
-import           Data.Foldable             as DF (all, foldlM, forM_, mapM_, foldl', maximum)
+import           Data.Foldable             (all, foldl', foldlM, forM_, mapM_,
+                                            maximum)
 import           Data.Functor              ((<$))
 import qualified Data.Map.Strict           as Map (toList)
 import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             as DS (Seq, singleton, empty, filter, null, index)
+import           Data.Sequence             (Seq, empty, filter, index, null,
+                                            singleton)
 import           Data.Traversable          (forM)
-import           Prelude                   hiding (all, filter, mapM_, length, maximum,
-                                                 null)
+import           Prelude                   hiding (all, filter, length, mapM_,
+                                            maximum, null)
 
 --------------------------------------------------------------------------------
 

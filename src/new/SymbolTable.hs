@@ -57,14 +57,14 @@ import           Scope
 import           Stack
 
 import           Control.Arrow    (second)
-import           Data.Foldable    as DF (Foldable, concatMap, find, foldr, msum,
-                                         toList)
+import           Data.Foldable    (Foldable, concatMap, find, foldr, msum,
+                                   toList)
 import           Data.Function    (on)
 import           Data.List        (groupBy, intercalate, sortBy)
 import qualified Data.Map.Strict  as Map (Map, alter, empty, lookup, toList)
-import           Data.Sequence    as DS (Seq, ViewL (..), empty, fromList,
-                                         singleton, viewl, (<|))
-import           Data.Traversable as DT (Traversable)
+import           Data.Sequence    (Seq, ViewL (..), empty, fromList, singleton,
+                                   viewl, (<|))
+import           Data.Traversable (Traversable)
 import           Prelude          hiding (concatMap, foldr, lookup)
 
 {- |

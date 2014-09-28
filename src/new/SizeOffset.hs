@@ -5,30 +5,19 @@ module SizeOffset
     , processSizeOffset
     ) where
 
---import           Error
 import           Program
 import           SappMonad
 import           SymbolTable
 
-import           Control.Arrow             ((&&&))
-import           Control.Monad             (liftM)
---import           Control.Monad             (liftM, void, unless, when)
-import           Control.Monad.State       (gets, modify)
---import           Control.Monad.Reader      (asks)
-import           Control.Monad.Writer      (tell)
-import           Control.Monad.RWS         (RWS, runRWS)
---import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Data.Foldable             as DF (forM_, mapM_)
---import           Data.Foldable             as DF (all, forM_, mapM_)
---import           Data.Functor              ((<$), (<$>))
---import qualified Data.Map                  as Map (toList)
-import           Data.Maybe                (fromJust)
---import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             as DS (Seq, empty)
---import           Data.Sequence             as DS (Seq, empty, filter)
---import           Data.Traversable          (forM)
-import           Prelude                   hiding (mapM_)
---import           Prelude                   as P hiding (all, filter, mapM_)
+import           Control.Arrow        ((&&&))
+import           Control.Monad        (liftM)
+import           Control.Monad.RWS    (RWS, runRWS)
+import           Control.Monad.State  (gets, modify)
+import           Control.Monad.Writer (tell)
+import           Data.Foldable        (forM_, mapM_)
+import           Data.Maybe           (fromJust)
+import           Data.Sequence        (empty)
+import           Prelude              hiding (mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -212,21 +201,11 @@ sizeOffsetStatement stL = case lexInfo stL of
         exitScope
 
     _ -> return ()
-    --StAssign (Lexeme Access) (Lexeme Expression)
-    --StStructDefinition    (Lexeme DataType)
-    --StReturn        (Lexeme Expression)
-    --StProcedureCall (Lexeme Identifier) (Seq (Lexeme Expression))
-    --StRead       (Lexeme Access)
-----    --StPrint      (Lexeme Expression)
+    --StAssign
+    --StStructDefinition
+    --StReturn
+    --StProcedureCall
+    --StRead
+    --StPrint
     --StBreak
     --StContinue
-
---------------------------------------------------------------------------------
--- Symbol Table processing
-
--- processOffset :: Seq (Identifier, Symbol) -> SizeOffset ()
--- processOffset syms = forM_ syms $ \(idn, sym) ->
---     case symbolCategory sym of
---         CatInfo     -> undefined
---         CatType     -> undefined
---         CatFunction -> undefined

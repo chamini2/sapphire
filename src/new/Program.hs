@@ -76,7 +76,7 @@ import           Lexeme
 import           Position
 import           Statement
 
-import           Data.Foldable as DF (concatMap)
+import           Data.Foldable (concatMap)
 import           Prelude       hiding (concatMap)
 
 --------------------------------------------------------------------------------

@@ -12,7 +12,7 @@ import           Data.Function        (on)
 import           Data.Functor         ((<$>))
 import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
-import           Data.Sequence        as DS (Seq, empty, singleton)
+import           Data.Sequence        (Seq, empty, singleton)
 
 --------------------------------------------------------------------------------
 -- Monadic functions

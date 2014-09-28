@@ -25,11 +25,11 @@ module DataType
 import           Identifier
 import           Lexeme
 
-import           Data.Foldable as DF (toList, find)
+import           Data.Foldable (find, toList)
 import           Data.Functor  ((<$), (<$>))
 import           Data.List     (intercalate)
 import           Data.Maybe    (fromJust)
-import           Data.Sequence as DS (Seq)
+import           Data.Sequence (Seq)
 
 data DataType
     = DataType (Lexeme Identifier)

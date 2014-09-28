@@ -15,7 +15,7 @@ module Lexer
     , alexGetPosition
     ) where
 
-import           Error           (Error(LError, PError), LexerError(..), ParseError(..))
+import           Error
 import           Position
 import           Lexeme
 

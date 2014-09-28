@@ -6,10 +6,10 @@ import           Definition
 import           TypeChecker
 import           SizeOffset
 
-import           Control.Monad       (when)
+import           Control.Monad      (when)
 import           Data.Foldable      (mapM_)
-import           Data.Sequence      as DS (null)
-import           Prelude            as P hiding (mapM_, null)
+import           Data.Sequence      (null)
+import           Prelude            hiding (mapM_, null)
 import qualified Prelude            as P (null)
 import           System.Environment (getArgs)
 
