@@ -38,14 +38,17 @@ module SymbolTable
     , top
     , pop
     , push
+    , modifyStack
     , initialStack
-    , emptyStack
-    --, singletonStack
+    -- , emptyStack
+    , singletonStack
 
     -- From Scope
     , Scope(..)
     , ScopeNum
-    , topScope
+    , topScopeNum
+    --, langScopeNum
+    -- , topScope
     --, langScope
     ) where
 
@@ -159,7 +162,6 @@ instance Show Symbol where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showSign = "(" ++ intercalate "," (map (show . lexInfo) $ toList prms) ++ ") -> " ++ show (lexInfo rt)
         where
-            showScp scp = "scope " ++ show scp
             showP p     = "(" ++ show p ++ ")"
             showU u     = if u then "used" else "NOT used"
             showW by    = show by ++ " bytes"
@@ -248,13 +250,6 @@ emptySymFunction = SymFunction
     , scopeStack = langStack
     , defPosn    = defaultPosn
     }
-
-----------------------------------------
-
-isProcedure :: Symbol -> Bool
-isProcedure sym = case sym of
-    SymFunction { returnType } -> lexInfo returnType == Void
-    _ -> error "Symbol.isProcedure: asking if non-function symbol is procedure"
 
 ----------------------------------------
 

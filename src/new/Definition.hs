@@ -65,7 +65,7 @@ initialState :: DefState
 initialState = DefState
     { table     = emptyTable
     , stack     = initialStack
-    , scopeId   = serial topScope
+    , scopeId   = topScopeNum
     , ast       = Program empty
     , loopLvl   = 0
     }
@@ -177,7 +177,7 @@ definitionStatement (Lex st posn) = case st of
 
         current <- currentScope
 
-        unlessGuard (current == serial topScope) $ tellSError posn (StaticError "top level structures only")
+        unlessGuard (current == topScopeNum) $ tellSError posn (StaticError "top level structures only")
 
         enterScope
         stk <- gets stack
@@ -233,11 +233,7 @@ definitionStatement (Lex st posn) = case st of
 
         enterScope
         mapM_ processDeclaration parms
-
-        enterScope
         definitionStatements block
-        exitScope
-
         exitScope
 
     StIf _ trueBlock falseBlock -> do
@@ -277,9 +273,9 @@ definitionStatement (Lex st posn) = case st of
         definitionStatements block
         exitLoop >> exitScope
 
-    StBreak -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn BreakOutsideLoop
+    StBreak -> gets loopLvl >>= \lvl -> unless (lvl > topScopeNum) $ tellSError posn BreakOutsideLoop
 
-    StContinue -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn BreakOutsideLoop
+    StContinue -> gets loopLvl >>= \lvl -> unless (lvl > topScopeNum) $ tellSError posn BreakOutsideLoop
 
     _ -> return ()
     --StAssign
@@ -298,15 +294,16 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
     case symbolCategory sym of
 
         -- Variables and Parameters
-        CatInfo     -> void $ runMaybeT $ do
+        CatInfo -> void $ runMaybeT $ do
             (dtL', wdt) <- getUpdatedDataTypeWidth (scopeStack sym) (defPosn sym) (dataType sym)
             modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { dataType = dtL', width = wdt })
 
-        CatType     -> do
+        CatType -> do
             let symDtL  = dataType   sym
                 symPosn = defPosn    sym
                 symTab  = fields     sym
                 symStk  = scopeStack sym
+
             -- We only need to check the user-defined types
             unless (langDef sym) $ do
                 let strIdn = case lexInfo symDtL of

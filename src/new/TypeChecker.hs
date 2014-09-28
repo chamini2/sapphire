@@ -65,9 +65,9 @@ initialState :: TypeState
 initialState = TypeState
     { table     = emptyTable
     , stack     = initialStack
-    , scopeId   = 0
+    , scopeId   = topScopeNum
     , ast       = Program empty
-    , funcStack = emptyStack
+    , funcStack = singletonStack ("sapphire", Void, topScopeNum)
     }
 
 --------------------------------------------------------------------------------
@@ -139,7 +139,9 @@ typeCheckStatement (Lex st posn) = case st of
         expDt <- lift $ typeCheckExpression expL
         (idn, retDt, funcScopeId) <- lift currentFunction
 
-        unlessGuard (retDt /= Void) $ tellSError posn (ReturnInProcedure expDt idn)
+        unlessGuard (retDt /= Void) $ if funcScopeId /= topScopeNum
+            then tellSError posn (ReturnInProcedure expDt idn)
+            else tellSError posn (StaticError "can't return top level")
 
         -- Checking for TypeError
         guard (isValid expDt)
@@ -149,11 +151,11 @@ typeCheckStatement (Lex st posn) = case st of
 
     StFunctionDef (Lex idn _) _ block -> do
         dtL <- liftM fromJust $ getsSymbol idn returnType
-        enterScope >> enterScope    -- Parameters >> Block
+        enterScope
         enterFunction idn (lexInfo dtL)
         typeCheckStatements block
         exitFunction
-        exitScope >> exitScope      -- Block >> Parameters
+        exitScope
 
     StProcedureCall idnL expLs -> void $ runMaybeT $ checkArguments idnL expLs False
 
@@ -234,8 +236,6 @@ typeCheckStatement (Lex st posn) = case st of
 
 typeCheckExpression :: Lexeme Expression -> TypeChecker DataType
 typeCheckExpression (Lex exp posn) = case exp of
-
-    --NoExpression -> return Void
 
     LitInt    _ -> return Int
     LitFloat  _ -> return Float
