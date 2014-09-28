@@ -24,8 +24,9 @@ import           Data.Functor              ((<$>))
 import           Data.Maybe                (fromJust, fromMaybe, isJust)
 import           Data.Sequence             as DS (Seq, empty, length, zipWith)
 import           Data.Traversable          (mapM)
-import           Prelude                   as P hiding (all, and, exp, length,
+import           Prelude                   hiding (all, and, exp, length,
                                                  mapM, mapM_, zipWith)
+import qualified Prelude                   as P (length)
 
 --------------------------------------------------------------------------------
 
@@ -35,11 +36,12 @@ type TypeChecker = RWS SappReader SappWriter TypeState
 -- State
 
 data TypeState = TypeState
-    { table     :: SymbolTable
-    , stack     :: Stack Scope
-    , scopeId   :: ScopeNum
-    , ast       :: Program
-    , funcStack :: Stack (Identifier, DataType, ScopeNum)
+    { table        :: SymbolTable
+    , stack        :: Stack Scope
+    , scopeId      :: ScopeNum
+    , ast          :: Program
+    , funcStack    :: Stack (Identifier, DataType, ScopeNum)
+    , stringOffset :: Offset
     }
 
 ----------------------------------------
@@ -63,11 +65,12 @@ instance Show TypeState where
 
 initialState :: TypeState
 initialState = TypeState
-    { table     = emptyTable
-    , stack     = initialStack
-    , scopeId   = topScopeNum
-    , ast       = Program empty
-    , funcStack = singletonStack ("sapphire", Void, topScopeNum)
+    { table        = emptyTable
+    , stack        = topStack
+    , scopeId      = topScopeNum
+    , ast          = Program empty
+    , funcStack    = singletonStack ("sapphire", Void, topScopeNum)
+    , stringOffset = 0
     }
 
 --------------------------------------------------------------------------------
@@ -169,7 +172,7 @@ typeCheckStatement (Lex st posn) = case st of
     StPrint exprL -> void $ runMaybeT $ do
         dt <- lift $ typeCheckExpression exprL
         guard (isValid dt)
-        unless (dt == String || isScalar dt) $ tellSError posn (PrintNonString dt)
+        unless (dt == String || isScalar dt) $ tellSError posn (PrintNonPrintable dt)
 
     StIf expL trueBlock falseBlock -> do
         expDt <- typeCheckExpression expL
@@ -242,7 +245,24 @@ typeCheckExpression (Lex exp posn) = case exp of
     LitFloat  _ -> return Float
     LitBool   _ -> return Bool
     LitChar   _ -> return Char
-    LitString _ -> return String
+
+    LitString strL -> do
+        strOff <- gets stringOffset
+        let strWdt = P.length $ lexInfo strL
+            info = emptySymInfo
+                { dataType   = fillLex String
+                , category   = CatConstant
+                , offset     = strOff
+                , width      = strWdt
+                , used       = True
+                , scopeStack = topStack
+                , defPosn    = lexPosn strL
+                }
+        -- Set the new global offset
+        modify $ \s -> s { stringOffset = strOff + strWdt}
+        -- '$' means it's a constant
+        addSymbol "$String" info
+        return String
 
     Variable accL -> liftM (maybe TypeError snd) $ runMaybeT $ accessDataType accL
 

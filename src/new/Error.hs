@@ -108,7 +108,7 @@ data StaticError
 --    | NoReturn                 Identifier
     -- Statements
     | ConditionDataType DataType
-    | PrintNonString    DataType
+    | PrintNonPrintable DataType
     | CaseWhenDataType  DataType DataType
     | ForInDataType     DataType
     | BreakOutsideLoop
