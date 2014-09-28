@@ -18,13 +18,13 @@ import           Control.Monad.RWS         (RWS, runRWS)
 import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Control.Monad.Writer      (listen, tell)
-import           Data.Foldable             as DF (all, foldlM, forM_, mapM_, foldl')
+import           Data.Foldable             as DF (all, foldlM, forM_, mapM_, foldl', maximum)
 import           Data.Functor              ((<$))
 import qualified Data.Map.Strict           as Map (toList)
 import           Data.Maybe                (fromJust, isJust)
 import           Data.Sequence             as DS (Seq, singleton, empty, filter, null, index)
 import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (all, filter, mapM_, length,
+import           Prelude                   as P hiding (all, filter, mapM_, length, maximum,
                                                  null)
 
 --------------------------------------------------------------------------------
@@ -332,16 +332,19 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     let fldSym' = fldSym { dataType = fldDtL, width = fldWdt }
                     return $ singleton fldSym'
 
-                let (symTab'' , typeWidth) = foldTable $ fmap fromJust symTab'
+                let (symTab'' , typeWidth) = case lexInfo symDtL of
+                        Record _ -> foldRecordTable $ fmap fromJust symTab'
+                        Union  _ -> widthUnionTable $ fmap fromJust symTab'
                 when (all isJust symTab') $
                     modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
                 where
-                    foldTable :: SymbolTable -> (SymbolTable, Width)
-                    foldTable symTab = foldl' func (symTab, 0) $ allSymbols symTab
-                    func :: (SymbolTable, Width) -> (Identifier, Symbol) -> (SymbolTable, Width)
-                    func (tab, accum) (fldIdn, fldSym) = (tab', accum')
+                    widthUnionTable :: SymbolTable -> (SymbolTable, Width)
+                    widthUnionTable symTab = (symTab, maximum . fmap (width . snd) $ allSymbols symTab)
+                    foldRecordTable :: SymbolTable -> (SymbolTable, Width)
+                    foldRecordTable symTab = foldl' recordField (symTab, 0) $ allSymbols symTab
+                    recordField :: (SymbolTable, Width) -> (Identifier, Symbol) -> (SymbolTable, Width)
+                    recordField (tab, accum) (fldIdn, fldSym) = (tab', accum + width fldSym)
                         where
-                            accum' = accum + width fldSym
                             tab'   = update fldIdn (\fldSym' -> fldSym' { offset = accum }) tab
 
         CatFunction -> do
