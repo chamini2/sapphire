@@ -5,7 +5,7 @@ module Stack
     , push
     , modifyStack
 
-    , initialStack
+    , topStack
     , langStack
     , emptyStack
     , singletonStack
@@ -14,7 +14,8 @@ module Stack
 import           Scope
 
 import           Data.Foldable as DF (Foldable (..))
-import           Prelude       as P hiding (concatMap)
+import           Prelude       hiding (concatMap, foldr)
+import qualified Prelude       as P (foldr)
 
 newtype Stack a = Stack [a]
     deriving (Eq)
@@ -60,8 +61,8 @@ modifyStack f (Stack (x : xs)) = Stack (f x : xs)
 {- |
     The scope stack has the inital scope by default.
 -}
-initialStack :: Stack Scope
-initialStack = Stack [ topScope, langScope ]
+topStack :: Stack Scope
+topStack = Stack [ topScope, langScope ]
 
 langStack :: Stack Scope
 langStack = singletonStack langScope

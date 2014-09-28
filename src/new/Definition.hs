@@ -24,7 +24,7 @@ import qualified Data.Map.Strict           as Map (toList)
 import           Data.Maybe                (fromJust, isJust)
 import           Data.Sequence             as DS (Seq, singleton, empty, filter, null, index)
 import           Data.Traversable          (forM)
-import           Prelude                   as P hiding (all, filter, mapM_, length, maximum,
+import           Prelude                   hiding (all, filter, mapM_, length, maximum,
                                                  null)
 
 --------------------------------------------------------------------------------
@@ -64,7 +64,7 @@ instance Show DefState where
 initialState :: DefState
 initialState = DefState
     { table     = emptyTable
-    , stack     = initialStack
+    , stack     = topStack
     , scopeId   = topScopeNum
     , ast       = Program empty
     , loopLvl   = 0

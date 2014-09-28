@@ -1,14 +1,16 @@
 module Main where
 
+import           Parser
+import           SappMonad
 import           Definition
 import           TypeChecker
-import           Parser
+import           SizeOffset
 
 import           Control.Monad       (when)
---import           Control.Monad.Trans (lift)
 import           Data.Foldable      (mapM_)
 import           Data.Sequence      as DS (null)
-import           Prelude            as P hiding (mapM_)
+import           Prelude            as P hiding (mapM_, null)
+import qualified Prelude            as P (null)
 import           System.Environment (getArgs)
 
 main :: IO ()
@@ -20,14 +22,17 @@ main = do
     let (readW, prog) = parseProgram input
     mapM_ print readW
     -- When there are no Lexing/Parsing errors
-    when (DS.null readW) $ do
+    when (null readW) $ do
         let (defS, defW) = processDefinition readW prog
         mapM_ print defW
         -- When there are no Definition errors
-        when (DS.null defW) $ do
-            let (typS, typW) = processTypeChecker defW (table defS) (ast defS)
-            print typS
+        when (null defW) $ do
+            let (typS, typW) = processTypeChecker defW (getTable defS) (getAst defS)
             mapM_ print typW
+            when (null typW) $ do
+                let (sizS, sizW) = processSizeOffset typW (getTable typS) (getAst typS)
+                print sizS
+                mapM_ print sizW
     putStrLn "done."
 
 
@@ -44,7 +49,7 @@ main = do
 --    mapM_ print afterW
 --    --putStrLn "#################################################################\n"
 --    ---- /TEMPORAL
---    --if DS.null writer
+--    --if null writer
 --    --    then print stAst
 --    --    else do
 --    --        let (lexErrors,parseErrors,staticErrors,warnings) = getErrors writer
@@ -52,11 +57,11 @@ main = do
 --    --        void $ runMaybeT $ do
 --    --            lift $ mapM_ print lexErrors
 
---    --            guard $ DS.null lexErrors
+--    --            guard $ null lexErrors
 --    --            lift $ mapM_ print parseErrors
 
---    --            guard $ DS.null parseErrors
+--    --            guard $ null parseErrors
 --    --            lift $ mapM_ print staticErrors
 
---    --            guard $ DS.null staticErrors
+--    --            guard $ null staticErrors
 --    --            lift $ mapM_ print warnings

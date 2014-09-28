@@ -39,7 +39,7 @@ module SymbolTable
     , pop
     , push
     , modifyStack
-    , initialStack
+    , topStack
     -- , emptyStack
     , singletonStack
 
@@ -65,7 +65,7 @@ import qualified Data.Map.Strict  as Map (Map, alter, empty, lookup, toList)
 import           Data.Sequence    as DS (Seq, ViewL (..), empty, fromList,
                                          singleton, viewl, (<|))
 import           Data.Traversable as DT (Traversable)
-import           Prelude          as P hiding (concatMap, foldr, lookup)
+import           Prelude          hiding (concatMap, foldr, lookup)
 
 {- |
     Symbol Table
@@ -169,24 +169,6 @@ instance Show Symbol where
 
 scopeNum :: Symbol -> ScopeNum
 scopeNum = serial . top . scopeStack
-
---instance Show Symbol where
---    show (SymInfo dt ct v sn dp i u p o) = showSN ++ showCT ++ showV ++ showDT ++ showDP ++ showU ++ showP ++ showO
---        where
---            showSN = "Scope " ++ show sn ++ ",\t"
---            showCT = show ct ++ " | "
---            showDT = show dt ++ case dt of
---                Record _ _ w -> " [" ++ show w ++ "] "
---                Union  _ _ w -> " [" ++ show w ++ "] "
---                Array  _ _ w -> " [" ++ show w ++ "] "
---                _            -> " "
---            showV  = showI ++ maybe "" show v ++ "\t"
---                where
---                    showI  = "(" ++ (if i then "init" else "NOT init") ++ ")"
---            showDP = show dp
---            showU  = " (" ++ (if u then "used" else "NOT used") ++ ")"
---            showP  = " (" ++ (if p then "pure" else "impure") ++ ")"
---            showO  = " (offset " ++ show o ++ ")"
 
 ----------------------------------------
 

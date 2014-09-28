@@ -15,11 +15,13 @@ data Declaration = Declaration
 
 data Category
     = CatVariable
+    | CatConstant
     | CatParameter
     | CatField
     deriving (Eq)
 
 instance Show Category where
     show CatVariable  = "variable"
+    show CatConstant  = "constant"
     show CatParameter = "parameter"
     show CatField     = "field"
