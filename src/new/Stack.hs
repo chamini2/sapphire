@@ -3,10 +3,12 @@ module Stack
     , top
     , pop
     , push
+    , modifyStack
 
     , initialStack
-    , emptyStack
     , langStack
+    , emptyStack
+    , singletonStack
     ) where
 
 import           Scope
@@ -45,6 +47,15 @@ push element (Stack s) = Stack $ element : s
 pop :: Stack a -> Stack a
 pop (Stack [])      = error "SymbolTable.pop: Empty stack"
 pop (Stack (_ : s)) = Stack s
+
+{- |
+    Modifies the top element in the stack.
+-}
+modifyStack :: (a -> a) -> Stack a -> Stack a
+modifyStack _ (Stack [])       = Stack []
+modifyStack f (Stack (x : xs)) = Stack (f x : xs)
+
+----------------------------------------
 
 {- |
     The scope stack has the inital scope by default.

@@ -39,14 +39,6 @@ import           Prelude       hiding (concatMap, foldr)
     "]"             { Lex TkRBrackets   _ }
 
     -- Types
-    --"Void"          { Lex TkVoidType    _ }
-    --"Int"           { Lex TkIntType     _ }
-    --"Float"         { Lex TkFloatType   _ }
-    --"Bool"          { Lex TkBoolType    _ }
-    --"Char"          { Lex TkCharType    _ }
-    --"String"        { Lex TkStringType  _ }
-    --"Range"         { Lex TkRangeType   _ }
-    --"Type"          { Lex TkTypeType    _ }
     "record"        { Lex TkRecordType  _ }
     "union"         { Lex TkUnionType   _ }
 
@@ -114,7 +106,7 @@ import           Prelude       hiding (concatMap, foldr)
     "@"             { Lex TkBelongs     _ }
 
     -- -- Identifiers
-    varid           { Lex (TkVarId  _)  _ }
+    idnid           { Lex (TkIden   _)  _ }
     typeid          { Lex (TkTypeId _)  _ }
 
 --------------------------------------------------------------------------------
@@ -155,10 +147,6 @@ StatementList :: { StBlock }
     : Statement                             { expandStatement $1       }
     | StatementList Separator Statement     { $1 >< expandStatement $3 }
 
---StatementList :: { StBlock }
---    : Statement Separator                   { expandStatement $1       }
---    | StatementList Statement Separator     { $1 >< expandStatement $2 }
-
 Separator :: { () }
     : ";"           { }
     | newline       { }
@@ -182,7 +170,7 @@ Statement :: { Lexeme Statement }
     | "return" Expression                                               { StReturn $2 <$ $1 }
 
     -- Conditionals
-    | "if"     Expression MaybeNL "then" StatementList ElIfs "end"                  { StIf $2          $5 $6    <$ $1 }
+    | "if"     Expression MaybeNL "then" StatementList ElIfList "end"               { StIf $2          $5 $6    <$ $1 }
     | "unless" Expression MaybeNL "then" StatementList "end"                        { StIf (notExp $2) $5 empty <$ $1 }
     | "unless" Expression MaybeNL "then" StatementList "else" StatementList "end"   { StIf (notExp $2) $5 $7    <$ $1 }
     | "case" Expression MaybeNL WhenList "end"                                      { StCase $2 $4 empty <$ $1 }
@@ -263,16 +251,16 @@ Statement :: { Lexeme Statement }
                                                                         }
 
     -- -- Conditionals
---    | "case" Expression MaybeNL          "end"                                      {% do
---                                                                                        let const = StNoop <$ $1
---                                                                                        tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
---                                                                                        return const
---                                                                                    }
---    | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
---                                                                                        let const = StNoop <$ $1
---                                                                                        tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
---                                                                                        return const
---                                                                                    }--
+   | "case" Expression MaybeNL          "end"                                      {% do
+                                                                                       let const = StNoop <$ $1
+                                                                                       tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
+                                                                                       return const
+                                                                                   }
+   | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
+                                                                                       let const = StNoop <$ $1
+                                                                                       tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
+                                                                                       return const
+                                                                                   }
 
     -- -- I/O
 --    | "read"              String         "," Access         { StReadString (Just $2) $4 <$ $1 }
@@ -318,7 +306,7 @@ AccessNL :: { Lexeme Access }
 -- Identifiers
 
 VariableId :: { Lexeme Identifier }
-    : varid         { unTkVarId `fmap` $1 }
+    : idnid         { unTkIden `fmap` $1 }
     | typeid        {% do
                         let const = unTkTypeId `fmap` $1
                         tellPError (lexPosn $1) (TypeIdInsteadOfVarId $ lexInfo const)
@@ -327,8 +315,8 @@ VariableId :: { Lexeme Identifier }
 
 TypeId :: { Lexeme Identifier }
     : typeid        { unTkTypeId `fmap` $1 }
-    | varid         {% do
-                        let const = unTkVarId `fmap` $1
+    | idnid         {% do
+                        let const = unTkIden `fmap` $1
                         tellPError (lexPosn $1) (VarIdInsteadOfTypeId $ lexInfo const)
                         return const
                     }
@@ -407,10 +395,10 @@ ParameterListNL :: { Seq (Lexeme Declaration) }
 ---------------------------------------
 -- Conditionals
 
-ElIfs :: { StBlock }
-    :                                                      { empty }
-    | "else" StatementList                                 { $2    }
-    | "elif" Expression MaybeNL "then" StatementList ElIfs { singleton $ StIf $2 $5 $6 <$ $1 }
+ElIfList :: { StBlock }
+    :                                                           { empty }
+    | "else" StatementList                                      { $2    }
+    | "elif" Expression MaybeNL "then" StatementList ElIfList   { singleton $ StIf $2 $5 $6 <$ $1 }
 
 WhenList :: { Seq (Lexeme When) }
     : When              { singleton $1 }

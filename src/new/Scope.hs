@@ -2,6 +2,8 @@ module Scope
     ( Scope(..)
     , ScopeNum
 
+    , topScopeNum
+    , langScopeNum
     , topScope
     , langScope
     ) where
@@ -16,14 +18,20 @@ instance Show Scope where
     The outermost scope in the program has a default value of 0
 -}
 topScope :: Scope
-topScope = Scope { serial = 0 }
+topScope = Scope { serial = topScopeNum }
 
 {-
     The scope that contanis all the language definitions
 -}
 langScope :: Scope
-langScope = Scope { serial = -1 }
+langScope = Scope { serial = langScopeNum }
 
 ----------------------------------------
 
 type ScopeNum = Int
+
+topScopeNum :: ScopeNum
+topScopeNum = 0
+
+langScopeNum :: ScopeNum
+langScopeNum = -1

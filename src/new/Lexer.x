@@ -48,7 +48,7 @@ $backslash = ["\\abfnrtv]
 @inside_string          = ($printable # ["\\] | \\$backslash)
 @inside_multilinestring = (@inside_string | $newline )
 
-@varid  = $small $idchar*
+@idnid  = $small $idchar*
 @typeid = $large $idchar*
 
 @int    = $digit+
@@ -82,13 +82,6 @@ tokens :-
         "]"                     { tok' TkRBrackets      }
 
         -- Types
-        --"Int"                   { tok' TkIntType        }
-        --"Float"                 { tok' TkFloatType      }
-        --"Bool"                  { tok' TkBoolType       }
-        --"Char"                  { tok' TkCharType       }
-        --"String"                { tok' TkStringType     }
-        --"Range"                 { tok' TkRangeType      }
-        --"Type"                  { tok' TkTypeType       }
         "record"                { tok' TkRecordType     }
         "union"                 { tok' TkUnionType      }
 
@@ -168,7 +161,7 @@ tokens :-
         --"++"                    { tok' TkConcat         }
 
         -- -- Identifiers
-        @varid                  { tok TkVarId           }
+        @idnid                  { tok TkIden            }
         @typeid                 { tok TkTypeId          }
 
         -- Errors
@@ -189,8 +182,6 @@ data Token
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets
 
     -- Types
---    | TkIntType | TkFloatType | TkBoolType | TkCharType
---    | TkStringType | TkRangeType | TkTypeType
     | TkRecordType | TkUnionType
 
     -- Statements
@@ -231,7 +222,7 @@ data Token
     | TkConcat
 
     -- -- Identifiers
-    | TkVarId  { unTkVarId  :: String }
+    | TkIden   { unTkIden   :: String }
     | TkTypeId { unTkTypeId :: String }
 
     -- Compiler
@@ -307,7 +298,7 @@ instance Show Token where
         TkGreatEq       -> "'>='"
         TkBelongs       -> "'@'"
         --TkConcat        -> "'++'"
-        TkVarId _       -> "variable identifier"
+        TkIden _        -> "variable identifier"
         TkTypeId _      -> "type identifier"
         TkEOF           -> "'EOF'"
         TkError _       -> "error on character '"
