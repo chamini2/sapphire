@@ -346,6 +346,11 @@ DataType :: { Lexeme DataType }
                                 tellPError (lexPosn $2) (ParseError "array data type must have a number between brackets")
                                 return const
                             }
+    | DataType "[" Access "]"   {% do
+                                    let const = Void <$ $1
+                                    tellPError (lexPosn $2) (ParseError "array data type size must be a literal integer")
+                                    return const
+                                }
 
 ---------------------------------------
 -- Structures

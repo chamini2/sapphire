@@ -16,10 +16,10 @@ data Error
 
 instance Show Error where
     show sappError = case sappError of
-        LError p e -> "Lexer error "   ++ show p ++ ": \n\t" ++ show e ++ "\n"
-        PError p e -> "Parsing error " ++ show p ++ ": \n\t" ++ show e ++ "\n"
-        SError p e -> "Static error "  ++ show p ++ ": \n\t" ++ show e ++ "\n"
-        Warn   p w -> "Warning "       ++ show p ++ ": \n\t" ++ show w ++ "\n"
+        LError p e -> "Lexer error "   ++ show p ++ ":\n\t" ++ show e ++ "\n"
+        PError p e -> "Parsing error " ++ show p ++ ":\n\t" ++ show e ++ "\n"
+        SError p e -> "Static error "  ++ show p ++ ":\n\t" ++ show e ++ "\n"
+        Warn   p w -> "Warning "       ++ show p ++ ":\n\t" ++ show w ++ "\n"
 
 instance Eq Error where
     (==) = (==) `on` errorPos
@@ -95,7 +95,7 @@ data StaticError
     | ReadNonReadable       DataType   Identifier
     | CaseNonCaseable       DataType
     -- Functions
---    | FunctionNotDefined       Identifier
+    | FunctionNotDefined       Identifier
     | ProcedureInExpression    Identifier
     | FunctionAsStatement      Identifier
 --    | UsedNotImplemented       Identifier
@@ -105,7 +105,7 @@ data StaticError
     | FunctionArguments        Identifier (Seq DataType) (Seq DataType)
     | FunctionAlreadyDefined   Identifier Position
 --    | LanguageFunctionRedefine Identifier
---    | NoReturn                 Identifier
+    | NoReturn                 Identifier
     -- Statements
     | ConditionDataType DataType
     | PrintNonPrintable DataType
@@ -178,15 +178,13 @@ data StaticError
 ----------------------------------------
 
 data Warning
-    = DefinedNotUsed        Identifier
-    | DefinedNotImplemented Identifier
-    | Warning               String
+    = DefinedNotUsed Identifier
+    | Warning        String
 
 instance Show Warning where
     show cWarn = case cWarn of
-        DefinedNotUsed iden         -> "identifier '" ++ iden ++ "' is defined but never used"
-        DefinedNotImplemented fname -> "function '" ++ fname ++ "' is defined but never implemented"
-        Warning msg                 -> msg
+        DefinedNotUsed iden -> "'" ++ iden ++ "' is defined but never used"
+        Warning msg         -> msg
 
 --------------------------------------------------------------------------------
 

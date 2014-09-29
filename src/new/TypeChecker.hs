@@ -298,7 +298,7 @@ checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> MaybeT
 checkArguments (Lex idn posn) args func = do
     maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, returnType sym, paramTypes sym))
 
-    unlessGuard (isJust maySymI) $ tellSError posn (NotDefined idn)
+    unlessGuard (isJust maySymI) $ tellSError posn (FunctionNotDefined idn)
 
     let (cat, Lex dt _, prms) = fromJust maySymI
 
