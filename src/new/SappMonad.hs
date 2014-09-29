@@ -28,8 +28,12 @@ data SappReader = SappReader
     , arch  :: Architecture
     }
 
-data Flag = OutputFile FilePath | SupressWarnings | AllWarnings
-    deriving (Eq)
+data Flag = Help                    -- -h      | --help
+          | Version                 -- -v      | --version
+          | AllWarnings             -- -wall   | --all-warnings
+          | SuppressWarnings        -- -w      | --no-warnings
+          | OutputFile FilePath     -- -o FILE | --output FILE
+    deriving (Show)
 
 data Architecture = Arch
     { archName :: String
@@ -38,6 +42,14 @@ data Architecture = Arch
 
 ----------------------------------------
 -- Instances
+
+instance Eq Flag where
+    Help             == Help             = True
+    Version          == Version          = True
+    AllWarnings      == AllWarnings      = True
+    SuppressWarnings == SuppressWarnings = True
+    OutputFile _     == OutputFile _     = True
+    _                == _                = False
 
 instance Eq Architecture where
     (==) = (==) `on` archName
