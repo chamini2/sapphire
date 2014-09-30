@@ -25,7 +25,7 @@ license:             BSD3
 license-file:        LICENSE
 
 -- The package author(s).
-author:              Matteo Ferrando
+author:              Matteo Ferrando, Germán León
 
 -- An email address to which users can send suggestions, bug reports, and
 -- patches.
