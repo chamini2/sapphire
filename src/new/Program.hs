@@ -27,6 +27,7 @@ module Program
     , Field
 
     , toIdentifier
+    , isVoid
     , isScalar
     , isValid
     , isArray

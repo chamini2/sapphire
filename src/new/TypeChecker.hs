@@ -15,6 +15,7 @@ import           SymbolTable
 import           Control.Arrow             ((&&&))
 import           Control.Monad             (guard, liftM, unless, void, when,
                                             (>=>))
+import           Control.Monad.Reader      (asks)
 import           Control.Monad.RWS         (RWS, lift, runRWS)
 import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
@@ -82,29 +83,30 @@ buildTypeChecker w tab program@(Program block) = do
     tell w
     typeCheckStatements block
 
+    syms <- liftM allSymbols $ gets table
+
+    -- Check warnings only when not suppressed
+    flgs <- asks flags
+    unless (SuppressWarnings `elem` flgs) $ checkWarnings syms
+
+----------------------------------------
+
+checkWarnings :: Seq (Identifier, Symbol) -> TypeChecker ()
+checkWarnings syms = forM_ syms $ \(idn, sym) -> case symbolCategory sym of
+        CatInfo -> unless (used sym) $ tellWarn (defPosn sym) (DefinedNotUsed idn)
+        CatType -> unless (used sym) $ tellWarn (defPosn sym) (TypeDefinedNotUsed idn)
+        CatFunction -> void $ runMaybeT $ do
+            unlessGuard (returned sym) $ tellSError (defPosn sym) (NoReturn idn)
+            unlessGuard (used sym)     $ tellWarn   (defPosn sym) (FunctionDefinedNotUsed idn)
+
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processTypeChecker :: SappWriter -> SymbolTable -> Program -> (TypeState, SappWriter)
-processTypeChecker w tab = runProgramTypeChecker . buildTypeChecker w tab
+processTypeChecker :: SappReader -> SappWriter -> SymbolTable -> Program -> (TypeState, SappWriter)
+processTypeChecker r w tab = runTypeChecker r . buildTypeChecker w tab
 
-runProgramTypeChecker :: TypeChecker a -> (TypeState, SappWriter)
-runProgramTypeChecker = (\(_,s,w) -> (s,w)) . runTypeChecker
-
-runTypeCheckerWithReader :: SappReader -> TypeChecker a -> (a, TypeState, SappWriter)
-runTypeCheckerWithReader r = flip (flip runRWS r) initialState
-
-runTypeChecker :: TypeChecker a -> (a, TypeState, SappWriter)
-runTypeChecker = runTypeCheckerWithReader initialReader
-
-getTypeChecker :: TypeChecker a -> a
-getTypeChecker = (\(v,_,_) -> v) . runTypeChecker
-
-getWriter :: TypeChecker a -> SappWriter
-getWriter = (\(_,_,w) -> w) . runTypeChecker
-
-getState :: TypeChecker a -> TypeState
-getState = (\(_,s,_) -> s) . runTypeChecker
+runTypeChecker :: SappReader -> TypeChecker a -> (TypeState, SappWriter)
+runTypeChecker r = (\(_,s,w) -> (s,w)) . flip (flip runRWS r) initialState
 
 --------------------------------------------------------------------------------
 -- Monad handling
@@ -144,9 +146,9 @@ typeCheckStatement (Lex st posn) = case st of
         expDt <- lift $ typeCheckExpression expL
         (idn, retDt, funcScopeId) <- lift currentFunction
 
-        unlessGuard (retDt /= Void) $ if funcScopeId /= topScopeNum
+        unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScopeNum
             then tellSError posn (ReturnInProcedure expDt idn)
-            else tellSError posn (StaticError "can't return in top level")
+            else tellSError posn ReturnInTopScope
 
         -- Checking for TypeError
         guard (isValid expDt)
@@ -309,9 +311,9 @@ checkArguments (Lex idn posn) args func = do
 
     if func
         -- When is a procedure, and should be a function
-        then when (dt == Void) $ tellSError posn (ProcedureInExpression idn)
+        then when   (isVoid dt) $ tellSError posn (ProcedureInExpression idn)
         -- When is a function, and should be a procedure
-        else when (dt /= Void) $ tellSError posn (FunctionAsStatement idn)
+        else unless (isVoid dt) $ tellSError posn (FunctionAsStatement idn)
 
     -- Typecheck arguments
     aDts <- lift $ mapM typeCheckExpression args

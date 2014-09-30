@@ -3,6 +3,7 @@ module DataType
     , Field
 
     , toIdentifier
+    , isVoid
     , isScalar
     , isValid
     , isArray
@@ -87,6 +88,9 @@ toIdentifier dt = case dt of
     TypeError -> "Error"
 
 ----------------------------------------
+
+isVoid :: DataType -> Bool
+isVoid = (== Void)
 
 isScalar :: DataType -> Bool
 isScalar = flip elem [Int , Float , Bool , Char]

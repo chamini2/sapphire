@@ -222,18 +222,18 @@ Statement :: { Lexeme Statement }
                                     }
     | Structure        "as" FieldList "end"     {% do
                                                     let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) (ParseError "structure must have a data type identifier")
+                                                    tellPError (lexPosn $2) (ParseError "type must have a data type identifier")
                                                     return const
                                                 }
     | Structure TypeId "as"           "end"     {% do
                                                     let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) (ParseError "structure must have at least one field")
+                                                    tellPError (lexPosn $2) (ParseError "type must have at least one field")
                                                     return const
                                                 }
     | Structure        "as"           "end"     {% do
                                                     let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) (ParseError "structure must have a data type identifier")
-                                                    tellPError (lexPosn $2) (ParseError "structure must have at least one field")
+                                                    tellPError (lexPosn $2) (ParseError "type must have a data type identifier")
+                                                    tellPError (lexPosn $2) (ParseError "type must have at least one field")
                                                     return const
                                                 }
 
@@ -243,7 +243,6 @@ Statement :: { Lexeme Statement }
                                                                             tellPError (lexPosn $2) (ParseError "missing identifier for function definition")
                                                                             return const
                                                                         }
---    | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
     | "return"                                                          {% do
                                                                             let const = StNoop <$ $1
                                                                             tellPError (lexPosn $1) (ParseError "return statement must have an expression")
@@ -334,21 +333,21 @@ VariableList :: { Seq (Lexeme Identifier) }
 -- Definitions
 
 DataType :: { Lexeme DataType }
-    : TypeId                { DataType $1 <$ $1 }
-    | DataType "[" Int "]"  { Array $1 $3 <$ $1 }
-    | DataType "["     "]"  {% do
-                                let const = Void <$ $1
-                                tellPError (lexPosn $2) (ParseError "array data type must have a number between brackets")
-                                return const
-                            }
-    | DataType     Int      {% do
-                                let const = Void <$ $1
-                                tellPError (lexPosn $2) (ParseError "array data type must have a number between brackets")
-                                return const
-                            }
+    : TypeId                    { DataType $1 <$ $1 }
+    | DataType "[" Int "]"      { Array $1 $3 <$ $1 }
+    | DataType "["     "]"      {% do
+                                    let const = Void <$ $1
+                                    tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
+                                    return const
+                                }
+    | DataType     Int          {% do
+                                    let const = Void <$ $1
+                                    tellPError (lexPosn $2) (ParseError "array data type size must be a literal integer between brackets")
+                                    return const
+                                }
     | DataType "[" Access "]"   {% do
                                     let const = Void <$ $1
-                                    tellPError (lexPosn $2) (ParseError "array data type size must be a literal integer")
+                                    tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
                                     return const
                                 }
 
@@ -430,7 +429,6 @@ Char :: { Lexeme Char }
 
 String :: { Lexeme String }
     : string        { unTkString `fmap` $1 }
-    --: string        { LitString (unTkString `fmap` $1) (length . unTkString $ lexInfo $1) <$ $1 }
 
 Expression :: { Lexeme Expression }
     -- Literals
@@ -475,7 +473,6 @@ ExpressionNL :: { Lexeme Expression }
     | AccessNL                  { Variable $1 <$ $1 }
     -- Function call
     | MaybeNL VariableId "(" MaybeExpressionListNL ")" MaybeNL      { FunctionCall $2 $4 <$ $2 }
-    --| MaybeNL string  MaybeNL           { LitString (unTkString `fmap` $2) (length . unTkString $ lexInfo $2) <$ $2 }
     -- Operators
     | ExpressionNL "+"   ExpressionNL   { ExpBinary (OpPlus    <$ $2) $1 $3 <$ $1 }
     | ExpressionNL "-"   ExpressionNL   { ExpBinary (OpMinus   <$ $2) $1 $3 <$ $1 }
@@ -555,7 +552,7 @@ lexWrap cont = do
 parseError :: Lexeme Token -> Alex a
 parseError (Lex t p) = fail $ show p ++ ": Parse error on Token: " ++ show t ++ "\n"
 
-parseProgram :: String -> (Seq Error, Program)
+parseProgram :: String -> (Program, Seq Error)
 parseProgram input = runAlex' input parse
 
 }

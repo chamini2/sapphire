@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {- |
     Symbol table based on the LeBlanc-Cook symbol table definition
  -}
@@ -24,9 +25,9 @@ module SymbolTable
     , emptySymFunction
     --, isProcedure
 
-    , Initialized
     , Used
-    , Pure
+    , LanguageDefined
+    , Returned
     , Offset
     , Width
 
@@ -108,10 +109,9 @@ showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) sho
 
 --------------------------------------------------------------------------------
 
-type Initialized     = Bool
 type Used            = Bool
-type Pure            = Bool
 type LanguageDefined = Bool
+type Returned        = Bool
 type Offset          = Int
 type Width           = Int
 
@@ -137,7 +137,7 @@ data Symbol = SymInfo
                 { paramTypes :: Seq (Lexeme DataType)
                 , returnType :: Lexeme DataType
                 , body       :: StBlock
-                , returned   :: Bool
+                , returned   :: Returned
                 , langDef    :: LanguageDefined
                 , width      :: Width
                 , used       :: Used

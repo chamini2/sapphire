@@ -6,43 +6,53 @@ import           SappMonad
 import           SizeOffset
 import           TypeChecker
 
-import           Control.Monad         (when, unless)
-import           Data.Foldable         (mapM_)
-import           Data.List             (nub)
-import           Data.Sequence         (null)
-import           Prelude               hiding (mapM_, null)
-import qualified Prelude               as P (null)
-import           System.Console.GetOpt (ArgDescr (..), ArgOrder (..),
-                                        OptDescr (..), getOpt, usageInfo)
-import           System.Environment    (getArgs)
+import           Control.Monad             (guard, void, when)
+import           Control.Monad.Trans       (liftIO)
+import           Control.Monad.Trans.Maybe (runMaybeT)
+import           Data.Foldable             (mapM_)
+import           Data.List                 (nub)
+import           Data.Sequence             (null)
+import           Prelude                   hiding (mapM_, null)
+import qualified Prelude                   as P (null)
+import           System.Console.GetOpt     (ArgDescr (..), ArgOrder (..),
+                                            OptDescr (..), getOpt, usageInfo)
+import           System.Environment        (getArgs)
 
 main :: IO ()
-main = do
-    (flgs, args) <- arguments
-    mapM_ print flgs
-    when (Help    `elem` flgs) $ putStrLn help
-    when (Version `elem` flgs) $ putStrLn version
+main = void $ runMaybeT $ do
+    (flgs, args) <- liftIO arguments
+    let reader = initialReader { flags = flgs }
+
+    when (Version `elem` flgs) . liftIO $ putStrLn version
+    when (Help    `elem` flgs) . liftIO $ putStrLn help
+
     -- Only continue if there were no 'help' or 'version' flags
-    unless ((Help `elem` flgs) || (Version `elem` flgs)) $ do
-        input <- if P.null args
-            then getContents
-            else readFile $ head args
-        let (readW, prog) = parseProgram input
-        mapM_ print readW
-        -- When there are no Lexing/Parsing errors
-        when (null readW) $ do
-            let (defS, defW) = processDefinition readW prog
-            mapM_ print defW
-            -- When there are no definition errors
-            when (null defW) $ do
-                let (typS, typW) = processTypeChecker defW (getTable defS) (getAst defS)
-                mapM_ print typW
-                -- When there are no type checking errors
-                when (null typW) $ do
-                    let (sizS, sizW) = processSizeOffset typW (getTable typS) (getAst typS)
-                    print sizS
-                    mapM_ print sizW
-    putStrLn "done."
+    guard . not $ (Help `elem` flgs) || (Version `elem` flgs)
+
+    input <- if P.null args
+        then liftIO getContents
+        else liftIO . readFile $ head args
+
+    let (prog, plErrs) = parseProgram input
+    mapM_ (liftIO . print) plErrs
+    guard (null plErrs)
+    -- When there are no lexer or parser errors
+
+    let (defS, dfErrs) = processDefinition reader plErrs prog
+    mapM_ (liftIO . print) dfErrs
+    guard (null dfErrs)
+    -- When there are no definition errors
+
+    let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) (getAst defS)
+    mapM_ (liftIO . print) tpErrs
+    guard (null tpErrs)
+    -- When there are no type checking errors
+
+    let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) (getAst typS)
+    liftIO $ print sizS
+    mapM_ (liftIO . print) szErrs
+
+    liftIO $ putStrLn "done."
 
 --------------------------------------------------------------------------------
 -- Flags handling
@@ -66,13 +76,19 @@ arguments :: IO ([Flag], [String])
 arguments = do
     args <- getArgs
     case getOpt Permute options args of
-         (flgs,rest ,[]  ) -> return (nub $ coherent flgs, rest)
-         (_   ,_    ,errs) -> ioError (userError (concat errs ++ help))
+         (flgs,rest,[]  ) -> return (nub $ coherent flgs, rest)
+         (_   ,_   ,errs) -> ioError (userError (concat errs ++ help))
     where
         coherent = foldr func []
         func flg flgs = case flg of
             Help             -> flg : flgs
             Version          -> flg : flgs
-            AllWarnings      -> if SuppressWarnings `elem` flgs then flgs else flg : flgs
-            SuppressWarnings -> if AllWarnings      `elem` flgs then flgs else flg : flgs
+            AllWarnings      ->
+                if SuppressWarnings `elem` flgs
+                    then flgs
+                    else flg : flgs
+            SuppressWarnings ->
+                if AllWarnings `elem` flgs
+                    then flgs
+                    else flg : flgs
             OutputFile _     -> flg : flgs

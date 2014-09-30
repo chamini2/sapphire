@@ -76,26 +76,11 @@ buildSizeOffset w tab program@(Program block) = do
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processSizeOffset :: SappWriter -> SymbolTable -> Program -> (SizeState, SappWriter)
-processSizeOffset w tab = runProgramSizeOffset . buildSizeOffset w tab
+processSizeOffset :: SappReader -> SappWriter -> SymbolTable -> Program -> (SizeState, SappWriter)
+processSizeOffset r w tab = runSizeOffset r . buildSizeOffset w tab
 
-runProgramSizeOffset :: SizeOffset a -> (SizeState, SappWriter)
-runProgramSizeOffset = (\(_,s,w) -> (s,w)) . runSizeOffset
-
-runSizeWithReader :: SappReader -> SizeOffset a -> (a, SizeState, SappWriter)
-runSizeWithReader r = flip (flip runRWS r) initialState
-
-runSizeOffset :: SizeOffset a -> (a, SizeState, SappWriter)
-runSizeOffset = runSizeWithReader initialReader
-
-getSizeOffset :: SizeOffset a -> a
-getSizeOffset = (\(v,_,_) -> v) . runSizeOffset
-
-getWriter :: SizeOffset a -> SappWriter
-getWriter = (\(_,_,w) -> w) . runSizeOffset
-
-getState :: SizeOffset a -> SizeState
-getState = (\(_,s,_) -> s) . runSizeOffset
+runSizeOffset :: SappReader -> SizeOffset a -> (SizeState, SappWriter)
+runSizeOffset r = (\(_,s,w) -> (s,w)) . flip (flip runRWS r) initialState
 
 --------------------------------------------------------------------------------
 -- Monad handling

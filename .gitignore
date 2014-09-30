@@ -1,5 +1,6 @@
 dist
-cabal-dev
+.cabal-sandbox
+cabal.sandbox.config
 *.o
 *.hi
 *.chi
@@ -9,6 +10,6 @@ src/*/Lexer.hs
 src/*/Parser.hs
 src/*/Sapphire
 
-# Vim
+# editors
 *.swp
 *~

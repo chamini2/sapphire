@@ -44,6 +44,7 @@ instance Show LexerError where
 
 data ParseError
     = ParseError      String
+    -- Generic
     | UnexpectedToken String
     -- Identifiers
     | TypeIdInsteadOfVarId String
@@ -57,6 +58,14 @@ data ParseError
     | AssignmentMissingAccess
     | VariableDefinitionMissingColon
 
+--    | VariableDefinitionWithoutDataType "variable definition missing data type"
+--    | TypeDefinitionIdentifier "type must have a data type identifier"
+--    | NoFieldsInType "type must have at least one field"
+--    | FunctionDefinitionIdentifier "missing identifier for function definition"
+--    | EmptyReturn "return statement must have an expression"
+--    | NoWhensInCase "case statement must have at least one 'when'"
+--    | ArrayDataTypeSize "array data type size must be a literal integer between brackets"
+
 instance Show ParseError where
     show pError = case pError of
         ParseError msg      -> msg
@@ -65,9 +74,9 @@ instance Show ParseError where
         TypeIdInsteadOfVarId idn -> "identifier '" ++ idn ++ "' must start with a lowercase letter"
         VarIdInsteadOfTypeId idn -> "type '" ++ idn ++ "' must start with an uppercase letter"
         -- Lists
-        VariableListComma      -> "variables must be separated with commas"
-        FieldListComma         -> "fields must be separated with commas"
-        ParameterListComma     -> "parameters must be separated with commas"
+        VariableListComma  -> "variables must be separated with commas"
+        FieldListComma     -> "fields must be separated with commas"
+        ParameterListComma -> "parameters must be separated with commas"
         -- Statements
         AssignmentMissingExpression    -> "assignment missing expression"
         AssignmentMissingAccess        -> "assignment missing variable"
@@ -78,34 +87,27 @@ instance Show ParseError where
 data StaticError
     = StaticError String
     -- Variables
---    | VariableNotInitialized Identifier
-    | InvalidAssignType      Identifier DataType DataType
---    | ArraySizeDataType      Expression DataType
---    | ImpureArraySize        Expression
+    | InvalidAssignType Identifier DataType DataType
     -- Types
-    | TypeAlreadyDefined    Identifier Position
-    | TypeIsLanguageDefined Identifier
-    | UndefinedType         Identifier
-    | RecursiveStruct       Identifier
-    | TypeNotYetDefined     Identifier Identifier Position
-    | AccessNonArray        Identifier DataType
-    | IndexDataType         Expression DataType
-    | AccessNonStruct       Identifier DataType
-    | StructNoField         DataType   Identifier
-    | ReadNonReadable       DataType   Identifier
-    | CaseNonCaseable       DataType
+    | TypeInInnerScope
+    | TypeAlreadyDefined  Identifier Position
+    | TypeLanguageDefined Identifier
+    | UndefinedType       Identifier
+    | RecursiveStruct     Identifier
+    | TypeNotYetDefined   Identifier Identifier Position
+    | AccessNonArray      Identifier DataType
+    | IndexDataType       Expression DataType
+    | AccessNonStruct     Identifier DataType
+    | StructNoField       DataType   Identifier
+    | ReadNonReadable     DataType   Identifier
+    | CaseNonCaseable     DataType
     -- Functions
-    | FunctionNotDefined       Identifier
-    | ProcedureInExpression    Identifier
-    | FunctionAsStatement      Identifier
---    | UsedNotImplemented       Identifier
---    | ImpInDefScope            Identifier Position
---    | AlreadyImplemented       Identifier Position
---    | LanguageImplemented      Identifier
-    | FunctionArguments        Identifier (Seq DataType) (Seq DataType)
-    | FunctionAlreadyDefined   Identifier Position
---    | LanguageFunctionRedefine Identifier
-    | NoReturn                 Identifier
+    | FunctionNotDefined     Identifier
+    | ProcedureInExpression  Identifier
+    | FunctionAsStatement    Identifier
+    | FunctionArguments      Identifier (Seq DataType) (Seq DataType)
+    | FunctionAlreadyDefined Identifier Position
+    | NoReturn               Identifier
     -- Statements
     | ConditionDataType DataType
     | PrintNonPrintable DataType
@@ -113,6 +115,7 @@ data StaticError
     | ForInDataType     DataType
     | BreakOutsideLoop
     | ContinueOutsideLoop
+    | ReturnInTopScope
     | ReturnInProcedure          DataType Identifier
     | ReturnType        DataType DataType Identifier
     -- Operators
@@ -140,6 +143,7 @@ data StaticError
 --        --ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' is 'impure'"
 --        ImpureArraySize        expr      -> "array size expression '" ++ showIndex expr ++ "' must be an 'Int' literal"
 --        -- Types
+--        TypeInInnerScope             -> "top level structures only"
 --        TypeAlreadyDefined   tname p -> "type '" ++ tname ++ "' has already been defined " ++ show p
 --        LanguageTypeRedefine tname   -> "cannot redefine a language defined type '" ++ tname ++ "'"
 --        UndefinedType        tname   -> "type '" ++ tname ++ "' has not been defined"
@@ -178,13 +182,19 @@ data StaticError
 ----------------------------------------
 
 data Warning
-    = DefinedNotUsed Identifier
-    | Warning        String
+    = Warning String
+    -- Usage of identifiers
+    | DefinedNotUsed         Identifier
+    | TypeDefinedNotUsed     Identifier
+    | FunctionDefinedNotUsed Identifier
 
 instance Show Warning where
     show cWarn = case cWarn of
-        DefinedNotUsed iden -> "'" ++ iden ++ "' is defined but never used"
-        Warning msg         -> msg
+        Warning msg -> msg
+        -- Usage of identifiers
+        DefinedNotUsed         idn -> "identifier '" ++ idn ++ "' is defined but never used"
+        TypeDefinedNotUsed     idn -> "type '"       ++ idn ++ "' is defined but never used"
+        FunctionDefinedNotUsed idn -> "function '"   ++ idn ++ "' is defined but never used"
 
 --------------------------------------------------------------------------------
 

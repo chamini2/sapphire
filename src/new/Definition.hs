@@ -82,7 +82,7 @@ buildDefinition w program@(Program block) = do
     tell w
     definitionStatements block
 
-    ((), defW) <- listen (return ())
+    (_, defW) <- listen (return ())
 
     when (null defW) $ do
         tab <- liftM allSymbols $ gets table
@@ -107,26 +107,11 @@ initializeTable = asks (Map.toList . types . arch) >>= \tuples -> forM_ tuples $
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processDefinition :: SappWriter -> Program -> (DefState, SappWriter)
-processDefinition w = runProgramDefinition . buildDefinition w
+processDefinition :: SappReader -> SappWriter -> Program -> (DefState, SappWriter)
+processDefinition r w = runDefinition r . buildDefinition w
 
-runProgramDefinition :: Definition a -> (DefState, SappWriter)
-runProgramDefinition = (\(_,s,w) -> (s,w)) . runDefinition
-
-runDefinitionWithReader :: SappReader -> Definition a -> (a, DefState, SappWriter)
-runDefinitionWithReader r = flip (flip runRWS r) initialState
-
-runDefinition :: Definition a -> (a, DefState, SappWriter)
-runDefinition = runDefinitionWithReader initialReader
-
-getDefinition :: Definition a -> a
-getDefinition = (\(v,_,_) -> v) . runDefinition
-
-getWriter :: Definition a -> SappWriter
-getWriter = (\(_,_,w) -> w) . runDefinition
-
-getState :: Definition a -> DefState
-getState = (\(_,s,_) -> s) . runDefinition
+runDefinition :: SappReader -> Definition a -> (DefState, SappWriter)
+runDefinition r = (\(_,s,w) -> (s,w)) . flip (flip runRWS r) initialState
 
 --------------------------------------------------------------------------------
 -- Monad handling
@@ -179,7 +164,7 @@ definitionStatement (Lex st posn) = case st of
 
         current <- currentScope
 
-        unlessGuard (current == topScopeNum) $ tellSError posn (StaticError "top level structures only")
+        unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
 
         enterScope
         stk <- gets stack
@@ -212,7 +197,7 @@ definitionStatement (Lex st posn) = case st of
         case maySymI of
             Nothing -> addSymbol idn info
             Just (symLangD, symDefP)
-                | symLangD  -> tellSError (lexPosn dtL) (TypeIsLanguageDefined idn)
+                | symLangD  -> tellSError (lexPosn dtL) (TypeLanguageDefined idn)
                 | otherwise -> tellSError (lexPosn dtL) (TypeAlreadyDefined idn symDefP)
 
     StFunctionDef idnL (Sign parms dtL) block -> do
@@ -359,7 +344,9 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
             when (all isJust mayParamDtLs && isJust mayRetDtL) $ do
                 let retDtL    = fromJust mayRetDtL
                     paramDtLs = fmap fromJust mayParamDtLs
-                modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs})
+                    -- Procedures are auotmatically 'returned'
+                    symRet    = isVoid $ lexInfo retDtL
+                modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs, returned = symRet })
 
 ----------------------------------------
 
@@ -367,7 +354,7 @@ getUpdatedDataType :: Stack Scope -> Position -> Lexeme DataType -> MaybeT Defin
 getUpdatedDataType stk posn dtL = liftM fst $ getUpdatedDataTypeWidth stk posn dtL
 
 getUpdatedDataTypeWidth :: Stack Scope -> Position -> Lexeme DataType -> MaybeT Definition (Lexeme DataType, Width)
-getUpdatedDataTypeWidth stk posn dtL = if lexInfo dtL == Void then return (dtL, 0)
+getUpdatedDataTypeWidth stk posn dtL = if isVoid $ lexInfo dtL then return (dtL, 0)
     else do
         maySymI <- getsSymbolWithStack deepDtIdn stk (lexInfo . dataType &&& width)
         let (symDt, wdt) = fromJust maySymI

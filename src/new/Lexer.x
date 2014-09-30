@@ -355,11 +355,11 @@ tok' = tok . const
 alexGetPosition :: Alex Position
 alexGetPosition = alexGetInput >>= \(p,_,_,_) -> return $ toPosition p
 
-runAlex' :: String -> Alex a -> (Seq Error, a)
+runAlex' :: String -> Alex a -> (a, Seq Error)
 runAlex' input (Alex f) =
     let Right (st,a) = f state
         ust = errors (alex_ust st)
-    in (ust,a)
+    in (a,ust)
     where
         state :: AlexState
         state = AlexState

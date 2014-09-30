@@ -12,7 +12,7 @@ import           Data.Function        (on)
 import           Data.Functor         ((<$>))
 import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
-import           Data.Sequence        (Seq, empty, singleton)
+import           Data.Sequence        (Seq, singleton)
 
 --------------------------------------------------------------------------------
 -- Monadic functions
@@ -24,7 +24,7 @@ unlessGuard cond actn = unless cond actn >> guard cond
 -- Reader
 
 data SappReader = SappReader
-    { flags :: Seq Flag
+    { flags :: [Flag]
     , arch  :: Architecture
     }
 
@@ -44,12 +44,13 @@ data Architecture = Arch
 -- Instances
 
 instance Eq Flag where
-    Help             == Help             = True
-    Version          == Version          = True
-    AllWarnings      == AllWarnings      = True
-    SuppressWarnings == SuppressWarnings = True
-    OutputFile _     == OutputFile _     = True
-    _                == _                = False
+    a == b = case (a, b) of
+        (Help            , Help            ) -> True
+        (Version         , Version         ) -> True
+        (AllWarnings     , AllWarnings     ) -> True
+        (SuppressWarnings, SuppressWarnings) -> True
+        (OutputFile _    , OutputFile _    ) -> True
+        (_               , _               ) -> False
 
 instance Eq Architecture where
     (==) = (==) `on` archName
@@ -59,7 +60,7 @@ instance Eq Architecture where
 
 initialReader :: SappReader
 initialReader = SappReader
-    { flags  = empty
+    { flags  = []
     , arch   = defaultArchitecture
     }
 
@@ -101,7 +102,6 @@ showSappState st = showT ++ showS ++ showA
     where
         showT = show (getTable st) ++ "\n"
         showS = "Scope Stack:\n"  ++ show (getStack st) ++ "\n"
-        --showI = "Scope Number:\t" ++ show (getScopeId st) ++ "\n"
         showA = show (getAst st) ++ "\n"
 
 --------------------------------------------------------------------------------
@@ -137,14 +137,13 @@ currentScope = gets (serial . top . getStack)
 --------------------------------------------------------------------------------
 -- SymbolTable
 
-----------------------------------------
--- Symbol
-
 addSymbol :: (SappState s, MonadState s m)
           => Identifier -> Symbol -> m ()
 addSymbol idn sym = do
     tab <- gets getTable
     modify $ \s -> putTable (insert idn sym tab) s
+
+----------------------------------------
 
 getSymbol :: (SappState s, MonadState s m)
           => Identifier -> m (Maybe Symbol)
@@ -161,6 +160,8 @@ getsSymbolWithStack :: (SappState s, MonadState s m)
 getsSymbolWithStack idn stk f = do
     tab <- gets getTable
     return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
+
+----------------------------------------
 
 modifySymbolWithScope :: (SappState s, MonadState s m)
                       => Identifier -> Stack Scope -> (Symbol -> Symbol) -> m ()
@@ -182,4 +183,4 @@ modifySymbol idn f = do
 
 markUsed :: (SappState s, MonadState s m)
          => Identifier -> m ()
-markUsed idn = modifySymbol idn (\sym -> sym { used = True })
+markUsed idn = modifySymbol idn $ \sym -> sym { used = True }
