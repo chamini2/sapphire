@@ -25,8 +25,8 @@ module DataType
 import           Identifier
 import           Lexeme
 
-import           Data.Foldable (find, toList)
-import           Data.Functor  ((<$), (<$>))
+import           Data.Foldable (toList)
+import           Data.Functor  ((<$))
 import           Data.List     (intercalate)
 import           Data.Maybe    (fromJust)
 import           Data.Sequence (Seq)

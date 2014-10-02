@@ -125,7 +125,7 @@ exitLoop = modify (\s -> s { loopLvl = loopLvl s - 1 })
 --------------------------------------------------------------------------------
 -- Declaration
 
-processDeclaration :: Lexeme Declaration -> Definition Bool
+processDeclaration :: Lexeme Declaration -> Definition ()
 processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
     stk <- gets stack
     let idn = lexInfo idnL
@@ -137,11 +137,11 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
             }
     maySymI <- getsSymbol idn $ \sym -> (scopeStack sym, defPosn sym, symbolCategory sym)
     case maySymI of
-        Nothing -> addSymbol idn info >> return True
+        Nothing -> addSymbol idn info
         Just (symStk, symDefP, symCat)
-            | symCat == CatFunction -> tellSError dclP (FunctionAlreadyDefined idn symDefP) >> return False
-            | symStk == stk         -> tellSError dclP (AlreadyDeclared idn symDefP)        >> return False
-            | otherwise             -> addSymbol idn info >> return True
+            | symCat == CatFunction -> tellSError dclP (FunctionAlreadyDefined idn symDefP)
+            | symStk == stk         -> tellSError dclP (AlreadyDeclared idn symDefP)
+            | otherwise             -> addSymbol idn info
 
 --------------------------------------------------------------------------------
 -- Statements
@@ -152,7 +152,7 @@ definitionStatements = mapM_ definitionStatement
 definitionStatement :: Lexeme Statement -> Definition ()
 definitionStatement (Lex st posn) = case st of
 
-    StVariableDeclaration dclL -> void $ processDeclaration dclL
+    StVariableDeclaration dclL -> processDeclaration dclL
 
     StStructDefinition dtL -> void $ runMaybeT $ do
 

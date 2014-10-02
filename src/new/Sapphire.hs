@@ -70,7 +70,7 @@ help :: String
 help = usageInfo "Usage: sapphire [OPTION]... [FILE]" options
 
 version :: String
-version = "sapphire 0.9"
+version = "sapphire 0.1.0.0"
 
 arguments :: IO ([Flag], [String])
 arguments = do
