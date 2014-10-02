@@ -34,18 +34,15 @@ main = void $ runMaybeT $ do
         else liftIO . readFile $ head args
 
     let (prog, plErrs) = parseProgram input
-    mapM_ (liftIO . print) plErrs
-    guard (null plErrs)
+    unlessGuard (null plErrs) $ mapM_ (liftIO . print) plErrs
     -- When there are no lexer or parser errors
 
     let (defS, dfErrs) = processDefinition reader plErrs prog
-    mapM_ (liftIO . print) dfErrs
-    guard (null dfErrs)
+    unlessGuard (null dfErrs) $ mapM_ (liftIO . print) dfErrs
     -- When there are no definition errors
 
     let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) (getAst defS)
-    mapM_ (liftIO . print) tpErrs
-    guard (null tpErrs)
+    unlessGuard (null tpErrs) $ mapM_ (liftIO . print) tpErrs
     -- When there are no type checking errors
 
     let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) (getAst typS)

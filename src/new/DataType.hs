@@ -33,14 +33,14 @@ import           Data.Maybe    (fromJust)
 import           Data.Sequence (Seq)
 
 data DataType
-    = DataType (Lexeme Identifier)
+    = DataType (Lexeme Identifier)                  -- For compiler use
     | Int | Float | Bool | Char | Range | Type
     | String
-    | Struct DataType (Seq Field)
+    | Struct DataType (Seq Field)                   -- For compiler use
     | Record (Lexeme Identifier)
     | Union  (Lexeme Identifier)
     | Array  (Lexeme DataType)   (Lexeme Int)
-    | Void | TypeError  -- For compiler use
+    | Void | TypeError                              -- For compiler use
     deriving (Ord, Eq)
 
 instance Show DataType where

@@ -87,12 +87,12 @@ buildTypeChecker w tab program@(Program block) = do
 
     -- Check warnings only when not suppressed
     flgs <- asks flags
-    unless (SuppressWarnings `elem` flgs) $ checkWarnings syms
+    unless (SuppressWarnings `elem` flgs) $ checkTable syms
 
 ----------------------------------------
 
-checkWarnings :: Seq (Identifier, Symbol) -> TypeChecker ()
-checkWarnings syms = forM_ syms $ \(idn, sym) -> case symbolCategory sym of
+checkTable :: Seq (Identifier, Symbol) -> TypeChecker ()
+checkTable syms = forM_ syms $ \(idn, sym) -> case symbolCategory sym of
         CatInfo -> unless (used sym) $ tellWarn (defPosn sym) (DefinedNotUsed idn)
         CatType -> unless (used sym) $ tellWarn (defPosn sym) (TypeDefinedNotUsed idn)
         CatFunction -> void $ runMaybeT $ do

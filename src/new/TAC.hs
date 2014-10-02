@@ -4,13 +4,13 @@
 module TAC (
       TACGenerator
     , generateTAC
-) 
+)
 where
 
-import           Data.Sequence             as DS (Seq, empty, length)
-import           Data.Foldable             as DF (mapM_, all, and, forM_)
-import           Data.Traversable          (mapM)
-import           Prelude                   as P hiding (mapM_, mapM, all, and)
+import           Data.Sequence    as DS (Seq, empty, length)
+import           Data.Foldable    as DF (mapM_, all, and, forM_)
+import           Data.Traversable (mapM)
+import           Prelude          as P hiding (mapM_, mapM, all, and)
 
 {-|
     Three-address code representation
@@ -20,17 +20,27 @@ type Label = String
 
 type Temporary = String
 
-data Address =
-      Variable String
-    | Constant
+data Address
+    = Variable  String
+    | Constant  Value
     | Temporary Temporary
 
-data Instruction = 
-      Assign Operator (Maybe Address) (Maybe Address) Address -- Quadruples
+data Value
+    = ValInt   Int
+    | ValFloat Float
+    | ValBool  Bool
+    | ValChar  Char
+
+data Instruction
+    = Assign Operator Address Address Address -- Quadruples
+    | AssignBin
+    | AssignUn
+    | AssignArrR
+    | AssignArrL
     -- Function related instructions
     | BeginFunction Int
     | EndFunction   Int
-    | PushParameter       
+    | PushParameter
     | PopParameters
     | Return
     | LCall
@@ -40,21 +50,21 @@ data Instruction =
     | IfZ Temporary Label
     -- Move
     | Move _ _
-    -- Store 
+    -- Store
     | Store _ _ _
     -- Load
     | Load _ _ _
 
-data Operator = 
-      Add   | Sub | Mul | Div | Mod
-    | Equal | LessThan  
+data Operator
+    = Add   | Sub | Mul | Div | Mod
+    | Equal | LessThan
     | Or    | And
     deriving (Show, Eq)
 
 {-|
-    TAC Generator Monad 
+    TAC Generator Monad
 
-    This monad needs to generate the necessary intermediate representation (IR) 
+    This monad needs to generate the necessary intermediate representation (IR)
     in this case the three-address code; store it temporarily as a structure for
     further processing and send it to a temporary file for debugging purposes.
 -}
@@ -70,13 +80,13 @@ TACState = TACState
     , labelSerial :: Int
     , table       :: SymbolTable
     , scopeId     :: ScopeNum
-    } 
+    }
 
 instance Show TACState where
     show (TACState _ _) = undefined
 
 initialState :: TACState
-initialState = TACState 
+initialState = TACState
     { tempSerial  = 0
     , labelSerial = 0
     , table       = emptyTable
@@ -97,15 +107,15 @@ generate i = tell $ singleton i
 getTemporary :: TACGenerator Temporary
 getTemporary = do
     currentTemp <- gets tempSerial
-    modify $ \s -> s { tempSerial = currentTemp + 1 }  
+    modify $ \s -> s { tempSerial = currentTemp + 1 }
     return $ "_T" ++ (show $ currentTemp + 1)
-            
+
 getLabel :: TACGenerator Label
 getLabel = do
     currentLabel <- gets labelSerial
     generate $ Label currentLabel
-    modify $ \s -> s { labelSerial = currentLabel + 1 }  
-    return $ "_L" ++ (show $ currentLabel + 1) 
+    modify $ \s -> s { labelSerial = currentLabel + 1 }
+    return $ "_L" ++ (show $ currentLabel + 1)
 
 linearizeStatements :: StBlock -> TACGenerator ()
 linearizeStatements = mapM_ linearizeStatement
@@ -179,12 +189,12 @@ linearizeExpression e = case e of
         {-OpBelongs -> "@"-}
 
     ExpUnary (Lex op _) -> do
-        case op of 
-        OpNegate -> 
-        OpNot    -> 
-    
+        case op of
+        OpNegate ->
+        OpNot    ->
+
 {-|
-    TAC Pretty printer 
+    TAC Pretty printer
 -}
 type TACPrinter = undefined
 

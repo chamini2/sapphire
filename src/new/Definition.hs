@@ -88,8 +88,9 @@ buildDefinition w program@(Program block) = do
         tab <- liftM allSymbols $ gets table
         -- First we define every DataType in the program,
         -- Then we get said DataTypes for the variables/parameters
-        fixDataTypes $ filter ((==) CatType . symbolCategory . snd) tab
-        fixDataTypes $ filter ((/=) CatType . symbolCategory . snd) tab
+        fixDataTypes tab
+        --fixDataTypes $ filter ((==) CatType . symbolCategory . snd) tab
+        --fixDataTypes $ filter ((/=) CatType . symbolCategory . snd) tab
 
 ----------------------------------------
 
@@ -164,6 +165,7 @@ definitionStatement (Lex st posn) = case st of
 
         current <- currentScope
 
+        -- Can only define structures in the top scope
         unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
 
         enterScope
@@ -260,9 +262,9 @@ definitionStatement (Lex st posn) = case st of
         definitionStatements block
         exitLoop >> exitScope
 
-    StBreak -> gets loopLvl >>= \lvl -> unless (lvl > topScopeNum) $ tellSError posn BreakOutsideLoop
+    StBreak -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn BreakOutsideLoop
 
-    StContinue -> gets loopLvl >>= \lvl -> unless (lvl > topScopeNum) $ tellSError posn BreakOutsideLoop
+    StContinue -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn ContinueOutsideLoop
 
     _ -> return ()
     --StAssign

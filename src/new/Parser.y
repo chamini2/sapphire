@@ -291,6 +291,7 @@ AccessNL :: { Lexeme Access }
 
 VariableId :: { Lexeme Identifier }
     : ident         { unTkIden `fmap` $1 }
+    -- Errors
     | typeid        {% do
                         let const = unTkTypeId `fmap` $1
                         tellPError (lexPosn $1) (TypeIdInsteadOfVarId $ lexInfo const)
@@ -299,6 +300,7 @@ VariableId :: { Lexeme Identifier }
 
 TypeId :: { Lexeme Identifier }
     : typeid        { unTkTypeId `fmap` $1 }
+    -- Errors
     | ident         {% do
                         let const = unTkIden `fmap` $1
                         tellPError (lexPosn $1) (VarIdInsteadOfTypeId $ lexInfo const)
@@ -308,6 +310,7 @@ TypeId :: { Lexeme Identifier }
 VariableList :: { Seq (Lexeme Identifier) }
     : VariableId                    { singleton $1 }
     | VariableList "," VariableId   { $1     |> $3 }
+    -- Errors
     | VariableList     VariableId   {% do
                                         let const = $1 |> $2
                                         tellPError (lexPosn $2) VariableListComma
@@ -320,6 +323,7 @@ VariableList :: { Seq (Lexeme Identifier) }
 DataType :: { Lexeme DataType }
     : TypeId                    { DataType $1 <$ $1 }
     | DataType "[" Int "]"      { Array $1 $3 <$ $1 }
+    -- Errors
     | DataType "["     "]"      {% do
                                     let const = Void <$ $1
                                     tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
@@ -342,6 +346,7 @@ DataType :: { Lexeme DataType }
 FieldList :: { Seq Field }
     : MaybeNL Field MaybeNL                 { expandField $2       }
     | FieldList "," MaybeNL Field MaybeNL   { $1 >< expandField $4 }
+    -- Errors
     | FieldList             Field MaybeNL   {% do
                                                 let const = $1 >< expandField $2
                                                 tellPError (lexPosn $ index (fst $2) 0) FieldListComma
@@ -366,6 +371,7 @@ ReturnType :: { Lexeme DataType }
 ParameterList :: { Seq (Lexeme Declaration) }
     : DataType VariableId                       { singleton (Declaration $2 $1 CatParameter <$ $1) }
     | ParameterList "," DataType VariableId     { $1     |> (Declaration $4 $3 CatParameter <$ $3) }
+    -- Errors
     | ParameterList     DataType VariableId     {% do
                                                     let const = $1 |> (Declaration $3 $2 CatParameter <$ $2)
                                                     tellPError (lexPosn $2) ParameterListComma
@@ -375,6 +381,7 @@ ParameterList :: { Seq (Lexeme Declaration) }
 ParameterListNL :: { Seq (Lexeme Declaration) }
     : MaybeNL DataType VariableId MaybeNL                       { singleton (Declaration $3 $2 CatParameter <$ $2) }
     | ParameterListNL "," MaybeNL DataType VariableId MaybeNL   { $1     |> (Declaration $5 $4 CatParameter <$ $4) }
+    -- Errors
     | ParameterListNL             DataType VariableId MaybeNL   {% do
                                                                     let const = $1 |> (Declaration $3 $2 CatParameter <$ $2)
                                                                     tellPError (lexPosn $2) ParameterListComma
