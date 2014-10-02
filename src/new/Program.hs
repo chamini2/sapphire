@@ -33,7 +33,6 @@ module Program
     , isArray
     , isStruct
     , arrayInnerDataType
-    , fieldInStruct
 
     , DataTypeHistory
     , DataTypeWidthZipper

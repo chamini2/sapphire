@@ -25,8 +25,8 @@ import           Data.Functor              ((<$>))
 import           Data.Maybe                (fromJust, fromMaybe, isJust)
 import           Data.Sequence             (Seq, empty, length, zipWith)
 import           Data.Traversable          (mapM)
-import           Prelude                   hiding (all, and, exp, length, mapM,
-                                            mapM_, zipWith)
+import           Prelude                   hiding (all, and, exp, length,
+                                            lookup, mapM, mapM_, zipWith)
 import qualified Prelude                   as P (length)
 
 --------------------------------------------------------------------------------
@@ -369,7 +369,11 @@ constructDataType idnL accZ dt = case defocusAccess <$> backAccess accZ of
         StructAccess _ fldIdnL -> do
             unlessGuard (isStruct dt) $ tellSError (lexPosn idnL) (AccessNonStruct (lexInfo idnL) dt)
 
-            let mayFldDt = lexInfo <$> fieldInStruct dt (lexInfo fldIdnL)
+            -- This (fromJust . fromJust) may be dangerous (or not)
+            tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
+
+            -- Looks for the field in the struct's SymbolTable
+            let mayFldDt = (lexInfo . dataType) <$> lookup (lexInfo fldIdnL) tab
             unlessGuard (isJust mayFldDt) $ tellSError (lexPosn fldIdnL) (StructNoField dt (lexInfo fldIdnL))
 
             constructDataType idnL (fromJust $ backAccess accZ) (fromJust mayFldDt)

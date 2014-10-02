@@ -159,7 +159,7 @@ getsSymbolWithStack :: (SappState s, MonadState s m)
                     => Identifier -> Stack Scope -> (Symbol -> a) -> m (Maybe a)
 getsSymbolWithStack idn stk f = do
     tab <- gets getTable
-    return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
+    return $ f <$> lookupWithScope idn stk tab
 
 ----------------------------------------
 

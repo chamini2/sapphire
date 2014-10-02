@@ -9,7 +9,6 @@ module DataType
     , isArray
     , isStruct
     , arrayInnerDataType
-    , fieldInStruct
 
     , DataTypeHistory
     , DataTypeWidthZipper
@@ -115,11 +114,6 @@ arrayInnerDataType :: DataType -> DataType
 arrayInnerDataType dt = case dt of
     Array dtL _ -> lexInfo dtL
     _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
-
-fieldInStruct :: DataType -> Identifier -> Maybe (Lexeme DataType)
-fieldInStruct dt idn = case dt of
-    Struct _ flds -> snd <$> find ((idn==) . lexInfo . fst) flds
-    _             -> error "Language.fieldInStruct: should not attempt to get fields from a non-structure DataType"
 
 --------------------------------------------------------------------------------
 

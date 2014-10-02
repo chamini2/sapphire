@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns             #-}
-{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {- |
@@ -312,7 +311,7 @@ updateWithScope idn sc f = SymTable . Map.alter func idn . getMap
 allSymbols :: SymbolTable -> Seq (Identifier, Symbol)
 allSymbols = fromList . sortIt . expand . Map.toList . getMap
     where
-        expand   = concatMap (\(idn, syms) -> fmap (idn,) (toList syms))
+        expand   = concatMap (\(idn, syms) -> zip (repeat idn) (toList syms))
         sortIt   = sortBy comp
         comp x y = case compOn symbolCategory x y of
                 EQ    -> compOn defPosn x y
