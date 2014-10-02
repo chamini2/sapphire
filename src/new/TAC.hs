@@ -7,10 +7,10 @@ module TAC (
 )
 where
 
-import           Data.Sequence    as DS (Seq, empty, length)
-import           Data.Foldable    as DF (mapM_, all, and, forM_)
+import           Data.Sequence    (Seq, empty, length)
+import           Data.Foldable    (mapM_, all, and, forM_)
 import           Data.Traversable (mapM)
-import           Prelude          as P hiding (mapM_, mapM, all, and)
+import           Prelude          hiding (mapM_, mapM, all, and)
 
 {-|
     Three-address code representation
