@@ -266,7 +266,12 @@ typeCheckExpression (Lex exp posn) = case exp of
         addSymbol "$String" info
         return String
 
-    Variable accL -> liftM (maybe TypeError snd) $ runMaybeT $ accessDataType accL
+    Variable accL -> liftM (fromMaybe TypeError) $ runMaybeT $ do
+        (accIdn, accDt) <- accessDataType accL
+        markUsed accIdn
+        return accDt
+
+    -- Variable accL -> liftM (maybe TypeError snd) $ runMaybeT $ accessDataType accL
 
     FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ runMaybeT $ checkArguments idnL expLs True
 
@@ -344,8 +349,6 @@ accessDataType accL = do
 
     -- Checking that it is a variable
     unlessGuard (cat == CatInfo) $ tellSError (lexPosn accL) (WrongCategory deepIdn CatInfo cat)
-
-    markUsed deepIdn
 
     dt' <- constructDataType deepIdnL deepZpp dt
     return (deepIdn, dt')

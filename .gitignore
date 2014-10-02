@@ -6,9 +6,6 @@ cabal.sandbox.config
 *.chi
 *.chs.h
 .virthualenv
-src/*/Lexer.hs
-src/*/Parser.hs
-src/*/Sapphire
 
 # editors
 *.swp
