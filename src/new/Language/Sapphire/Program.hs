@@ -1,4 +1,4 @@
-module Program
+module Language.Sapphire.Program
     ( Program(..)
 
     -- From Statement
@@ -68,13 +68,13 @@ module Program
     ) where
 
 
-import           DataType
-import           Declaration
-import           Expression
-import           Identifier
-import           Lexeme
-import           Position
-import           Statement
+import           Language.Sapphire.DataType
+import           Language.Sapphire.Declaration
+import           Language.Sapphire.Expression
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
+import           Language.Sapphire.Position
+import           Language.Sapphire.Statement
 
 import           Data.Foldable (concatMap)
 import           Prelude       hiding (concatMap)

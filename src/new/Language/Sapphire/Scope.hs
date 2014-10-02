@@ -1,4 +1,4 @@
-module Scope
+module Language.Sapphire.Scope
     ( Scope(..)
     , ScopeNum
 

@@ -1,4 +1,4 @@
-module Expression
+module Language.Sapphire.Expression
     ( Expression(..)
     , Binary(..)
     , Unary(..)
@@ -20,9 +20,9 @@ module Expression
     , deepAccess
     ) where
 
-import           DataType
-import           Identifier
-import           Lexeme
+import           Language.Sapphire.DataType
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
 
 import           Data.Foldable (find)
 import           Data.Functor  ((<$), (<$>))

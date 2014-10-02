@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
-module SappMonad where
+module Language.Sapphire.SappMonad where
 
-import           Error
-import           Program
-import           SymbolTable
+import           Language.Sapphire.Error
+import           Language.Sapphire.Program
+import           Language.Sapphire.SymbolTable
 
 import           Control.Monad        (MonadPlus, when, liftM, unless, guard)
 import           Control.Monad.State  (MonadState, gets, modify)

@@ -1,4 +1,4 @@
-module Definition
+module Language.Sapphire.Definition
     ( DefState(..)
     --, Definition
     --, buildDefinition
@@ -6,10 +6,10 @@ module Definition
     , processDefinition
     ) where
 
-import           Error
-import           Program
-import           SappMonad
-import           SymbolTable
+import           Language.Sapphire.Error
+import           Language.Sapphire.Program
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SymbolTable
 
 import           Control.Arrow             ((&&&))
 import           Control.Monad             (liftM, unless, void, when)

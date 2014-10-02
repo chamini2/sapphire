@@ -1,15 +1,15 @@
-module Statement
+module Language.Sapphire.Statement
     ( Statement(..)
     , StBlock
     , When(..)
     , Signature(..)
     ) where
 
-import           DataType
-import           Declaration
-import           Expression
-import           Identifier
-import           Lexeme
+import           Language.Sapphire.DataType
+import           Language.Sapphire.Declaration
+import           Language.Sapphire.Expression
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
 
 import           Data.Sequence (Seq)
 

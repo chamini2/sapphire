@@ -1,13 +1,13 @@
-module SizeOffset
+module Language.Sapphire.SizeOffset
     ( SizeState
 
     , SizeOffset
     , processSizeOffset
     ) where
 
-import           Program
-import           SappMonad
-import           SymbolTable
+import           Language.Sapphire.Program
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SymbolTable
 
 import           Control.Arrow        ((&&&))
 import           Control.Monad        (liftM)

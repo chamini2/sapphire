@@ -1,4 +1,4 @@
-module Stack
+module Language.Sapphire.Stack
     ( Stack(..)
     , top
     , pop
@@ -11,7 +11,7 @@ module Stack
     , singletonStack
     ) where
 
-import           Scope
+import           Language.Sapphire.Scope
 
 import           Data.Foldable (Foldable (..))
 import           Prelude       hiding (concatMap, foldr)

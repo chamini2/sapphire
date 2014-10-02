@@ -1,9 +1,9 @@
-module Lexeme
+module Language.Sapphire.Lexeme
     ( Lexeme(..)
     , fillLex
     ) where
 
-import           Position
+import           Language.Sapphire.Position
 
 data Lexeme a = Lex
     { lexInfo :: a

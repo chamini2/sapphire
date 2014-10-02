@@ -1,4 +1,4 @@
-module TypeChecker
+module Language.Sapphire.TypeChecker
     ( TypeState
 
     , TypeChecker
@@ -7,10 +7,10 @@ module TypeChecker
     , processTypeChecker
     ) where
 
-import           Error
-import           Program
-import           SappMonad
-import           SymbolTable
+import           Language.Sapphire.Error
+import           Language.Sapphire.Program
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SymbolTable
 
 import           Control.Arrow             ((&&&))
 import           Control.Monad             (guard, liftM, unless, void, when,

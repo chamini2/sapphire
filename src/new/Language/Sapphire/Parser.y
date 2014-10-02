@@ -1,21 +1,20 @@
 {
 {-# OPTIONS -w #-}
-{-# LANGUAGE TupleSections #-}
-module Parser
+module Language.Sapphire.Parser
     ( parseProgram
     ) where
 
-import           Lexer
-import           Program
-import           Position
-import           Lexeme
-import           Error         (Error, LexerError(..), ParseError(..))
+import           Language.Sapphire.Lexer
+import           Language.Sapphire.Program
+import           Language.Sapphire.Position
+import           Language.Sapphire.Lexeme
+import           Language.Sapphire.Error
 
 import           Control.Monad (unless)
-import           Data.Functor
+import           Data.Functor  ((<$>),(<$))
 import           Data.Maybe    (fromJust, isJust)
 import           Data.Sequence hiding (length)
-import           Prelude       hiding (concatMap, foldr)
+import           Prelude       hiding (concatMap, foldr, zip)
 }
 
 %name parse
@@ -532,7 +531,7 @@ expandStatement stL = case lexInfo stL of
 
 -- For the syntactic sugar of defining several fields of the same type using commas
 expandField :: (Seq (Lexeme Identifier), Lexeme DataType) -> Seq (Lexeme Identifier, Lexeme DataType)
-expandField (idns, dt) = fmap (,dt) idns
+expandField (idns, dt) = zip idns $ fromList (repeat dt)
 
 notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp

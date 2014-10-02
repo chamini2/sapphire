@@ -1,10 +1,10 @@
 module Main where
 
-import           Definition
-import           Parser
-import           SappMonad
-import           SizeOffset
-import           TypeChecker
+import           Language.Sapphire.Definition
+import           Language.Sapphire.Parser
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SizeOffset
+import           Language.Sapphire.TypeChecker
 
 import           Control.Monad             (guard, void, when)
 import           Control.Monad.Trans       (liftIO)

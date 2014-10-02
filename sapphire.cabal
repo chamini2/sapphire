@@ -11,24 +11,24 @@ maintainer   : matteo.ferrando2@gmail.com
 -- copyright:
 category     : Language
 build-type   : Simple
-cabal-version: >=1.10
+cabal-version: >= 1.10
 -- Extra files to be distributed with the package, such as examples or a README.
 -- extra-source-files:
 
 executable sapphire
   hs-source-dirs  : src/new
-  main-is         : Sapphire.hs
+  main-is         : Language/Sapphire/Sapphire.hs
   default-language: Haskell2010
 
   ghc-options:
       -Wall
 
   -- Modules included in this executable, other than Main.
-  other-modules: Lexer, Parser
+  other-modules: Language.Sapphire.Lexer, Language.Sapphire.Parser
 
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:
-      TupleSections
+      DeriveTraversable
     , FlexibleContexts
     , FlexibleInstances
     , GeneralizedNewtypeDeriving

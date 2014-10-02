@@ -6,7 +6,7 @@
 {- |
     Symbol table based on the LeBlanc-Cook symbol table definition
  -}
-module SymbolTable
+module Language.Sapphire.SymbolTable
     ( SymbolTable
     , emptyTable
     , insert
@@ -52,9 +52,9 @@ module SymbolTable
     --, langScope
     ) where
 
-import           Program
-import           Scope
-import           Stack
+import           Language.Sapphire.Program
+import           Language.Sapphire.Scope
+import           Language.Sapphire.Stack
 
 import           Control.Arrow    (second)
 import           Data.Foldable    (Foldable, concatMap, find, foldr, msum,

@@ -1,4 +1,4 @@
-module DataType
+module Language.Sapphire.DataType
     ( DataType(..)
     , Field
 
@@ -22,8 +22,8 @@ module DataType
     , putDataType
     ) where
 
-import           Identifier
-import           Lexeme
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
 
 import           Data.Foldable (toList)
 import           Data.Functor  ((<$))

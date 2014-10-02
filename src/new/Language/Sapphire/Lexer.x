@@ -3,7 +3,7 @@
     Lexer for programming language SAPPHIRE.
 -}
 
-module Lexer
+module Language.Sapphire.Lexer
     ( Alex (..)
     , Token (..)
     , Lexeme (..)
@@ -15,9 +15,9 @@ module Lexer
     , alexGetPosition
     ) where
 
-import           Error
-import           Position
-import           Lexeme
+import           Language.Sapphire.Error
+import           Language.Sapphire.Position
+import           Language.Sapphire.Lexeme
 
 import           Control.Monad   (liftM)
 import           Data.List       (intercalate, foldl')
