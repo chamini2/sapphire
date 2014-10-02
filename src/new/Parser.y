@@ -11,6 +11,7 @@ import           Position
 import           Lexeme
 import           Error         (Error, LexerError(..), ParseError(..))
 
+import           Control.Monad (unless)
 import           Data.Functor
 import           Data.Maybe    (fromJust, isJust)
 import           Data.Sequence hiding (length)
@@ -334,7 +335,10 @@ VariableList :: { Seq (Lexeme Identifier) }
 
 DataType :: { Lexeme DataType }
     : TypeId                    { DataType $1 <$ $1 }
-    | DataType "[" Int "]"      { Array $1 $3 <$ $1 }
+    | DataType "[" Int "]"      {% do
+                                    unless (lexInfo $3 > 0) $ tellPError (lexPosn $3) (ParseError "size of array must be positive")
+                                    return $ Array $1 $3 <$ $1
+                                }
     | DataType "["     "]"      {% do
                                     let const = Void <$ $1
                                     tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
