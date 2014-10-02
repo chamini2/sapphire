@@ -106,7 +106,7 @@ import           Prelude       hiding (concatMap, foldr)
     "@"             { Lex TkBelongs     _ }
 
     -- -- Identifiers
-    idnid           { Lex (TkIden   _)  _ }
+    ident           { Lex (TkIden   _)  _ }
     typeid          { Lex (TkTypeId _)  _ }
 
 --------------------------------------------------------------------------------
@@ -161,7 +161,7 @@ Statement :: { Lexeme Statement }
     | Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
-    | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
+    | VariableList ":" DataType                 { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
     | Structure TypeId "as" FieldList "end"     { StStructDefinition (Struct ((lexInfo $1) $2) $4 <$ $1) <$ $1 }
 
     -- Functions
@@ -195,6 +195,8 @@ Statement :: { Lexeme Statement }
     | "for" VariableId "in" Expression "do" StatementList "end"                             { StFor $2 $4 $6 <$ $1 }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
+
+----------------------------------------
 
     -- Errors
     -- -- Assignment
@@ -261,23 +263,6 @@ Statement :: { Lexeme Statement }
                                                                                        return const
                                                                                    }
 
-    -- -- I/O
---    | "read"              String         "," Access         { StReadString (Just $2) $4 <$ $1 }
---    | "read"  "(" MaybeNL String MaybeNL "," AccessNL ")"   { StReadString (Just $4) $7 <$ $1 }
---    | "read"      Access                                    { StReadString Nothing   $2 <$ $1 }
---    | "read"  "(" AccessNL ")"                              { StReadString Nothing   $3 <$ $1 }
---    | "print"     ExpressionList            { StPrintList $2 <$ $1 }
---    | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
-
-    -- -- Loops
---    | "while" Expression "do" StatementList "end"                                           { StLoop empty $2          $4    <$ $1 }
---    | "until" Expression "do" StatementList "end"                                           { StLoop empty (notExp $2) $4    <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "while" Expression                               { StLoop $2    $6          empty <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "until" Expression                               { StLoop $2    (notExp $6) empty <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"      { StLoop $2    $6          $8    <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"      { StLoop $2    (notExp $6) $8    <$ $1 }
---    | "for" VariableId "in" Expression "do" StatementList "end"                             { StFor  $2    $4          $6    <$ $1 }
-
 ---------------------------------------
 -- Structures
 
@@ -305,7 +290,7 @@ AccessNL :: { Lexeme Access }
 -- Identifiers
 
 VariableId :: { Lexeme Identifier }
-    : idnid         { unTkIden `fmap` $1 }
+    : ident         { unTkIden `fmap` $1 }
     | typeid        {% do
                         let const = unTkTypeId `fmap` $1
                         tellPError (lexPosn $1) (TypeIdInsteadOfVarId $ lexInfo const)
@@ -314,7 +299,7 @@ VariableId :: { Lexeme Identifier }
 
 TypeId :: { Lexeme Identifier }
     : typeid        { unTkTypeId `fmap` $1 }
-    | idnid         {% do
+    | ident         {% do
                         let const = unTkIden `fmap` $1
                         tellPError (lexPosn $1) (VarIdInsteadOfTypeId $ lexInfo const)
                         return const

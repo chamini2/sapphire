@@ -48,7 +48,7 @@ $backslash = ["\\abfnrtv]
 @inside_string          = ($printable # ["\\] | \\$backslash)
 @inside_multilinestring = (@inside_string | $newline )
 
-@idnid  = $small $idchar*
+@ident  = $small $idchar*
 @typeid = $large $idchar*
 
 @int    = $digit+
@@ -161,7 +161,7 @@ tokens :-
         --"++"                    { tok' TkConcat         }
 
         -- -- Identifiers
-        @idnid                  { tok TkIden            }
+        @ident                  { tok TkIden            }
         @typeid                 { tok TkTypeId          }
 
         -- Errors
@@ -242,13 +242,6 @@ instance Show Token where
         TkRParen        -> "')'"
         TkLBrackets     -> "'['"
         TkRBrackets     -> "']'"
-        --TkIntType       -> "type 'Int'"
-        --TkFloatType     -> "type 'Float'"
-        --TkBoolType      -> "type 'Bool'"
-        --TkCharType      -> "type 'Char'"
-        --TkStringType    -> "type 'String'"
-        --TkRangeType     -> "type 'Range'"
-        --TkTypeType      -> "type 'Type'"
         TkRecordType    -> "type 'record'"
         TkUnionType     -> "type 'union'"
         TkAssign        -> "'='"

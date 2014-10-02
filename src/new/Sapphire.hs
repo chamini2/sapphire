@@ -64,6 +64,9 @@ options =
     , Option "W" ["Wall"]    (NoArg  AllWarnings)       "show all warnings"
     , Option "w" ["Wnone"]   (NoArg  SuppressWarnings)  "suppress all warnings"
     , Option "o" ["output"]  (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
+    -- Compiler flags
+    --, Option "t" ["symbol-table"]   (NoArg  SuppressWarnings)  "suppress all warnings"
+    --, Option "a" ["ast"]   (NoArg  SuppressWarnings)  "suppress all warnings"
     ]
 
 help :: String
