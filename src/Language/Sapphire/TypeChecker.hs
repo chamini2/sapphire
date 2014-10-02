@@ -268,10 +268,9 @@ typeCheckExpression (Lex exp posn) = case exp of
 
     Variable accL -> liftM (fromMaybe TypeError) $ runMaybeT $ do
         (accIdn, accDt) <- accessDataType accL
+        -- Mark used only when being evaluated for an expression
         markUsed accIdn
         return accDt
-
-    -- Variable accL -> liftM (maybe TypeError snd) $ runMaybeT $ accessDataType accL
 
     FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ runMaybeT $ checkArguments idnL expLs True
 
