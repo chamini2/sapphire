@@ -77,19 +77,19 @@ def j : ( Bool b  # paramtero 1
   end
 end
 
-Record Punto as
+record Punto as
     x, y : Int
     nombre : String
 end
 
-Record Point as x, y : Int; name : String end
+record Point as x, y : Int; name : String end
 
-Union EitherIntFloat as
+union EitherIntFloat as
   int : Int
   float : Float
 end
 
-Union IntOFloat as int : Int; float : Float end
+union IntOFloat as int : Int; float : Float end
 
 case object
     when ( syntax_error # becuyase hisa
