@@ -1,4 +1,4 @@
-module DataType
+module Language.Sapphire.DataType
     ( DataType(..)
     , Field
 
@@ -9,10 +9,9 @@ module DataType
     , isArray
     , isStruct
     , arrayInnerDataType
-    , fieldInStruct
 
     , DataTypeHistory
-    , DataTypeWidthZipper
+    , DataTypeZipper
     --, Thread
     , focusDataType
     , defocusDataType
@@ -23,20 +22,16 @@ module DataType
     , putDataType
     ) where
 
-import           Identifier
-import           Lexeme
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
 
-import           Data.Foldable (find, toList)
-import           Data.Functor  ((<$), (<$>))
-import           Data.List     (intercalate)
-import           Data.Maybe    (fromJust)
-import           Data.Sequence (Seq)
+import           Data.Functor                 ((<$))
+import           Data.Maybe                   (fromJust)
 
 data DataType
     = DataType (Lexeme Identifier)                  -- For compiler use
     | Int | Float | Bool | Char | Range | Type
     | String
-    | Struct DataType (Seq Field)                   -- For compiler use
     | Record (Lexeme Identifier)
     | Union  (Lexeme Identifier)
     | Array  (Lexeme DataType)   (Lexeme Int)
@@ -53,15 +48,11 @@ instance Show DataType where
         String          -> "String"
         Range           -> "Range"
         Type            -> "Type"
-        Struct strDt fs -> show strDt ++ showFields fs
         Record idnL     -> "record " ++ lexInfo idnL
         Union  idnL     -> "union "  ++ lexInfo idnL
         Array  dtL sizL -> show (lexInfo dtL) ++ "[" ++ show (lexInfo sizL) ++ "]"
         Void            -> "()"
         TypeError       -> error "DataType TypeError should never be shown"
-        where
-            showFields :: Seq Field -> String
-            showFields flds = " {" ++ intercalate ", " (toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show d) flds) ++ "}"
 
 ----------------------------------------
 
@@ -80,10 +71,9 @@ toIdentifier dt = case dt of
     Range  -> "Range"
     Type   -> "Type"
     String -> "String"
-    Struct strDt _ -> toIdentifier strDt
-    Record idnL    -> lexInfo idnL
-    Union  idnL    -> lexInfo idnL
-    Array dtL _    -> toIdentifier $ lexInfo dtL
+    Record idnL -> lexInfo idnL
+    Union  idnL -> lexInfo idnL
+    Array dtL _ -> toIdentifier $ lexInfo dtL
     Void      -> "()"
     TypeError -> "Error"
 
@@ -116,11 +106,6 @@ arrayInnerDataType dt = case dt of
     Array dtL _ -> lexInfo dtL
     _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
 
-fieldInStruct :: DataType -> Identifier -> Maybe (Lexeme DataType)
-fieldInStruct dt idn = case dt of
-    Struct _ flds -> snd <$> find ((idn==) . lexInfo . fst) flds
-    _             -> error "Language.fieldInStruct: should not attempt to get fields from a non-structure DataType"
-
 --------------------------------------------------------------------------------
 
 {-
@@ -148,35 +133,35 @@ data DataTypeHistory = HistoryDataType (Lexeme Int)
 
 type Thread = [Lexeme DataTypeHistory]
 
-type DataTypeWidthZipper = (Lexeme DataType, Int, Thread)
+type DataTypeZipper = (Lexeme DataType, Int, Thread)
 
 ----------------------------------------
 
-focusDataType :: Lexeme DataType -> DataTypeWidthZipper
+focusDataType :: Lexeme DataType -> DataTypeZipper
 focusDataType dtL = (dtL, 1, [])
 
-defocusDataType :: DataTypeWidthZipper -> (Lexeme DataType, Int)
+defocusDataType :: DataTypeZipper -> (Lexeme DataType, Int)
 defocusDataType (dtL, dim, _) = (dtL, dim)
 
-inDataType :: DataTypeWidthZipper -> Maybe DataTypeWidthZipper
+inDataType :: DataTypeZipper -> Maybe DataTypeZipper
 inDataType (dtL, dim, thrd) = case lexInfo dtL of
     Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataType sizL <$ dtL) : thrd)
     _                -> Nothing
 
-backDataType :: DataTypeWidthZipper -> Maybe DataTypeWidthZipper
+backDataType :: DataTypeZipper -> Maybe DataTypeZipper
 backDataType (dtL, dim, thrd) = case thrd of
     []                                          -> Nothing
     hstL@(Lex (HistoryDataType sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
 
-topDataType :: DataTypeWidthZipper -> DataTypeWidthZipper
+topDataType :: DataTypeZipper -> DataTypeZipper
 topDataType zpp@(_, _, thrd) = case thrd of
     []    -> zpp
     _ : _ -> topDataType $ fromJust $ backDataType zpp
 
-deepDataType :: DataTypeWidthZipper -> DataTypeWidthZipper
+deepDataType :: DataTypeZipper -> DataTypeZipper
 deepDataType zpp@(dtL, _, _) = case lexInfo dtL of
     Array _ _ -> deepDataType $ fromJust $ inDataType zpp
     _         -> zpp
 
-putDataType :: Lexeme DataType -> DataTypeWidthZipper -> DataTypeWidthZipper
+putDataType :: Lexeme DataType -> DataTypeZipper -> DataTypeZipper
 putDataType dtL (_, dim, thrd) = (dtL, dim, thrd)

@@ -1,23 +1,23 @@
-module SizeOffset
+module Language.Sapphire.SizeOffset
     ( SizeState
 
     , SizeOffset
     , processSizeOffset
     ) where
 
-import           Program
-import           SappMonad
-import           SymbolTable
+import           Language.Sapphire.Program
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SymbolTable
 
-import           Control.Arrow        ((&&&))
-import           Control.Monad        (liftM)
-import           Control.Monad.RWS    (RWS, runRWS)
-import           Control.Monad.State  (gets, modify)
-import           Control.Monad.Writer (tell)
-import           Data.Foldable        (forM_, mapM_)
-import           Data.Maybe           (fromJust)
-import           Data.Sequence        (empty)
-import           Prelude              hiding (mapM_)
+import           Control.Arrow                 ((&&&))
+import           Control.Monad                 (liftM)
+import           Control.Monad.RWS             (RWS, runRWS)
+import           Control.Monad.State           (gets, modify)
+import           Control.Monad.Writer          (tell)
+import           Data.Foldable                 (forM_, mapM_)
+import           Data.Maybe                    (fromJust)
+import           Data.Sequence                 (empty)
+import           Prelude                       hiding (mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -121,7 +121,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         modifySymbolWithScope idn symStk (\sym -> sym { offset = off })
         addOffset symWdt
 
-    StStructDefinition _ -> enterScope >> exitScope         -- For scopeStack maintenance
+    StStructDefinition _ _ -> enterScope >> exitScope       -- For scopeStack maintenance
 
     StFunctionDef (Lex idn _) (Sign parms _) block ->  do
         sym <- liftM fromJust $ getSymbol idn

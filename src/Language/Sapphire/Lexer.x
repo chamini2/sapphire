@@ -1,28 +1,28 @@
 {
+{-# OPTIONS_GHC -w #-}
 {-|
     Lexer for programming language SAPPHIRE.
 -}
 
-module Lexer
+module Language.Sapphire.Lexer
     ( Alex (..)
     , Token (..)
     , Lexeme (..)
-    , AlexUserState (..)
+    -- , AlexUserState (..)
     , alexMonadScan
     , runAlex'
     , tellLError
     , tellPError
-    , alexGetPosition
+    -- , alexGetPosition
     ) where
 
-import           Error
-import           Position
-import           Lexeme
+import           Language.Sapphire.Error
+import           Language.Sapphire.Lexeme
 
-import           Control.Monad   (liftM)
-import           Data.List       (intercalate, foldl')
-import           Data.List.Split (splitOn)
-import           Data.Sequence   (Seq, (|>), empty)
+import           Control.Monad            (liftM)
+import           Data.List                (intercalate, foldl')
+import           Data.List.Split          (splitOn)
+import           Data.Sequence            (Seq, (|>), empty)
 
 }
 

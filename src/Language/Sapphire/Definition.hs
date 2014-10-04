@@ -1,4 +1,4 @@
-module Definition
+module Language.Sapphire.Definition
     ( DefState(..)
     --, Definition
     --, buildDefinition
@@ -6,28 +6,28 @@ module Definition
     , processDefinition
     ) where
 
-import           Error
-import           Program
-import           SappMonad
-import           SymbolTable
+import           Language.Sapphire.Error
+import           Language.Sapphire.Program
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SymbolTable
 
-import           Control.Arrow             ((&&&))
-import           Control.Monad             (liftM, unless, void, when)
-import           Control.Monad.Reader      (asks)
-import           Control.Monad.RWS         (RWS, runRWS)
-import           Control.Monad.State       (gets, modify)
-import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Control.Monad.Writer      (listen, tell)
-import           Data.Foldable             (all, foldl', foldlM, forM_, mapM_,
-                                            maximum)
-import           Data.Functor              ((<$))
-import qualified Data.Map.Strict           as Map (toList)
-import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             (Seq, empty, filter, index, null,
-                                            singleton)
-import           Data.Traversable          (forM)
-import           Prelude                   hiding (all, filter, length, mapM_,
-                                            maximum, null)
+import           Control.Arrow                 ((&&&))
+import           Control.Monad                 (liftM, unless, void, when)
+import           Control.Monad.Reader          (asks)
+import           Control.Monad.RWS             (RWS, runRWS)
+import           Control.Monad.State           (gets, modify)
+import           Control.Monad.Trans.Maybe     (MaybeT, runMaybeT)
+import           Control.Monad.Writer          (listen, tell)
+import           Data.Foldable                 (all, foldl', foldlM, forM_,
+                                                mapM_, maximum)
+import           Data.Functor                  ((<$))
+import qualified Data.Map.Strict               as Map (toList)
+import           Data.Maybe                    (fromJust, isJust)
+import           Data.Sequence                 (Seq, empty, index, null,
+                                                singleton)
+import           Data.Traversable              (forM)
+import           Prelude                       hiding (all, filter, length,
+                                                lookup, mapM_, maximum, null)
 
 --------------------------------------------------------------------------------
 
@@ -126,7 +126,7 @@ exitLoop = modify (\s -> s { loopLvl = loopLvl s - 1 })
 --------------------------------------------------------------------------------
 -- Declaration
 
-processDeclaration :: Lexeme Declaration -> Definition Bool
+processDeclaration :: Lexeme Declaration -> Definition ()
 processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
     stk <- gets stack
     let idn = lexInfo idnL
@@ -138,11 +138,11 @@ processDeclaration (Lex (Declaration idnL dtL cat) dclP) = do
             }
     maySymI <- getsSymbol idn $ \sym -> (scopeStack sym, defPosn sym, symbolCategory sym)
     case maySymI of
-        Nothing -> addSymbol idn info >> return True
+        Nothing -> addSymbol idn info
         Just (symStk, symDefP, symCat)
-            | symCat == CatFunction -> tellSError dclP (FunctionAlreadyDefined idn symDefP) >> return False
-            | symStk == stk         -> tellSError dclP (AlreadyDeclared idn symDefP)        >> return False
-            | otherwise             -> addSymbol idn info >> return True
+            | symCat == CatFunction -> tellSError dclP (FunctionAlreadyDefined idn symDefP)
+            | symStk == stk         -> tellSError dclP (AlreadyDeclared idn symDefP)
+            | otherwise             -> addSymbol idn info
 
 --------------------------------------------------------------------------------
 -- Statements
@@ -153,15 +153,12 @@ definitionStatements = mapM_ definitionStatement
 definitionStatement :: Lexeme Statement -> Definition ()
 definitionStatement (Lex st posn) = case st of
 
-    StVariableDeclaration dclL -> void $ processDeclaration dclL
+    StVariableDeclaration dclL -> processDeclaration dclL
 
-    StStructDefinition dtL -> void $ runMaybeT $ do
-
-        let Struct dt flds = lexInfo dtL
-            idn            = case dt of
+    StStructDefinition dtL flds -> void $ runMaybeT $ do
+        let idn = case lexInfo dtL of
                 Record idnL -> lexInfo idnL
                 Union  idnL -> lexInfo idnL
-            dtL' = dt <$ dtL
 
         current <- currentScope
 
@@ -180,16 +177,16 @@ definitionStatement (Lex st posn) = case st of
                     , defPosn    = fldP
                     , scopeStack = stk
                     }
-                maySymI = lookupWithScope fldIdn stk fldsTab
+                maySymI = lookup fldIdn fldsTab
             case maySymI of
-                Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
                 Nothing   -> return $ insert fldIdn info fldsTab
+                Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
 
         exitScope
         stk' <- gets stack
 
         let info = emptySymType
-                { dataType   = dtL'
+                { dataType   = dtL
                 , fields     = Just fldsTab
                 , defPosn    = lexPosn dtL
                 , scopeStack = stk'

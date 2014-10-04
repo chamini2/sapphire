@@ -1,10 +1,10 @@
-module Error where
+module Language.Sapphire.Error where
 
-import           Program
-import           SymbolTable
+import           Language.Sapphire.Program
+import           Language.Sapphire.SymbolTable
 
-import           Data.Function (on)
-import           Data.Sequence (Seq)
+import           Data.Function                 (on)
+import           Data.Sequence                 (Seq)
 
 --------------------------------------------------------------------------------
 

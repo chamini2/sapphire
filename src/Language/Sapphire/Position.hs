@@ -1,4 +1,4 @@
-module Position
+module Language.Sapphire.Position
     ( Position(..)
     , row
     , col

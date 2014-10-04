@@ -1,20 +1,19 @@
 {
-{-# OPTIONS -w #-}
-{-# LANGUAGE TupleSections #-}
-module Parser
+{-# OPTIONS_GHC -w #-}
+module Language.Sapphire.Parser
     ( parseProgram
     ) where
 
-import           Lexer
-import           Program
-import           Position
-import           Lexeme
-import           Error         (Error, LexerError(..), ParseError(..))
+import           Language.Sapphire.Lexer
+import           Language.Sapphire.Program
+import           Language.Sapphire.Error
 
-import           Data.Functor
-import           Data.Maybe    (fromJust, isJust)
-import           Data.Sequence hiding (length)
-import           Prelude       hiding (concatMap, foldr)
+import           Control.Monad             (unless)
+import           Data.Foldable             (toList)
+import           Data.Functor              ((<$>),(<$))
+import           Data.Maybe                (fromJust, isJust)
+import           Data.Sequence             hiding (length, zip)
+import           Prelude                   hiding (concatMap, foldr)
 }
 
 %name parse
@@ -156,13 +155,13 @@ MaybeNL :: { () }
     | MaybeNL newline       { }
 
 Statement :: { Lexeme Statement }
-    : {- λ, no-op -}            { fillLex StNoop }
+    : {- λ, no-op -}            { pure StNoop }
     -- Assignment
     | Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
-    | VariableList ":" DataType                 { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
-    | Structure TypeId "as" FieldList "end"     { StStructDefinition (Struct ((lexInfo $1) $2) $4 <$ $1) <$ $1 }
+    | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
+    | Structure TypeId "as" FieldList "end"     { StStructDefinition ($1 <*> pure $2) $4 <$ $1 }
 
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
@@ -322,7 +321,10 @@ VariableList :: { Seq (Lexeme Identifier) }
 
 DataType :: { Lexeme DataType }
     : TypeId                    { DataType $1 <$ $1 }
-    | DataType "[" Int "]"      { Array $1 $3 <$ $1 }
+    | DataType "[" Int "]"      {% do
+                                    unless (lexInfo $3 > 0) $ tellPError (lexPosn $3) (ParseError "size of array must be positive")
+                                    return $ Array $1 $3 <$ $1
+                                }
     -- Errors
     | DataType "["     "]"      {% do
                                     let const = Void <$ $1
@@ -344,17 +346,17 @@ DataType :: { Lexeme DataType }
 -- Structures
 
 FieldList :: { Seq Field }
-    : MaybeNL Field MaybeNL                 { expandField $2       }
-    | FieldList "," MaybeNL Field MaybeNL   { $1 >< expandField $4 }
+    : MaybeNL Field MaybeNL                 { $2       }
+    | FieldList "," MaybeNL Field MaybeNL   { $1 >< $4 }
     -- Errors
     | FieldList             Field MaybeNL   {% do
-                                                let const = $1 >< expandField $2
-                                                tellPError (lexPosn $ index (fst $2) 0) FieldListComma
+                                                let const = $1 >< $2
+                                                tellPError (lexPosn . snd $ index $2 0) FieldListComma
                                                 return const
                                             }
 
-Field :: { (Seq (Lexeme Identifier), Lexeme DataType) }
-    : VariableList ":" DataType     { ($1, $3) }
+Field :: { Seq Field }
+    : VariableList ":" DataType     { expandField $3 $1 }
 
 ---------------------------------------
 -- Function definition
@@ -519,8 +521,8 @@ expandStatement stL = case lexInfo stL of
     _      -> singleton stL
 
 -- For the syntactic sugar of defining several fields of the same type using commas
-expandField :: (Seq (Lexeme Identifier), Lexeme DataType) -> Seq (Lexeme Identifier, Lexeme DataType)
-expandField (idns, dt) = fmap (,dt) idns
+expandField :: Lexeme DataType -> Seq (Lexeme Identifier) -> Seq Field
+expandField dtL idnLs = fromList $ zip (toList idnLs) (repeat dtL)
 
 notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp

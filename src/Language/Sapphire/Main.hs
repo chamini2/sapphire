@@ -1,22 +1,23 @@
 module Main where
 
-import           Definition
-import           Parser
-import           SappMonad
-import           SizeOffset
-import           TypeChecker
+import           Language.Sapphire.Definition
+import           Language.Sapphire.Parser
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SizeOffset
+import           Language.Sapphire.TypeChecker
 
-import           Control.Monad             (guard, void, when)
-import           Control.Monad.Trans       (liftIO)
-import           Control.Monad.Trans.Maybe (runMaybeT)
-import           Data.Foldable             (mapM_)
-import           Data.List                 (nub)
-import           Data.Sequence             (null)
-import           Prelude                   hiding (mapM_, null)
-import qualified Prelude                   as P (null)
-import           System.Console.GetOpt     (ArgDescr (..), ArgOrder (..),
-                                            OptDescr (..), getOpt, usageInfo)
-import           System.Environment        (getArgs)
+import           Control.Monad                 (guard, void, when)
+import           Control.Monad.Trans           (liftIO)
+import           Control.Monad.Trans.Maybe     (runMaybeT)
+import           Data.Foldable                 (mapM_)
+import           Data.List                     (nub)
+import           Data.Sequence                 (null)
+import           Prelude                       hiding (mapM_, null)
+import qualified Prelude                       as P (null)
+import           System.Console.GetOpt         (ArgDescr (..), ArgOrder (..),
+                                                OptDescr (..), getOpt,
+                                                usageInfo)
+import           System.Environment            (getArgs)
 
 main :: IO ()
 main = void $ runMaybeT $ do
@@ -56,21 +57,21 @@ main = void $ runMaybeT $ do
 
 options :: [OptDescr Flag]
 options =
-    [ Option "h" ["help"]    (NoArg  Help)              "shows this help message"
-    , Option "v" ["version"] (NoArg  Version)           "shows version number"
-    , Option "W" ["Wall"]    (NoArg  AllWarnings)       "show all warnings"
-    , Option "w" ["Wnone"]   (NoArg  SuppressWarnings)  "suppress all warnings"
-    , Option "o" ["output"]  (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
-    -- Compiler flags
-    --, Option "t" ["symbol-table"]   (NoArg  SuppressWarnings)  "suppress all warnings"
-    --, Option "a" ["ast"]   (NoArg  SuppressWarnings)  "suppress all warnings"
+    [ Option "h"  ["help"]         (NoArg  Help)              "shows this help message"
+    , Option "v"  ["version"]      (NoArg  Version)           "shows version number"
+    , Option "W"  ["Wall"]         (NoArg  AllWarnings)       "show all warnings"
+    , Option "w"  ["Wnone"]        (NoArg  SuppressWarnings)  "suppress all warnings"
+    , Option "o"  ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
+    -- For compiler use
+    , Option "st" ["symbol-table"] (NoArg ShowSymbolTable)    "shows the symbol table"
+    , Option "a " ["ast"]          (NoArg ShowAST)            "shows the AST"
     ]
 
 help :: String
 help = usageInfo "Usage: sapphire [OPTION]... [FILE]" options
 
 version :: String
-version = "sapphire 0.9"
+version = "sapphire 0.1.0.0"
 
 arguments :: IO ([Flag], [String])
 arguments = do
@@ -92,3 +93,6 @@ arguments = do
                     then flgs
                     else flg : flgs
             OutputFile _     -> flg : flgs
+            -- For compiler use
+            ShowSymbolTable  -> flg : flgs
+            ShowAST          -> flg : flgs

@@ -1,4 +1,4 @@
-module Program
+module Language.Sapphire.Program
     ( Program(..)
 
     -- From Statement
@@ -17,8 +17,6 @@ module Program
     -- From Lexeme
     , Lexeme(..)
     , fillLex
-
-    -- From Position
     , Position(..)
     , defaultPosn
 
@@ -33,10 +31,9 @@ module Program
     , isArray
     , isStruct
     , arrayInnerDataType
-    , fieldInStruct
 
     , DataTypeHistory
-    , DataTypeWidthZipper
+    , DataTypeZipper
     --, Thread
     , focusDataType
     , defocusDataType
@@ -69,23 +66,19 @@ module Program
     ) where
 
 
-import           DataType
-import           Declaration
-import           Expression
-import           Identifier
-import           Lexeme
-import           Position
-import           Statement
+import           Language.Sapphire.DataType
+import           Language.Sapphire.Declaration
+import           Language.Sapphire.Expression
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
+import           Language.Sapphire.Statement
 
-import           Data.Foldable (concatMap)
-import           Prelude       hiding (concatMap)
+-- import           Data.Foldable                 (concatMap)
+-- import           Prelude                       hiding (concatMap)
 
 --------------------------------------------------------------------------------
 
 newtype Program = Program StBlock
 
-instance Show Program where
-    show (Program sts) = concatMap ((++) "\n" . show) sts
-
---instance Show Program where
---    show (Program sts) = runPrinter $ printProgram
+-- instance Show Program where
+--     show (Program sts) = concatMap ((++) "\n" . show) sts

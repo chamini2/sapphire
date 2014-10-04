@@ -1,9 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
-module SappMonad where
+module Language.Sapphire.SappMonad where
 
-import           Error
-import           Program
-import           SymbolTable
+import           Language.Sapphire.Error
+import           Language.Sapphire.Printer ()
+import           Language.Sapphire.Program
+import           Language.Sapphire.SymbolTable
 
 import           Control.Monad        (MonadPlus, when, liftM, unless, guard)
 import           Control.Monad.State  (MonadState, gets, modify)
@@ -30,9 +31,12 @@ data SappReader = SappReader
 
 data Flag = Help                    -- -h      | --help
           | Version                 -- -v      | --version
-          | AllWarnings             -- -wall   | --all-warnings
+          | AllWarnings             -- -W      | --all-warnings
           | SuppressWarnings        -- -w      | --no-warnings
           | OutputFile FilePath     -- -o FILE | --output FILE
+          -- For compiler use
+          | ShowSymbolTable         -- -st     | --symbol-table
+          | ShowAST                 -- -a      | --ast
     deriving (Show)
 
 data Architecture = Arch
@@ -50,6 +54,8 @@ instance Eq Flag where
         (AllWarnings     , AllWarnings     ) -> True
         (SuppressWarnings, SuppressWarnings) -> True
         (OutputFile _    , OutputFile _    ) -> True
+        (ShowSymbolTable , ShowSymbolTable ) -> True
+        (ShowAST         , ShowAST         ) -> True
         (_               , _               ) -> False
 
 instance Eq Architecture where
@@ -159,7 +165,7 @@ getsSymbolWithStack :: (SappState s, MonadState s m)
                     => Identifier -> Stack Scope -> (Symbol -> a) -> m (Maybe a)
 getsSymbolWithStack idn stk f = do
     tab <- gets getTable
-    return $ f <$> lookupWithScope idn stk tab -- f <$> == maybe Nothing (Just . f)
+    return $ f <$> lookupWithScope idn stk tab
 
 ----------------------------------------
 

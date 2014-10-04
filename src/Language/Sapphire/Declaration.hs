@@ -1,11 +1,11 @@
-module Declaration
+module Language.Sapphire.Declaration
     ( Declaration(..)
     , Category(..)
     ) where
 
-import           DataType
-import           Identifier
-import           Lexeme
+import           Language.Sapphire.DataType
+import           Language.Sapphire.Identifier
+import           Language.Sapphire.Lexeme
 
 data Declaration = Declaration
     { dclIdentifier :: Lexeme Identifier

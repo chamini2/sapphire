@@ -1,16 +1,14 @@
-module TypeChecker
+module Language.Sapphire.TypeChecker
     ( TypeState
 
     , TypeChecker
-    --, buildTypeChecker
-    --, runProgramTypeChecker
     , processTypeChecker
     ) where
 
-import           Error
-import           Program
-import           SappMonad
-import           SymbolTable
+import           Language.Sapphire.Error
+import           Language.Sapphire.Program
+import           Language.Sapphire.SappMonad
+import           Language.Sapphire.SymbolTable
 
 import           Control.Arrow             ((&&&))
 import           Control.Monad             (guard, liftM, unless, void, when,
@@ -25,8 +23,8 @@ import           Data.Functor              ((<$>))
 import           Data.Maybe                (fromJust, fromMaybe, isJust)
 import           Data.Sequence             (Seq, empty, length, zipWith)
 import           Data.Traversable          (mapM)
-import           Prelude                   hiding (all, and, exp, length, mapM,
-                                            mapM_, zipWith)
+import           Prelude                   hiding (all, and, exp, length,
+                                            lookup, mapM, mapM_, zipWith)
 import qualified Prelude                   as P (length)
 
 --------------------------------------------------------------------------------
@@ -140,7 +138,7 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
-    StStructDefinition _ ->  enterScope >> exitScope        -- For scopeStack maintenance
+    StStructDefinition _ _ ->  enterScope >> exitScope      -- For scopeStack maintenance
 
     StReturn expL -> void $ runMaybeT $ do
         expDt <- lift $ typeCheckExpression expL
@@ -266,7 +264,11 @@ typeCheckExpression (Lex exp posn) = case exp of
         addSymbol "$String" info
         return String
 
-    Variable accL -> liftM (maybe TypeError snd) $ runMaybeT $ accessDataType accL
+    Variable accL -> liftM (fromMaybe TypeError) $ runMaybeT $ do
+        (accIdn, accDt) <- accessDataType accL
+        -- Mark used only when being evaluated for an expression
+        markUsed accIdn
+        return accDt
 
     FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ runMaybeT $ checkArguments idnL expLs True
 
@@ -345,8 +347,6 @@ accessDataType accL = do
     -- Checking that it is a variable
     unlessGuard (cat == CatInfo) $ tellSError (lexPosn accL) (WrongCategory deepIdn CatInfo cat)
 
-    markUsed deepIdn
-
     dt' <- constructDataType deepIdnL deepZpp dt
     return (deepIdn, dt')
 
@@ -369,7 +369,11 @@ constructDataType idnL accZ dt = case defocusAccess <$> backAccess accZ of
         StructAccess _ fldIdnL -> do
             unlessGuard (isStruct dt) $ tellSError (lexPosn idnL) (AccessNonStruct (lexInfo idnL) dt)
 
-            let mayFldDt = lexInfo <$> fieldInStruct dt (lexInfo fldIdnL)
+            -- This (fromJust . fromJust) may be dangerous (or not)
+            tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
+
+            -- Looks for the field in the struct's SymbolTable
+            let mayFldDt = (lexInfo . dataType) <$> lookup (lexInfo fldIdnL) tab
             unlessGuard (isJust mayFldDt) $ tellSError (lexPosn fldIdnL) (StructNoField dt (lexInfo fldIdnL))
 
             constructDataType idnL (fromJust $ backAccess accZ) (fromJust mayFldDt)
