@@ -11,7 +11,9 @@ import           Language.Sapphire.Expression
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Sequence (Seq)
+import           Data.Foldable                 (foldl')
+import           Data.Sequence                 (Seq)
+import           Data.List                     (intercalate)
 
 type StBlock    = Seq (Lexeme Statement)
 
@@ -24,7 +26,7 @@ data Statement
     -- Definitions
     | StVariableDeclaration (Lexeme Declaration)
     | StDeclarationList     (Seq (Lexeme Declaration))      -- Only used in Parser
-    | StStructDefinition    (Lexeme DataType)
+    | StStructDefinition    (Lexeme DataType) (Seq Field)
     -- Functions
     | StReturn        (Lexeme Expression)
     | StFunctionDef   (Lexeme Identifier) Signature StBlock
@@ -54,4 +56,10 @@ data When = When (Seq (Lexeme Expression)) StBlock
 
 
 data Signature = Sign (Seq (Lexeme Declaration)) (Lexeme DataType)
-    deriving (Show)
+
+instance Show Signature where
+    show (Sign parmLs retDtL) = showParms ++ showRetDt
+        where
+            showParms = intercalate ", " $ foldl' func [] parmLs
+            showRetDt = " -> " ++ show (lexInfo retDtL)
+            func ls (Lex dcl _) = (show (lexInfo $ dclDataType dcl) ++ " " ++ lexInfo (dclIdentifier dcl)) : ls

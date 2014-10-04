@@ -1,20 +1,19 @@
 {
-{-# OPTIONS -w #-}
+{-# OPTIONS_GHC -w #-}
 module Language.Sapphire.Parser
     ( parseProgram
     ) where
 
 import           Language.Sapphire.Lexer
 import           Language.Sapphire.Program
-import           Language.Sapphire.Position
-import           Language.Sapphire.Lexeme
 import           Language.Sapphire.Error
 
-import           Control.Monad (unless)
-import           Data.Functor  ((<$>),(<$))
-import           Data.Maybe    (fromJust, isJust)
-import           Data.Sequence hiding (length)
-import           Prelude       hiding (concatMap, foldr, zip)
+import           Control.Monad             (unless)
+import           Data.Foldable             (toList)
+import           Data.Functor              ((<$>),(<$))
+import           Data.Maybe                (fromJust, isJust)
+import           Data.Sequence             hiding (length, zip)
+import           Prelude                   hiding (concatMap, foldr)
 }
 
 %name parse
@@ -156,13 +155,13 @@ MaybeNL :: { () }
     | MaybeNL newline       { }
 
 Statement :: { Lexeme Statement }
-    : {- λ, no-op -}            { fillLex StNoop }
+    : {- λ, no-op -}            { pure StNoop }
     -- Assignment
     | Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
     | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
-    | Structure TypeId "as" FieldList "end"     { StStructDefinition (Struct ((lexInfo $1) $2) $4 <$ $1) <$ $1 }
+    | Structure TypeId "as" FieldList "end"     { StStructDefinition ($1 <*> pure $2) $4 <$ $1 }
 
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
@@ -358,16 +357,16 @@ DataType :: { Lexeme DataType }
 -- Structures
 
 FieldList :: { Seq Field }
-    : MaybeNL Field MaybeNL                 { expandField $2       }
-    | FieldList "," MaybeNL Field MaybeNL   { $1 >< expandField $4 }
+    : MaybeNL Field MaybeNL                 { $2       }
+    | FieldList "," MaybeNL Field MaybeNL   { $1 >< $4 }
     | FieldList             Field MaybeNL   {% do
-                                                let const = $1 >< expandField $2
-                                                tellPError (lexPosn $ index (fst $2) 0) FieldListComma
+                                                let const = $1 >< $2
+                                                tellPError (lexPosn . snd $ index $2 0) FieldListComma
                                                 return const
                                             }
 
-Field :: { (Seq (Lexeme Identifier), Lexeme DataType) }
-    : VariableList ":" DataType     { ($1, $3) }
+Field :: { Seq Field }
+    : VariableList ":" DataType     { expandField $3 $1 }
 
 ---------------------------------------
 -- Function definition
@@ -530,8 +529,8 @@ expandStatement stL = case lexInfo stL of
     _      -> singleton stL
 
 -- For the syntactic sugar of defining several fields of the same type using commas
-expandField :: (Seq (Lexeme Identifier), Lexeme DataType) -> Seq (Lexeme Identifier, Lexeme DataType)
-expandField (idns, dt) = zip idns $ fromList (repeat dt)
+expandField :: Lexeme DataType -> Seq (Lexeme Identifier) -> Seq Field
+expandField dtL idnLs = fromList $ zip (toList idnLs) (repeat dtL)
 
 notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp

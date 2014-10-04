@@ -11,7 +11,7 @@ module Language.Sapphire.DataType
     , arrayInnerDataType
 
     , DataTypeHistory
-    , DataTypeWidthZipper
+    , DataTypeZipper
     --, Thread
     , focusDataType
     , defocusDataType
@@ -25,21 +25,20 @@ module Language.Sapphire.DataType
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable (toList)
-import           Data.Functor  ((<$))
-import           Data.List     (intercalate)
-import           Data.Maybe    (fromJust)
-import           Data.Sequence (Seq)
+import           Data.Foldable                (toList)
+import           Data.Functor                 ((<$))
+import           Data.List                    (intercalate)
+import           Data.Maybe                   (fromJust)
+import           Data.Sequence                (Seq)
 
 data DataType
     = DataType (Lexeme Identifier)
     | Int | Float | Bool | Char | Range | Type
     | String
-    | Struct DataType (Seq Field)
     | Record (Lexeme Identifier)
     | Union  (Lexeme Identifier)
     | Array  (Lexeme DataType)   (Lexeme Int)
-    | Void | TypeError  -- For compiler use
+    | Void | TypeError                          -- For compiler use
     deriving (Ord, Eq)
 
 instance Show DataType where
@@ -52,7 +51,6 @@ instance Show DataType where
         String          -> "String"
         Range           -> "Range"
         Type            -> "Type"
-        Struct strDt fs -> show strDt ++ showFields fs
         Record idnL     -> "record " ++ lexInfo idnL
         Union  idnL     -> "union "  ++ lexInfo idnL
         Array  dtL sizL -> show (lexInfo dtL) ++ "[" ++ show (lexInfo sizL) ++ "]"
@@ -79,10 +77,9 @@ toIdentifier dt = case dt of
     Range  -> "Range"
     Type   -> "Type"
     String -> "String"
-    Struct strDt _ -> toIdentifier strDt
-    Record idnL    -> lexInfo idnL
-    Union  idnL    -> lexInfo idnL
-    Array dtL _    -> toIdentifier $ lexInfo dtL
+    Record idnL -> lexInfo idnL
+    Union  idnL -> lexInfo idnL
+    Array dtL _ -> toIdentifier $ lexInfo dtL
     Void      -> "()"
     TypeError -> "Error"
 
@@ -142,35 +139,35 @@ data DataTypeHistory = HistoryDataType (Lexeme Int)
 
 type Thread = [Lexeme DataTypeHistory]
 
-type DataTypeWidthZipper = (Lexeme DataType, Int, Thread)
+type DataTypeZipper = (Lexeme DataType, Int, Thread)
 
 ----------------------------------------
 
-focusDataType :: Lexeme DataType -> DataTypeWidthZipper
+focusDataType :: Lexeme DataType -> DataTypeZipper
 focusDataType dtL = (dtL, 1, [])
 
-defocusDataType :: DataTypeWidthZipper -> (Lexeme DataType, Int)
+defocusDataType :: DataTypeZipper -> (Lexeme DataType, Int)
 defocusDataType (dtL, dim, _) = (dtL, dim)
 
-inDataType :: DataTypeWidthZipper -> Maybe DataTypeWidthZipper
+inDataType :: DataTypeZipper -> Maybe DataTypeZipper
 inDataType (dtL, dim, thrd) = case lexInfo dtL of
     Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataType sizL <$ dtL) : thrd)
     _                -> Nothing
 
-backDataType :: DataTypeWidthZipper -> Maybe DataTypeWidthZipper
+backDataType :: DataTypeZipper -> Maybe DataTypeZipper
 backDataType (dtL, dim, thrd) = case thrd of
     []                                          -> Nothing
     hstL@(Lex (HistoryDataType sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
 
-topDataType :: DataTypeWidthZipper -> DataTypeWidthZipper
+topDataType :: DataTypeZipper -> DataTypeZipper
 topDataType zpp@(_, _, thrd) = case thrd of
     []    -> zpp
     _ : _ -> topDataType $ fromJust $ backDataType zpp
 
-deepDataType :: DataTypeWidthZipper -> DataTypeWidthZipper
+deepDataType :: DataTypeZipper -> DataTypeZipper
 deepDataType zpp@(dtL, _, _) = case lexInfo dtL of
     Array _ _ -> deepDataType $ fromJust $ inDataType zpp
     _         -> zpp
 
-putDataType :: Lexeme DataType -> DataTypeWidthZipper -> DataTypeWidthZipper
+putDataType :: Lexeme DataType -> DataTypeZipper -> DataTypeZipper
 putDataType dtL (_, dim, thrd) = (dtL, dim, thrd)

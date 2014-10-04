@@ -2,8 +2,6 @@ module Language.Sapphire.TypeChecker
     ( TypeState
 
     , TypeChecker
-    --, buildTypeChecker
-    --, runProgramTypeChecker
     , processTypeChecker
     ) where
 
@@ -140,7 +138,7 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
-    StStructDefinition _ ->  enterScope >> exitScope        -- For scopeStack maintenance
+    StStructDefinition _ _ ->  enterScope >> exitScope      -- For scopeStack maintenance
 
     StReturn expL -> void $ runMaybeT $ do
         expDt <- lift $ typeCheckExpression expL

@@ -11,23 +11,23 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SymbolTable
 
-import           Control.Arrow             ((&&&))
-import           Control.Monad             (liftM, unless, void, when)
-import           Control.Monad.Reader      (asks)
-import           Control.Monad.RWS         (RWS, runRWS)
-import           Control.Monad.State       (gets, modify)
-import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Control.Monad.Writer      (listen, tell)
-import           Data.Foldable             (all, foldl', foldlM, forM_, mapM_,
-                                            maximum)
-import           Data.Functor              ((<$))
-import qualified Data.Map.Strict           as Map (toList)
-import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             (Seq, empty, filter, index, null,
-                                            singleton)
-import           Data.Traversable          (forM)
-import           Prelude                   hiding (all, filter, length, mapM_,
-                                            maximum, null)
+import           Control.Arrow                 ((&&&))
+import           Control.Monad                 (liftM, unless, void, when)
+import           Control.Monad.Reader          (asks)
+import           Control.Monad.RWS             (RWS, runRWS)
+import           Control.Monad.State           (gets, modify)
+import           Control.Monad.Trans.Maybe     (MaybeT, runMaybeT)
+import           Control.Monad.Writer          (listen, tell)
+import           Data.Foldable                 (all, foldl', foldlM, forM_,
+                                                mapM_, maximum)
+import           Data.Functor                  ((<$))
+import qualified Data.Map.Strict               as Map (toList)
+import           Data.Maybe                    (fromJust, isJust)
+import           Data.Sequence                 (Seq, empty, filter, index, null,
+                                                singleton)
+import           Data.Traversable              (forM)
+import           Prelude                       hiding (all, filter, length,
+                                                lookup, mapM_, maximum, null)
 
 --------------------------------------------------------------------------------
 
@@ -154,16 +154,12 @@ definitionStatement (Lex st posn) = case st of
 
     StVariableDeclaration dclL -> processDeclaration dclL
 
-    StStructDefinition dtL -> void $ runMaybeT $ do
-
-        let Struct dt flds = lexInfo dtL
-            idn            = case dt of
+    StStructDefinition dtL flds -> void $ runMaybeT $ do
+        let idn = case lexInfo dtL of
                 Record idnL -> lexInfo idnL
                 Union  idnL -> lexInfo idnL
-            dtL' = dt <$ dtL
 
         current <- currentScope
-
         unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
 
         enterScope
@@ -178,16 +174,16 @@ definitionStatement (Lex st posn) = case st of
                     , defPosn    = fldP
                     , scopeStack = stk
                     }
-                maySymI = lookupWithScope fldIdn stk fldsTab
+                maySymI = lookup fldIdn fldsTab
             case maySymI of
-                Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
                 Nothing   -> return $ insert fldIdn info fldsTab
+                Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
 
         exitScope
         stk' <- gets stack
 
         let info = emptySymType
-                { dataType   = dtL'
+                { dataType   = dtL
                 , fields     = Just fldsTab
                 , defPosn    = lexPosn dtL
                 , scopeStack = stk'
