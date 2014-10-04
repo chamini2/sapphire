@@ -5,6 +5,7 @@ import           Language.Sapphire.Parser
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SizeOffset
 import           Language.Sapphire.TypeChecker
+import           Language.Sapphire.TACGenerator
 
 import           Control.Monad                 (guard, void, when)
 import           Control.Monad.Trans           (liftIO)
@@ -47,8 +48,12 @@ main = void $ runMaybeT $ do
     -- When there are no type checking errors
 
     let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) (getAst typS)
-    liftIO $ print sizS
-    mapM_ (liftIO . print) szErrs
+    unlessGuard (null szErrs) $ mapM_ (liftIO . print) szErrs
+    -- When there are no size or offset errors
+
+    let tacW = processTACGenerator () (getTable sizS) (getAst sizS)
+
+    mapM_ (liftIO . print) tacW
 
     liftIO $ putStrLn "done."
 
