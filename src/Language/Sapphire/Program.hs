@@ -17,8 +17,6 @@ module Language.Sapphire.Program
     -- From Lexeme
     , Lexeme(..)
     , fillLex
-
-    -- From Position
     , Position(..)
     , defaultPosn
 
@@ -35,7 +33,7 @@ module Language.Sapphire.Program
     , arrayInnerDataType
 
     , DataTypeHistory
-    , DataTypeWidthZipper
+    , DataTypeZipper
     --, Thread
     , focusDataType
     , defocusDataType
@@ -73,18 +71,14 @@ import           Language.Sapphire.Declaration
 import           Language.Sapphire.Expression
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
-import           Language.Sapphire.Position
 import           Language.Sapphire.Statement
 
-import           Data.Foldable (concatMap)
-import           Prelude       hiding (concatMap)
+-- import           Data.Foldable                 (concatMap)
+-- import           Prelude                       hiding (concatMap)
 
 --------------------------------------------------------------------------------
 
 newtype Program = Program StBlock
 
-instance Show Program where
-    show (Program sts) = concatMap ((++) "\n" . show) sts
-
---instance Show Program where
---    show (Program sts) = runPrinter $ printProgram
+-- instance Show Program where
+--     show (Program sts) = concatMap ((++) "\n" . show) sts

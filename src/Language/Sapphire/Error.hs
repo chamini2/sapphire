@@ -3,8 +3,8 @@ module Language.Sapphire.Error where
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 
-import           Data.Function (on)
-import           Data.Sequence (Seq)
+import           Data.Function                 (on)
+import           Data.Sequence                 (Seq)
 
 --------------------------------------------------------------------------------
 
