@@ -5,6 +5,8 @@ module Language.Sapphire.Lexeme
     -- From Position
     , Position(..)
     , defaultPosn
+    , row
+    , col
     ) where
 
 import           Language.Sapphire.Position

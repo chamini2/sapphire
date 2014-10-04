@@ -18,6 +18,7 @@ module Language.Sapphire.Lexer
 
 import           Language.Sapphire.Error
 import           Language.Sapphire.Lexeme
+import           Language.Sapphire.SappMonad (initialWriter)
 
 import           Control.Monad            (liftM)
 import           Data.List                (intercalate, foldl')
@@ -302,7 +303,7 @@ instance Show Token where
 data AlexUserState = AlexUST { errors :: Seq Error }
 
 alexInitUserState :: AlexUserState
-alexInitUserState = AlexUST empty
+alexInitUserState = AlexUST initialWriter
 
 -- Some useful functions for the Alex monad (which is naturally an instance of state monad)
 modifyUserState :: (AlexUserState -> AlexUserState) -> Alex ()

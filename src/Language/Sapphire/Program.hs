@@ -19,6 +19,8 @@ module Language.Sapphire.Program
     , fillLex
     , Position(..)
     , defaultPosn
+    , row
+    , col
 
     -- From DataType
     , DataType(..)

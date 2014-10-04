@@ -44,10 +44,27 @@ data Statement
     | StFor      (Lexeme Identifier) (Lexeme Expression)  StBlock
     | StBreak
     | StContinue
-    deriving (Show)
 
---instance Show Statement where
---    show = runPrinter . printStatement
+instance Show Statement where
+    show st = case st of
+        StNoop                  -> "Noop"
+        StAssign _ _            -> "Assign"
+        StVariableDeclaration _ -> "VariableDeclaration"
+        StDeclarationList _     -> "DeclarationList"
+        StStructDefinition _ _  -> "StructDefinition"
+        StReturn _              -> "Return"
+        StFunctionDef _ _ _     -> "FunctionDef"
+        StProcedureCall _ _     -> "ProcedureCall"
+        StRead _                -> "Read"
+        StReadString _ _        -> "ReadString"
+        StPrint _               -> "Print"
+        StPrintList _           -> "PrintList"
+        StIf _ _ _              -> "If"
+        StCase _ _ _            -> "Case"
+        StLoop _ _ _            -> "Loop"
+        StFor _ _ _             -> "For"
+        StBreak                 -> "Break"
+        StContinue              -> "Continue"
 
 ----------------------------------------
 

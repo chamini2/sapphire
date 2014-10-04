@@ -11,6 +11,8 @@ import           Data.Sequence        (Seq, singleton)
 import           Data.Foldable        (concat, mapM_, forM_)
 import           Prelude              hiding (concat, mapM_, exp)
 
+--------------------------------------------------------------------------------
+
 instance Show Program where
     show = processPrinter
 

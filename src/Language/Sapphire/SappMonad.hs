@@ -13,7 +13,7 @@ import           Data.Function        (on)
 import           Data.Functor         ((<$>))
 import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
-import           Data.Sequence        (Seq, singleton)
+import           Data.Sequence        (Seq, singleton, empty)
 
 --------------------------------------------------------------------------------
 -- Monadic functions
@@ -86,6 +86,12 @@ defaultArchitecture = Arch
 -- Writer
 
 type SappWriter = Seq Error
+
+----------------------------------------
+-- Initial
+
+initialWriter :: SappWriter
+initialWriter = empty
 
 --------------------------------------------------------------------------------
 -- State
