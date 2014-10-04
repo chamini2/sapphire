@@ -24,10 +24,10 @@ import           Language.Sapphire.DataType
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable (find)
-import           Data.Functor  ((<$), (<$>))
-import           Data.Maybe    (fromJust)
-import           Data.Sequence (Seq, fromList)
+import           Data.Foldable                (find)
+import           Data.Functor                 ((<$), (<$>))
+import           Data.Maybe                   (fromJust)
+import           Data.Sequence                (Seq, fromList)
 
 data Expression
     -- Error
@@ -110,19 +110,18 @@ binaryOperator op = fromList $ case op of
     OpFromTo  -> [ ((Int, Int), Range) ]
     OpOr      -> boolean
     OpAnd     -> boolean
-    OpEqual   -> everything
-    OpUnequal -> everything
+    OpEqual   -> everythingCompare
+    OpUnequal -> everythingCompare
     OpLess    -> arithmeticCompare
     OpLessEq  -> arithmeticCompare
     OpGreat   -> arithmeticCompare
     OpGreatEq -> arithmeticCompare
     OpBelongs -> [ ((Int, Range), Bool) ]
     where
-        everything = arithmetic ++ boolean
-        arithmetic = [((Int, Int), Int), ((Float, Float), Float)]
-        boolean = [ ((Bool, Bool), Bool) ]
-        arithmeticCompare = zip numbers $ repeat Bool
-        numbers = [(Int, Int), (Float, Float)]
+        arithmetic        = [((Int, Int), Int), ((Float, Float), Float)]
+        boolean           = [((Bool, Bool), Bool)]
+        arithmeticCompare = [((Int, Int), Bool), ((Float, Float), Bool)]
+        everythingCompare = arithmeticCompare ++ boolean
 
 data Unary = OpNegate | OpNot
     deriving (Eq, Ord)
