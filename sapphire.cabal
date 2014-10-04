@@ -17,7 +17,7 @@ cabal-version: >= 1.10
 
 executable sapphire
   hs-source-dirs  : src
-  main-is         : Language/Sapphire/Sapphire.hs
+  main-is         : Language/Sapphire/Main.hs
   default-language: Haskell2010
 
   ghc-options:
