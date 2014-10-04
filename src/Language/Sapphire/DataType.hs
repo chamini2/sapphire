@@ -26,6 +26,7 @@ import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
 import           Data.Functor                 ((<$))
+import           Data.Function                (on)
 import           Data.Maybe                   (fromJust)
 
 data DataType
@@ -36,7 +37,7 @@ data DataType
     | Union  (Lexeme Identifier)
     | Array  (Lexeme DataType)   (Lexeme Int)
     | Void | TypeError                              -- For compiler use
-    deriving (Ord, Eq)
+    deriving (Ord)
 
 instance Show DataType where
     show dt = case dt of
@@ -54,6 +55,25 @@ instance Show DataType where
         Void            -> "()"
         TypeError       -> error "DataType TypeError should never be shown"
 
+instance Eq DataType where
+    a == b = case (a,b) of
+        (DataType idnAL, DataType idnBL)     -> comp idnAL idnBL
+        (Int, Int)                           -> True
+        (Float, Float)                       -> True
+        (Bool, Bool)                         -> True
+        (Char, Char)                         -> True
+        (Range, Range)                       -> True
+        (Type, Type)                         -> True
+        (String, String)                     -> True
+        (Record idnAL, Record idnBL)         -> comp idnAL idnBL
+        (Union  idnAL, Union  idnBL)         -> comp idnAL idnBL
+        (Array dtAL sizAL, Array dtBL sizBL) -> (comp dtAL dtBL) && (comp sizAL sizBL)
+        (Void, Void)                         -> True
+        (TypeError, TypeError)               -> True
+        _                                    -> False
+        where
+            comp :: Eq a => Lexeme a -> Lexeme a -> Bool
+            comp = (==) `on` lexInfo
 ----------------------------------------
 
 type Field = (Lexeme Identifier, Lexeme DataType)
