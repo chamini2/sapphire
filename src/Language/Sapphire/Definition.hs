@@ -1,8 +1,5 @@
 module Language.Sapphire.Definition
     ( DefState(..)
-    --, Definition
-    --, buildDefinition
-    --, runProgramDefinition
     , processDefinition
     ) where
 
@@ -14,7 +11,7 @@ import           Language.Sapphire.SymbolTable
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void, when)
 import           Control.Monad.Reader          (asks)
-import           Control.Monad.RWS             (RWS, runRWS)
+import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Trans.Maybe     (MaybeT, runMaybeT)
 import           Control.Monad.Writer          (listen, tell)
@@ -112,7 +109,7 @@ processDefinition :: SappReader -> SappWriter -> Program -> (DefState, SappWrite
 processDefinition r w = runDefinition r . buildDefinition w
 
 runDefinition :: SappReader -> Definition a -> (DefState, SappWriter)
-runDefinition r = (\(_,s,w) -> (s,w)) . flip (flip runRWS r) initialState
+runDefinition r = flip (flip execRWS r) initialState
 
 --------------------------------------------------------------------------------
 -- Monad handling
