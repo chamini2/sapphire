@@ -24,7 +24,7 @@ data Address
 instance Show Address where
     show addr = case addr of
         Name idn    -> idn
-        Constant v  -> "!" ++ show v
+        Constant v  -> "\\" ++ show v
         Temporary t -> t
 
 data Value
@@ -43,15 +43,22 @@ instance Show Value where
 
 data Instruction
     = Comment String
-    | PutLabel Label
-    | Assign            -- Quadruples
+    | PutLabel Label String
+    | AssignBin
         { result :: Address
-        , opr    :: Operator
         , left   :: Address
+        , binop  :: BinOperator
         , right  :: Address
         }
---    | AssignBin
---    | AssignUn
+    | AssignUn
+        { result  :: Address
+        , unop    :: UnOperator
+        , operand :: Address
+        }
+    | Assign
+        { dst :: Address
+        , src :: Address
+        }
 --    | AssignArrR
 --    | AssignArrL
     -- Function related instructions
@@ -60,43 +67,46 @@ data Instruction
     | PushParameter Address
     | PopParameters
     | Return
-    | LCall
-    | ACall
+    | PCall         Label Int
+    | FCall Address Label Int
     -- Goto
     | Goto Label
-    | IfGoto Address Relation Address Label
-    -- Move
-    | Move
-        { dst :: Address
-        , src :: Address
-        }
+    | IfGoto      Address Relation Address Label
+    | IfTrueGoto  Address Label
+    | IfFalseGoto Address Label
 
 instance Show Instruction where
     show ins = case ins of
-        PutLabel la -> la ++ ": "
-        Comment str -> "# " ++ str
+        Comment str     -> "# " ++ str
+        PutLabel la str -> la ++ ":" ++ replicate 10 '\t' ++ "# " ++ str
         _ -> "\t" ++ case ins of
-            Assign res o le ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
-            BeginFunction nb   -> "begin_function " ++ show nb
-            EndFunction nb     -> "end_function " ++ show nb
-            PushParameter a    -> "param " ++ show a
-            PopParameters      -> ""
-            Return             -> ""
-            LCall              -> ""
-            ACall              -> ""
-            Goto l             -> "goto " ++ show l
-            IfGoto le r ri la  -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
-            Move d s           -> show d ++ " := " ++ show s
+            AssignBin res le o ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
+            AssignUn  res o n     -> show res ++ " := " ++ show o  ++ " " ++ show n
+            Assign d s            -> show d ++ " := " ++ show s
+            BeginFunction nb      -> "begin_function " ++ show nb
+            EndFunction nb        -> "end_function " ++ show nb
+            PushParameter a       -> "param " ++ show a
+            PopParameters         -> "unparam"
+            Return                -> "return"
+            PCall la i            -> "call " ++ la ++ ", " ++ show i
+            FCall d la i          -> show d ++ " := " ++ "call " ++ la ++ ", " ++ show i
+            Goto l                -> "goto " ++ show l
+            IfGoto le r ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
+            IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la
+            IfFalseGoto a la      -> "ifnot " ++ show a ++ " goto " ++ la
 
 
-data Operator
+data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW
     | OR   | AND
     | ArrR | ArrL
     | Rel Relation
     deriving (Eq)
 
-instance Show Operator where
+data UnOperator
+    = NOT | NEG
+
+instance Show BinOperator where
     show op = case op of
         ADD   -> "+"
         SUB   -> "-"
@@ -109,6 +119,11 @@ instance Show Operator where
         ArrR  -> "=[]"
         ArrL  -> "[]="
         Rel r -> show r
+
+instance Show UnOperator where
+    show op = case op of
+        NOT -> "!"
+        NEG -> "-"
 
 data Relation
     = EQ | NE
@@ -125,8 +140,17 @@ instance Show Relation where
         GT -> ">"
         GE -> ">="
 
-binaryToOperator :: Binary -> Operator
-binaryToOperator op = case op of
+binaryToRelation :: Binary -> Relation
+binaryToRelation op = case op of
+    OpEqual   -> EQ
+    OpUnequal -> NE
+    OpLess    -> LT
+    OpLessEq  -> LE
+    OpGreat   -> GT
+    OpGreatEq -> GE
+
+binaryToBinOperator :: Binary -> BinOperator
+binaryToBinOperator op = case op of
     OpPlus    -> ADD
     OpMinus   -> SUB
     OpTimes   -> MUL
@@ -143,3 +167,8 @@ binaryToOperator op = case op of
     OpGreat   -> Rel GT
     OpGreatEq -> Rel GE
     -- OpBelongs ->
+
+unaryToUnOperator :: Unary -> UnOperator
+unaryToUnOperator op = case op of
+    OpNot    -> NOT
+    OpNegate -> NEG

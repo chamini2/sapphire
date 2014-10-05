@@ -15,12 +15,16 @@ import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC
 
+-- import           Control.Arrow                 ((&&&))
+import           Control.Monad                 (liftM, void, unless)
 import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
-import           Data.Foldable                 (mapM_)
-import           Data.Sequence                 (Seq, empty, singleton)
-import           Prelude                       hiding (Ordering(..), exp, mapM_)
+import           Data.Foldable                 (mapM_, forM_)
+import           Data.Maybe                    (fromJust)
+import           Data.Sequence                 (Seq, empty, singleton, length, null, zip)
+import           Data.Traversable              (mapM, forM)
+import           Prelude                       hiding (Ordering(..), exp, mapM, mapM_, length, null, zip)
 
 --------------------------------------------------------------------------------
 
@@ -125,22 +129,49 @@ newLabel = do
 -- Statements
 
 linearizeStatements :: StBlock -> TACGenerator ()
-linearizeStatements = mapM_ linearizeStatement
+linearizeStatements = mapM_ $ \stL -> do
+    nextLabel <- newLabel
+    linearizeStatement nextLabel stL
+    generate $ PutLabel nextLabel $ "next statement of the one in line " ++ show (row $ lexPosn stL)
 
-linearizeStatement :: Lexeme Statement -> TACGenerator ()
-linearizeStatement (Lex st posn) = do
-    generate . Comment $ show (row posn) ++ ", " ++ show st
+linearizeStatement :: Label -> Lexeme Statement -> TACGenerator ()
+linearizeStatement nextLabel (Lex st posn) = do
+    generate . Comment $ "line " ++ show (row posn) ++ ", " ++ show st
     case st of
-        StAssign accL expL ->  do
-            expAddr <- linearizeExpression expL
-            resAddr  <- newTemporary
-            generate $ Move resAddr expAddr
 
-        -- StVariableDeclaration (Lexeme Declaration)
-        -- StStructDefinition    (Lexeme DataType) (Seq Field)
+        StAssign accL expL ->  do
+
+            (resAddr, accDt) <- getAccessAddress accL
+
+            -- When assigning a Boolean expression, use jumping code
+            if accDt == Bool then do
+                trueLabel  <- newLabel
+                falseLabel <- newLabel
+                jumpingCode expL trueLabel falseLabel
+
+                generate $ PutLabel trueLabel "true label for assignment"
+                generate $ Assign resAddr (Constant $ ValBool True)
+                generate $ Goto nextLabel
+
+                generate $ PutLabel falseLabel "false label for assignment"
+                generate $ Assign resAddr (Constant $ ValBool False)
+
+            else do
+                expAddr <- linearizeExpression expL
+                generate $ Assign resAddr expAddr
+
+        -- StVariableDeclaration
+
+        StStructDefinition _ _ -> enterScope >> exitScope      -- For scopeStack maintenance
+
         -- StReturn        (Lexeme Expression)
         -- StFunctionDef   (Lexeme Identifier) Signature StBlock
-        -- StProcedureCall (Lexeme Identifier) (Seq (Lexeme Expression))
+
+        StProcedureCall idnL prmLs -> do
+            prmAddrs <- mapM linearizeExpression prmLs
+            mapM_ (generate . PushParameter) prmAddrs
+            generate $ PCall (lexInfo idnL) (length prmAddrs)
+
         -- StRead       (Lexeme Access)
         -- StPrint      (Lexeme Expression)
 
@@ -149,25 +180,105 @@ linearizeStatement (Lex st posn) = do
             falseLabel <- newLabel
             endLabel   <- newLabel
 
-            linearizeExpression expL
+            jumpingCode expL trueLabel falseLabel
 
-            generate $ PutLabel trueLabel
+            generate $ PutLabel trueLabel "then label for `if`"
             linearizeStatements trueBlock
             generate $ Goto endLabel
 
-            generate $ PutLabel falseLabel
+            generate $ PutLabel falseLabel "else label for `if`"
             linearizeStatements falseBlock
 
-            generate $ PutLabel endLabel
+            generate $ PutLabel endLabel "end of `if`"
 
-        -- StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
-        -- StLoop     StBlock (Lexeme Expression) StBlock
+        StCase expL whnLs othrBlock -> do
+            testLabel <- newLabel
+            othrLabel <- newLabel
+
+            expAddr <- linearizeExpression expL
+            generate $ Goto testLabel
+
+            whenLabels <- forM whnLs $ \(Lex (When _ whnBlock) whnPosn) -> do
+                whnLabel <- newLabel
+                generate $ PutLabel whnLabel $ "when label for `case` in line " ++ show (row whnPosn)
+
+                linearizeStatements whnBlock
+                generate $ Goto nextLabel
+
+                return whnLabel
+
+            -- Only when there is an `otherwise`
+            unless (null othrBlock) $ do
+                generate $ PutLabel othrLabel "otherwise label for `case`"
+                linearizeStatements othrBlock
+                generate $ Goto nextLabel
+
+            generate $ PutLabel testLabel "test label for `case`"
+
+            -- For every when, with the block's label
+            forM_ (zip whenLabels whnLs) $ \(whnLabel, Lex (When whnExpLs _) _) ->
+                forM_ whnExpLs $ \whnExpL -> do
+                    whnAddr <- linearizeExpression whnExpL
+                    generate $ IfGoto expAddr EQ whnAddr whnLabel
+
+            -- Only jump when there is an `otherwise`
+            unless (null othrBlock) . generate $ Goto othrLabel
+
+        StLoop befBlock expL aftBlock -> do
+            befLabel <- newLabel
+            aftLabel <- newLabel
+
+            generate $ PutLabel befLabel "before block for `loop`"
+            linearizeStatements befBlock
+
+            jumpingCode expL aftLabel nextLabel
+
+            generate $ PutLabel aftLabel "after block for `loop`"
+            linearizeStatements aftBlock
+
+            generate $ Goto befLabel
+
         -- StFor      (Lexeme Identifier) (Lexeme Expression)  StBlock
         -- StBreak
         -- StContinue
 
+        _ -> return ()
+
 --------------------------------------------------------------------------------
 -- Expressions
+
+jumpingCode :: Lexeme Expression -> Label -> Label -> TACGenerator ()
+jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
+
+    LitBool v -> do
+        generate . Goto $ if lexInfo v then trueLabel else falseLabel
+
+    ExpBinary (Lex op _) lExpL rExpL -> case op of
+        OpOr  -> do
+            rightLabel <- newLabel
+            jumpingCode lExpL trueLabel rightLabel
+            generate $ PutLabel rightLabel "right operand of `or`"
+            jumpingCode rExpL trueLabel falseLabel
+        OpAnd -> do
+            rightLabel <- newLabel
+            jumpingCode lExpL rightLabel falseLabel
+            generate $ PutLabel rightLabel "right operand of `and`"
+            jumpingCode rExpL trueLabel falseLabel
+        _ -> if comp op then do
+                lAddr <- linearizeExpression lExpL
+                rAddr <- linearizeExpression rExpL
+                generate $ IfGoto lAddr (binaryToRelation op) rAddr trueLabel
+                generate $ Goto falseLabel
+            else void $ linearizeExpression expL
+        where
+            comp = flip elem [OpEqual,OpUnequal,OpLess,OpLessEq,OpGreat,OpGreatEq]
+
+    ExpUnary (Lex op _) unExpL -> case op of
+        OpNot -> jumpingCode unExpL falseLabel trueLabel
+        _     -> void $ linearizeExpression expL
+
+    _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
+
 
 linearizeExpression :: Lexeme Expression -> TACGenerator Address
 linearizeExpression (Lex exp _) = case exp of
@@ -177,9 +288,9 @@ linearizeExpression (Lex exp _) = case exp of
     LitBool  v -> return . Constant . ValBool  $ lexInfo v
     LitChar  v -> return . Constant . ValChar  $ lexInfo v
 
-    LitString str -> undefined
+    LitString str -> newTemporary
 
-    Variable accL -> undefined
+    Variable accL -> newTemporary
         -- case acc of
         --     VariableAccess idL -> return . Variable $ lexInfo idL
         --     -- ArrayAccess    accL indexL -> do
@@ -189,49 +300,88 @@ linearizeExpression (Lex exp _) = case exp of
         --     -- StructAccess   accL fieldL ->
         -- return $ Variable
 
-    FunctionCall idnL expLs -> undefined
-        -- here <- newLabel
-        -- generate $ BeginFunction 0
-        -- -- mapM_ pushParameter
-        -- generate $ EndFunction 0
+    FunctionCall idnL prmLs -> do
+        resTemp  <- newTemporary
+        prmAddrs <- mapM linearizeExpression prmLs
+        mapM_ (generate . PushParameter) prmAddrs
+        generate $ FCall resTemp (lexInfo idnL) (length prmAddrs)
+        return resTemp
 
     ExpBinary (Lex op _) lExpL rExpL -> do
         lAddr   <- linearizeExpression lExpL
         rAddr   <- linearizeExpression rExpL
         resTemp <- newTemporary
-        generate $ Assign resTemp (binaryToOperator op) lAddr rAddr
+        generate $ AssignBin resTemp lAddr (binaryToBinOperator op) rAddr
         return resTemp
-
-    -- ExpBinary (Lex op _) lExpL rExpL -> case op of
-    --     OpPlus    -> "+"
-    --     OpMinus   -> "-"
-    --     OpTimes   -> "*"
-    --     OpDivide  -> "/"
-    --     OpModulo  -> "%"
-    --     {-OpPower   -> "^"-}
-    --     {-OpFromTo  -> ".."-}
-    --     OpOr      -> "or"
-    --     OpAnd     -> "and"
-    --     OpLess    -> "<"
-    --     OpEqual   -> "=="
-    --     OpUnequal -> "/="
-    --         -- !(op1 == op2)
-    --     OpLessEq  -> "<="
-    --         -- (op1 == op2) || (op1 < op2)
-    --     OpGreat   -> ">"
-    --         -- !(op1 < op2) && !(op1 == op2)
-    --     OpGreatEq -> ">="
-    --          -- !(op1 < op2)
-    --     {-OpBelongs -> "@"-}
 
     ExpUnary (Lex op _) expL -> do
         expAddr <- linearizeExpression expL
         resTemp <- newTemporary
-        case op of
-            OpNot    -> undefined
-            OpNegate -> do
-                generate $ Assign resTemp SUB (Constant $ ValInt 0) expAddr
-                return resTemp
+        generate $ AssignUn resTemp (unaryToUnOperator op) expAddr
+        return resTemp
+
+--------------------------------------------------------------------------------
+
+getAccessAddress :: Lexeme Access -> TACGenerator (Address, DataType)
+getAccessAddress accL = do
+    -- It works only for Variable for now
+    let VariableAccess idnL = lexInfo accL
+        idn                 = lexInfo idnL
+    dt <- liftM (fromJust) $ getsSymbol idn (lexInfo . dataType)
+    return (Name idn, dt)
+
+-- getAccessAddress :: Lexeme Access -> TACGenerator Address
+-- getAccessAddress accL = do
+--     let deepAccZpp              = deepAccess $ focusAccess accL
+--         VariableAccess deepIdnL = lexInfo $ defocusAccess deepAccZpp
+--         deepIdn                 = lexInfo deepIdnL
+
+--     maySymI <- getsSymbol deepIdn (offset &&& dataType)
+--     let (off, dtL) = fromJust maySymI
+
+--     let deepDtZpp          = deepDataType $ focusDataType dtL
+--         (deepDtL, deepDim) = defocusDataType deepDtZpp
+
+--     innerWdt <- getDataTypeWidth dtL
+
+--     wdt <- calculateRelativeOffset deepAccZpp deepDtZpp (Constant $ ValInt innerWdt) (Constant $ ValInt 0)
+--     return . Constant $ ValInt off
+
+----------------------------------------
+
+-- getDataTypeWidth :: Lexeme DataType -> TACGenerator Width
+-- getDataTypeWidth dtL = do
+--     let deepDt = lexInfo . fst . defocusDataType . deepDataType $ focusDataType dtL
+--     liftM fromJust $ getsSymbol (toIdentifier deepDt) width
+
+-- calculateRelativeOffset :: AccessZipper -> DataTypeZipper -> Address -> Address -> TACGenerator Address
+-- calculateRelativeOffset accZ dtZ wdt off = case defocusAccess `fmap` backAccess accZ of
+
+--     Just accL -> case lexInfo accL of
+
+--         ArrayAccess _ expL -> do
+
+--             -- Calculate the index's value
+--             expAddr <- linearizeExpression expL
+
+--             mulTemp <- newTemporary
+--             addTemp <- newTemporary
+--             generate $ AssignBin mulTemp MUL expAddr wdt
+--             generate $ AssignBin addTemp ADD mulTemp off
+
+--             calculateRelativeOffset (fromJust $ backAccess accZ) dtZ wdt off
+
+--         StructAccess _ fldIdnL -> do
+
+--             -- This (fromJust . fromJust) may be dangerous (or not)
+--             -- tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
+
+--             -- -- Looks for the field in the struct's SymbolTable
+--             -- let mayFldDt = (lexInfo . dataType) <$> lookup (lexInfo fldIdnL) tab
+--             -- constructDataType (fromJust $ backAccess accZ) (fromJust mayFldDt)
+--             return off
+
+--     Nothing -> return off
 
 -- {-|
 --     TAC Pretty printer
