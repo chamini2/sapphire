@@ -138,7 +138,7 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
-    StStructDefinition _ _ ->  enterScope >> exitScope      -- For scopeStack maintenance
+    StStructDefinition _ _ -> enterScope >> exitScope       -- For scopeStack maintenance
 
     StReturn expL -> void $ runMaybeT $ do
         expDt <- lift $ typeCheckExpression expL
@@ -191,6 +191,8 @@ typeCheckStatement (Lex st posn) = case st of
     StCase expL whnLs othrBlock -> do
         expDt <- typeCheckExpression expL
         unless (isScalar expDt) $ tellSError posn (CaseNonCaseable expDt)
+
+        when (expDt == Bool) $ tellWarn (lexPosn expL) CaseOfBool
 
         -- For every when
         forM_ whnLs $ \(Lex (When whnExpLs whnBlock) whnP) -> do
@@ -339,10 +341,9 @@ accessDataType accL = do
         VariableAccess deepIdnL = lexInfo $ defocusAccess deepZpp
         deepIdn                 = lexInfo deepIdnL
     maySymI <- getsSymbol deepIdn ((lexInfo . dataType) &&& symbolCategory)
+    let (dt, cat) = fromJust maySymI
 
     unlessGuard (isJust maySymI) $ tellSError (lexPosn deepIdnL) (NotDefined deepIdn)
-
-    let (dt, cat) = fromJust maySymI
 
     -- Checking that it is a variable
     unlessGuard (cat == CatInfo) $ tellSError (lexPosn accL) (WrongCategory deepIdn CatInfo cat)
@@ -357,7 +358,7 @@ constructDataType idnL accZ dt = case defocusAccess <$> backAccess accZ of
 
     Just accL -> case lexInfo accL of
 
-        ArrayAccess  _ expL -> do
+        ArrayAccess _ expL -> do
             unlessGuard (isArray dt) $ tellSError (lexPosn idnL) (AccessNonArray (lexInfo idnL) dt)
 
             expDt <- lift $ typeCheckExpression expL

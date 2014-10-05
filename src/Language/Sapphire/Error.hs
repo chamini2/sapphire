@@ -183,6 +183,8 @@ data StaticError
 
 data Warning
     = Warning String
+    -- Type checking
+    | CaseOfBool
     -- Usage of identifiers
     | DefinedNotUsed         Identifier
     | TypeDefinedNotUsed     Identifier
@@ -191,6 +193,8 @@ data Warning
 instance Show Warning where
     show cWarn = case cWarn of
         Warning msg -> msg
+        -- Type checking
+        CaseOfBool -> "case expression is of type 'Bool', consider using an 'if-then-else' statement"
         -- Usage of identifiers
         DefinedNotUsed         idn -> "identifier '" ++ idn ++ "' is defined but never used"
         TypeDefinedNotUsed     idn -> "type '"       ++ idn ++ "' is defined but never used"

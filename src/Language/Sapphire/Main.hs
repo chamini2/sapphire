@@ -43,15 +43,18 @@ main = void $ runMaybeT $ do
     unlessGuard (null dfErrs) $ mapM_ (liftIO . print) dfErrs
     -- When there are no definition errors
 
-    let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) (getAst defS)
+    let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) prog
     unlessGuard (null tpErrs) $ mapM_ (liftIO . print) tpErrs
     -- When there are no type checking errors
 
-    let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) (getAst typS)
+    let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) prog
     unlessGuard (null szErrs) $ mapM_ (liftIO . print) szErrs
     -- When there are no size or offset errors
 
-    let tacW = processTACGenerator () (getTable sizS) (getAst sizS)
+    when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
+    when (ShowAST         `elem` flgs) . liftIO $ print prog
+
+    let tacW = processTACGenerator () (getTable sizS) prog
 
     mapM_ (liftIO . print) tacW
 
