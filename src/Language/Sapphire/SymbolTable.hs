@@ -40,7 +40,7 @@ module Language.Sapphire.SymbolTable
     , push
     , modifyStack
     , topStack
-    -- , emptyStack
+    , emptyStack
     , singletonStack
 
     -- From Scope
