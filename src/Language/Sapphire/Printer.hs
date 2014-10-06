@@ -64,10 +64,10 @@ printString str = get >>= \t -> tell . singleton $ tabs t ++ str ++ "\n"
 -- Tabs
 
 raiseTabs :: Printer ()
-raiseTabs = modify (\t -> t + 1)
+raiseTabs = modify succ
 
 lowerTabs :: Printer ()
-lowerTabs = modify (\t -> t - 1)
+lowerTabs = modify pred
 
 --------------------------------------------------------------------------------
 

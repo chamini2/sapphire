@@ -136,9 +136,9 @@ tellWarn posn = tell . singleton . Warn posn
 
 enterScope :: (SappState s, MonadState s m) => m ()
 enterScope = do
-    scp <- gets getScopeId
-    let scope = Scope { serial = scp + 1 }
-    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId (scp + 1) s
+    scp <- liftM succ $ gets getScopeId
+    let scope = Scope { serial = scp }
+    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId scp s
 
 exitScope :: (SappState s, MonadState s m) => m ()
 exitScope = modify $ \s -> putStack (pop $ getStack s) s

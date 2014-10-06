@@ -23,7 +23,7 @@ import           System.Environment            (getArgs)
 main :: IO ()
 main = void $ runMaybeT $ do
     (flgs, args) <- liftIO arguments
-    let reader = initialReader { flags = flgs }
+    let reader = initialReader { flags = SuppressWarnings : flgs }  -- While developing
 
     when (Version `elem` flgs) . liftIO $ putStrLn version
     when (Help    `elem` flgs) . liftIO $ putStrLn help

@@ -115,10 +115,10 @@ runDefinition r = flip (flip execRWS r) initialState
 -- Monad handling
 
 enterLoop :: Definition ()
-enterLoop = modify $ \s -> s { loopLvl = loopLvl s + 1 }
+enterLoop = modify $ \s -> s { loopLvl = succ $ loopLvl s }
 
 exitLoop :: Definition ()
-exitLoop = modify $ \s -> s { loopLvl = loopLvl s - 1 }
+exitLoop = modify $ \s -> s { loopLvl = pred $ loopLvl s }
 
 --------------------------------------------------------------------------------
 -- Declaration

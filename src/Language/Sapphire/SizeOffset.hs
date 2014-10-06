@@ -134,7 +134,7 @@ sizeOffsetStatement stL = case lexInfo stL of
             let parmIdn = lexInfo $ dclIdentifier dcl
             (parmStk, parmWdt) <- liftM fromJust $ getsSymbol parmIdn (scopeStack &&& width)
             off                <- currentOffset
-            modifySymbolWithScope parmIdn parmStk (\sym' -> sym' { offset = (-1) * off }) -- (-1) For the execution stack
+            modifySymbolWithScope parmIdn parmStk (\sym' -> sym' { offset = negate off }) -- (-1) For the execution stack
             addOffset parmWdt
 
         -- Restarts the offset in 0 for this scope
