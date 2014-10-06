@@ -218,8 +218,9 @@ printStatement (Lex st posn) = case st of
 
 
     StBreak    -> printString $ "BREAK"    ++ show posn
-
     StContinue -> printString $ "CONTINUE" ++ show posn
+
+    _ -> error $ "Printer.printStatement: statement '" ++ show st ++ "' should not shown in the AST"
 
 printExpression :: Expression -> Printer ()
 printExpression exp = case exp of

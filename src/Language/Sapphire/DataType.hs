@@ -33,8 +33,8 @@ data DataType
     = DataType (Lexeme Identifier)                  -- For compiler use
     | Int | Float | Bool | Char | Range | Type
     | String
-    | Record (Lexeme Identifier)
-    | Union  (Lexeme Identifier)
+    | Record { structIdentifier :: (Lexeme Identifier) }
+    | Union  { structIdentifier :: (Lexeme Identifier) }
     | Array  (Lexeme DataType)   (Lexeme Int)
     | Void | TypeError                              -- For compiler use
     deriving (Ord)

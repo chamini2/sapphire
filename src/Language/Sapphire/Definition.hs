@@ -153,9 +153,7 @@ definitionStatement (Lex st posn) = case st of
     StVariableDeclaration dclL -> processDeclaration dclL
 
     StStructDefinition dtL flds -> void $ runMaybeT $ do
-        let idn = case lexInfo dtL of
-                Record idnL -> lexInfo idnL
-                Union  idnL -> lexInfo idnL
+        let idn = lexInfo . structIdentifier $ lexInfo dtL
 
         current <- currentScope
 
@@ -289,9 +287,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
 
             -- We only need to check the user-defined types
             unless (langDef sym) $ do
-                let strIdn = case lexInfo symDtL of
-                        Record idnL -> lexInfo idnL
-                        Union  idnL -> lexInfo idnL
+                let strIdn = lexInfo . structIdentifier $ lexInfo symDtL
 
                 unless (isJust symTab) $ error "Definition.fixDataTypes: user-defined type has no fields SymbolTable"
 

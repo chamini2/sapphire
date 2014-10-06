@@ -176,7 +176,7 @@ typeCheckStatement (Lex st posn) = case st of
 
     StIf expL trueBlock falseBlock -> do
         expDt <- typeCheckExpression expL
-        runMaybeT $ do
+        void . runMaybeT $ do
             guard (isValid expDt)
             when (expDt /= Bool) $ tellSError posn (ConditionDataType expDt)
 
@@ -213,7 +213,7 @@ typeCheckStatement (Lex st posn) = case st of
 
     StLoop befBlock expL aftBlock -> do
         expDt <- typeCheckExpression expL
-        runMaybeT $ do
+        void . runMaybeT $ do
             guard (isValid expDt)
             when (expDt /= Bool) $ tellSError posn (ConditionDataType expDt)
 
@@ -227,7 +227,7 @@ typeCheckStatement (Lex st posn) = case st of
 
     StFor _ expL block -> do
         expDt <- typeCheckExpression expL
-        runMaybeT $ do
+        void . runMaybeT $ do
             guard (isValid expDt)
             when (expDt /= Range) $ tellSError posn (ForInDataType expDt)
 

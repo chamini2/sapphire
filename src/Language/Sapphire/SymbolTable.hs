@@ -104,7 +104,7 @@ showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) sho
             showScpInfs :: ScopeNum -> [(Identifier, Symbol)] -> String
             showScpInfs scp infs = tabs ++ "\t" ++ show scp ++ " -> " ++ concatMap (uncurry showInf) infs
             showInf :: Identifier -> Symbol -> String
-            showInf idn sym = "\n\t\t" ++ tabs ++ "'" ++ idn ++ "':\t" ++ show sym
+            showInf idn sym = "\n\t\t" ++ tabs ++ "'" ++ idn ++ "':" ++ replicate (3 - div (length idn + 3) 4) '\t' ++ show sym
 
 --------------------------------------------------------------------------------
 
