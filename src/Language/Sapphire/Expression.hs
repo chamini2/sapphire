@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.Expression
     ( Expression(..)
     , Binary(..)
@@ -59,7 +60,7 @@ data Binary
     deriving (Eq, Ord)
 
 instance Show Binary where
-    show op = case op of
+    show = \case
         OpPlus    -> "+"
         OpMinus   -> "-"
         OpTimes   -> "*"
@@ -78,7 +79,7 @@ instance Show Binary where
         OpBelongs -> "@"
 
 --instance Show Binary where
---    show op = case op of
+--    show = \case
 --        OpPlus    -> "arithmetic addition"
 --        OpMinus   -> "arithmetic substraction"
 --        OpTimes   -> "arithmetic multiplication"
@@ -100,7 +101,7 @@ binaryOperation :: Binary -> (DataType, DataType) -> Maybe DataType
 binaryOperation op dts = snd <$> find ((dts==) . fst) (binaryOperator op)
 
 binaryOperator :: Binary -> Seq ((DataType, DataType), DataType)
-binaryOperator op = fromList $ case op of
+binaryOperator = fromList . \case
     OpPlus    -> arithmetic
     OpMinus   -> arithmetic
     OpTimes   -> arithmetic
@@ -127,12 +128,12 @@ data Unary = OpNegate | OpNot
     deriving (Eq, Ord)
 
 instance Show Unary where
-    show op = case op of
+    show = \case
         OpNegate -> "-"
         OpNot    -> "not"
 
 --instance Show Unary where
---    show op = case op of
+--    show = \case
 --        OpNegate -> "arithmetic negation"
 --        OpNot    -> "logical negation"
 
@@ -140,7 +141,7 @@ unaryOperation :: Unary -> DataType -> Maybe DataType
 unaryOperation op dt = snd <$> find ((dt==) . fst) (unaryOperator op)
 
 unaryOperator :: Unary -> Seq (DataType, DataType)
-unaryOperator op = fromList $ case op of
+unaryOperator = fromList . \case
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
 
@@ -152,7 +153,7 @@ data Access = VariableAccess (Lexeme Identifier)
             deriving (Eq, Ord)
 
 instance Show Access where
-    show acc = case acc of
+    show = \case
         VariableAccess idnL      -> lexInfo idnL
         ArrayAccess    accL indL -> show (lexInfo accL) ++ "[" ++ show (lexInfo indL) ++ "]"
         StructAccess   accL fldL -> show (lexInfo accL) ++ "." ++ lexInfo fldL

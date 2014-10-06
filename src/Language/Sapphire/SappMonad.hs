@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.SappMonad where
 
 import           Language.Sapphire.Error
@@ -184,11 +185,9 @@ modifySymbolWithScope idn stk f = do
 
 modifySymbol :: (SappState s, MonadState s m)
              => Identifier -> (Symbol -> Symbol) -> m ()
-modifySymbol idn f = do
-    mayStk <- getsSymbol idn scopeStack
-    case mayStk of
-        Nothing        -> return ()
-        Just stk -> modifySymbolWithScope idn stk f
+modifySymbol idn f = getsSymbol idn scopeStack >>= \case
+    Nothing  -> return ()
+    Just stk -> modifySymbolWithScope idn stk f
 
 ----------------------------------------
 -- Used

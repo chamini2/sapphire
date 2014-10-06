@@ -1,4 +1,11 @@
-module Language.Sapphire.Error where
+{-# LANGUAGE LambdaCase #-}
+module Language.Sapphire.Error
+    ( Error(..)
+    , LexerError(..)
+    , ParseError(..)
+    , StaticError(..)
+    , Warning(..)
+    ) where
 
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
@@ -15,7 +22,7 @@ data Error
     | Warn   Position Warning
 
 instance Show Error where
-    show sappError = case sappError of
+    show = \case
         LError p e -> "Lexer error "   ++ show p ++ ":\n\t" ++ show e ++ "\n"
         PError p e -> "Parsing error " ++ show p ++ ":\n\t" ++ show e ++ "\n"
         SError p e -> "Static error "  ++ show p ++ ":\n\t" ++ show e ++ "\n"
@@ -35,7 +42,7 @@ data LexerError
     | StringError    String
 
 instance Show LexerError where
-    show lError = case lError of
+    show = \case
         LexerError msg   -> msg
         UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
         StringError str  -> "missing matching quotation mark for string " ++ show str
@@ -67,7 +74,7 @@ data ParseError
 --    | ArrayDataTypeSize "array data type size must be a literal integer between brackets"
 
 instance Show ParseError where
-    show pError = case pError of
+    show = \case
         ParseError msg      -> msg
         UnexpectedToken tok -> "unexpected token '" ++ show tok ++ "'"
         -- Identifiers
@@ -128,7 +135,7 @@ data StaticError
     deriving Show
 
 --instance Show StaticError where
---    show sError = case sError of
+--    show = \case
 --        StaticError msg -> msg
 --        -- Variables
 --        VariableNotInitialized var       -> "variable '" ++ var ++ "' may not have been initialized"
@@ -191,7 +198,7 @@ data Warning
     | FunctionDefinedNotUsed Identifier
 
 instance Show Warning where
-    show cWarn = case cWarn of
+    show = \case
         Warning msg -> msg
         -- Type checking
         CaseOfBool -> "case expression is of type 'Bool', consider using an 'if-then-else' statement"
@@ -203,7 +210,7 @@ instance Show Warning where
 --------------------------------------------------------------------------------
 
 errorPos :: Error -> Position
-errorPos err = case err of
+errorPos = \case
     LError p _ -> p
     PError p _ -> p
     SError p _ -> p

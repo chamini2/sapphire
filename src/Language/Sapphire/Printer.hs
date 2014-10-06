@@ -1,6 +1,7 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.Printer
     ( processPrinter
-    )where
+    ) where
 
 import           Language.Sapphire.Program
 
@@ -223,7 +224,7 @@ printStatement (Lex st posn) = case st of
     _ -> error $ "Printer.printStatement: statement '" ++ show st ++ "' should not shown in the AST"
 
 printExpression :: Expression -> Printer ()
-printExpression exp = case exp of
+printExpression = \case
 
     LitInt    i -> printString $ "Int literal: "   ++ show (lexInfo i)
     LitChar   c -> printString $ "Char literal: " ++ show (lexInfo c)

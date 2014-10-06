@@ -1,5 +1,6 @@
 {
 {-# OPTIONS_GHC -w #-}
+{-# LANGUAGE LambdaCase #-}
 {-|
     Lexer for programming language SAPPHIRE.
 -}
@@ -233,7 +234,7 @@ data Token
     deriving (Eq)
 
 instance Show Token where
-    show tk = case tk of
+    show = \case
         TkNewLine       -> "'newline'"
         TkEnd           -> "'end'"
         TkReturn        -> "'return'"

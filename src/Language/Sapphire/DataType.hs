@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.DataType
     ( DataType(..)
     , Field
@@ -40,7 +41,7 @@ data DataType
     deriving (Ord)
 
 instance Show DataType where
-    show dt = case dt of
+    show = \case
         DataType idnL   -> "DataType " ++ lexInfo idnL
         Int             -> "Int"
         Float           -> "Float"
@@ -82,7 +83,7 @@ type Field = (Lexeme Identifier, Lexeme DataType)
 
 -- For lookups in the SymbolTable
 toIdentifier :: DataType -> Identifier
-toIdentifier dt = case dt of
+toIdentifier = \case
     DataType idnL -> lexInfo idnL
     Int    -> "Int"
     Float  -> "Float"
@@ -106,23 +107,23 @@ isScalar :: DataType -> Bool
 isScalar = flip elem [Int , Float , Bool , Char]
 
 isValid :: DataType -> Bool
-isValid dt = case dt of
+isValid = \case
     TypeError -> False
     _         -> True
 
 isArray :: DataType -> Bool
-isArray dt = case dt of
+isArray = \case
     Array _ _ -> True
     _         -> False
 
 isStruct :: DataType -> Bool
-isStruct dt = case dt of
+isStruct = \case
     Record _   -> True
     Union  _   -> True
     _          -> False
 
 arrayInnerDataType :: DataType -> DataType
-arrayInnerDataType dt = case dt of
+arrayInnerDataType = \case
     Array dtL _ -> lexInfo dtL
     _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
 
