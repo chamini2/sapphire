@@ -22,9 +22,9 @@ import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (mapM_, forM_)
 import           Data.Maybe                    (fromJust)
-import           Data.Sequence                 (Seq, empty, singleton, length, null, zip)
+import           Data.Sequence                 (Seq, empty, singleton, length, null, zip, reverse)
 import           Data.Traversable              (mapM, forM)
-import           Prelude                       hiding (Ordering(..), exp, mapM, mapM_, length, null, zip)
+import           Prelude                       hiding (Ordering(..), exp, mapM, mapM_, length, null, zip, reverse)
 
 --------------------------------------------------------------------------------
 
@@ -45,6 +45,7 @@ data TACState = TACState
     , ast         :: Program
     , tempSerial  :: Serial
     , labelSerial :: Serial
+    , loopStack   :: Stack (Label, Label)   -- (StartLoopLabel, EndLoopLabel)
     }
 
 ----------------------------------------
@@ -74,6 +75,7 @@ initialState = TACState
     , ast         = Program empty
     , tempSerial  = 0
     , labelSerial = 0
+    , loopStack   = emptyStack
     }
 
 --------------------------------------------------------------------------------
@@ -113,17 +115,28 @@ generateTAC r = snd . flip (flip execRWS r) initialState
 --------------------------------------------------------------------------------
 -- Monad handling
 
+enterLoop :: Label -> Label -> TACGenerator ()
+enterLoop startLoop endLoop = modify $ \s -> s { loopStack = push (startLoop, endLoop) (loopStack s) }
+
+exitLoop :: TACGenerator ()
+exitLoop = modify $ \s -> s { loopStack = pop (loopStack s) }
+
+currentLoop :: TACGenerator (Label, Label)
+currentLoop = gets (top . loopStack)
+
+----------------------------------------
+
 newTemporary :: TACGenerator Address
 newTemporary = do
-    current <- gets tempSerial
-    modify $ \s -> s { tempSerial = current + 1 }
-    return . Temporary $ "$T" ++ (show $ current + 1)
+    current <- liftM succ $ gets tempSerial
+    modify $ \s -> s { tempSerial = current }
+    return . Temporary $ "$T" ++ show current
 
 newLabel :: TACGenerator Label
 newLabel = do
-    current <- gets labelSerial
-    modify $ \s -> s { labelSerial = current + 1 }
-    return $ "L" ++ (show $ current + 1)
+    current <- liftM succ $ gets labelSerial
+    modify $ \s -> s { labelSerial = current}
+    return $ "L" ++ show current
 
 --------------------------------------------------------------------------------
 -- Statements
@@ -164,13 +177,20 @@ linearizeStatement nextLabel (Lex st posn) = do
 
         StStructDefinition _ _ -> enterScope >> exitScope      -- For scopeStack maintenance
 
-        -- StReturn        (Lexeme Expression)
-        -- StFunctionDef   (Lexeme Identifier) Signature StBlock
+        StReturn expL -> linearizeExpression expL >>= generate . Return
+
+        StFunctionDef idnL sign block -> do
+            wdt <- liftM fromJust $ getsSymbol (lexInfo idnL) width
+
+            generate $ BeginFunction wdt
+            linearizeStatements block
+            generate $ EndFunction
 
         StProcedureCall idnL prmLs -> do
-            prmAddrs <- mapM linearizeExpression prmLs
+            prmAddrs <- mapM linearizeExpression (reverse prmLs)
             mapM_ (generate . PushParameter) prmAddrs
             generate $ PCall (lexInfo idnL) (length prmAddrs)
+            -- PopParameters
 
         -- StRead       (Lexeme Access)
         -- StPrint      (Lexeme Expression)
@@ -183,11 +203,15 @@ linearizeStatement nextLabel (Lex st posn) = do
             jumpingCode expL trueLabel falseLabel
 
             generate $ PutLabel trueLabel "then label for `if`"
+            enterScope
             linearizeStatements trueBlock
+            exitScope
             generate $ Goto endLabel
 
             generate $ PutLabel falseLabel "else label for `if`"
+            enterScope
             linearizeStatements falseBlock
+            exitScope
 
             generate $ PutLabel endLabel "end of `if`"
 
@@ -202,15 +226,19 @@ linearizeStatement nextLabel (Lex st posn) = do
                 whnLabel <- newLabel
                 generate $ PutLabel whnLabel $ "when label for `case` in line " ++ show (row whnPosn)
 
+                enterScope
                 linearizeStatements whnBlock
+                exitScope
                 generate $ Goto nextLabel
 
                 return whnLabel
 
-            -- Only when there is an `otherwise`
+            -- Only when there is an 'otherwise'
             unless (null othrBlock) $ do
                 generate $ PutLabel othrLabel "otherwise label for `case`"
+                enterScope
                 linearizeStatements othrBlock
+                exitScope
                 generate $ Goto nextLabel
 
             generate $ PutLabel testLabel "test label for `case`"
@@ -219,9 +247,9 @@ linearizeStatement nextLabel (Lex st posn) = do
             forM_ (zip whenLabels whnLs) $ \(whnLabel, Lex (When whnExpLs _) _) ->
                 forM_ whnExpLs $ \whnExpL -> do
                     whnAddr <- linearizeExpression whnExpL
-                    generate $ IfGoto expAddr EQ whnAddr whnLabel
+                    generate $ IfGoto EQ expAddr whnAddr whnLabel
 
-            -- Only jump when there is an `otherwise`
+            -- Only jump when there is an 'otherwise'
             unless (null othrBlock) . generate $ Goto othrLabel
 
         StLoop befBlock expL aftBlock -> do
@@ -229,18 +257,44 @@ linearizeStatement nextLabel (Lex st posn) = do
             aftLabel <- newLabel
 
             generate $ PutLabel befLabel "before block for `loop`"
+            enterScope >> enterLoop befLabel nextLabel
             linearizeStatements befBlock
+            exitScope
 
             jumpingCode expL aftLabel nextLabel
 
             generate $ PutLabel aftLabel "after block for `loop`"
+            enterScope
             linearizeStatements aftBlock
+            exitLoop >> exitScope
 
             generate $ Goto befLabel
 
-        -- StFor      (Lexeme Identifier) (Lexeme Expression)  StBlock
-        -- StBreak
-        -- StContinue
+        StFor idnL expL block -> do
+            let idnAddr = Name $ lexInfo idnL
+            condLabel  <- newLabel
+            blockLabel <- newLabel
+
+            let ExpBinary _ fromExpL toExpL = lexInfo expL
+            fromAddr <- linearizeExpression fromExpL
+            toAddr   <- linearizeExpression toExpL
+
+            -- Initialize the 'for' variable
+            generate $ Assign idnAddr fromAddr
+
+            generate $ PutLabel condLabel "condition label for `for`"
+            generate $ IfGoto GT idnAddr toAddr nextLabel
+
+            generate $ PutLabel blockLabel "block label for `for`"
+            enterScope >> enterLoop condLabel nextLabel
+            linearizeStatements block
+            exitLoop >> exitScope
+
+            generate $ AssignBin idnAddr ADD idnAddr (Constant $ ValInt 1)
+            generate $ Goto condLabel
+
+        StBreak    -> (liftM snd) currentLoop >>= generate . Goto
+        StContinue -> (liftM fst) currentLoop >>= generate . Goto
 
         _ -> return ()
 
@@ -264,14 +318,12 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
             jumpingCode lExpL rightLabel falseLabel
             generate $ PutLabel rightLabel "right operand of `and`"
             jumpingCode rExpL trueLabel falseLabel
-        _ -> if comp op then do
+        _ -> if isComparable op then do
                 lAddr <- linearizeExpression lExpL
                 rAddr <- linearizeExpression rExpL
-                generate $ IfGoto lAddr (binaryToRelation op) rAddr trueLabel
+                generate $ IfGoto (binaryToRelation op) lAddr rAddr trueLabel
                 generate $ Goto falseLabel
             else void $ linearizeExpression expL
-        where
-            comp = flip elem [OpEqual,OpUnequal,OpLess,OpLessEq,OpGreat,OpGreatEq]
 
     ExpUnary (Lex op _) unExpL -> case op of
         OpNot -> jumpingCode unExpL falseLabel trueLabel
@@ -290,19 +342,11 @@ linearizeExpression (Lex exp _) = case exp of
 
     LitString str -> newTemporary
 
-    Variable accL -> newTemporary
-        -- case acc of
-        --     VariableAccess idL -> return . Variable $ lexInfo idL
-        --     -- ArrayAccess    accL indexL -> do
-        --         -- L.Array <- getarrayInfo
-        --         -- L.type <- L.array.type.elem
-        --         -- addr <- generateTemporary
-        --     -- StructAccess   accL fieldL ->
-        -- return $ Variable
+    Variable accL -> liftM fst $ getAccessAddress accL
 
     FunctionCall idnL prmLs -> do
         resTemp  <- newTemporary
-        prmAddrs <- mapM linearizeExpression prmLs
+        prmAddrs <- mapM linearizeExpression (reverse prmLs)
         mapM_ (generate . PushParameter) prmAddrs
         generate $ FCall resTemp (lexInfo idnL) (length prmAddrs)
         return resTemp
@@ -311,7 +355,7 @@ linearizeExpression (Lex exp _) = case exp of
         lAddr   <- linearizeExpression lExpL
         rAddr   <- linearizeExpression rExpL
         resTemp <- newTemporary
-        generate $ AssignBin resTemp lAddr (binaryToBinOperator op) rAddr
+        generate $ AssignBin resTemp (binaryToBinOperator op) lAddr rAddr
         return resTemp
 
     ExpUnary (Lex op _) expL -> do

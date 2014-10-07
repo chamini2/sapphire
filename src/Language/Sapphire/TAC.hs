@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-|
     Three-address code (TAC) generation module
 -}
@@ -5,8 +6,8 @@ module Language.Sapphire.TAC where
 
 import           Language.Sapphire.Program
 
-import           Prelude                   hiding (Ordering(..))
 import           Data.Char                 (toLower)
+import           Prelude                   hiding (Ordering (..))
 
 {-|
     Three-address code representation
@@ -22,7 +23,7 @@ data Address
     | Temporary Temporary
 
 instance Show Address where
-    show addr = case addr of
+    show = \case
         Name idn    -> idn
         Constant v  -> "\\" ++ show v
         Temporary t -> t
@@ -34,7 +35,7 @@ data Value
     | ValChar  Char
 
 instance Show Value where
-    show val = case val of
+    show = \case
         ValInt   v -> show v
         ValFloat v -> show v
         ValBool  v -> map toLower (show v)
@@ -46,8 +47,8 @@ data Instruction
     | PutLabel Label String
     | AssignBin
         { result :: Address
-        , left   :: Address
         , binop  :: BinOperator
+        , left   :: Address
         , right  :: Address
         }
     | AssignUn
@@ -63,38 +64,37 @@ data Instruction
 --    | AssignArrL
     -- Function related instructions
     | BeginFunction Int
-    | EndFunction   Int
+    | EndFunction
     | PushParameter Address
-    | PopParameters
-    | Return
+    | PopParameters Int
+    | Return Address
     | PCall         Label Int
     | FCall Address Label Int
     -- Goto
     | Goto Label
-    | IfGoto      Address Relation Address Label
+    | IfGoto      Relation Address Address Label
     | IfTrueGoto  Address Label
     | IfFalseGoto Address Label
 
 instance Show Instruction where
     show ins = case ins of
         Comment str     -> "# " ++ str
-        PutLabel la str -> la ++ ":" ++ replicate 10 '\t' ++ "# " ++ str
+        PutLabel la str -> la ++ ":" ++ replicate (10 - div (length la + 1) 4) '\t' ++ "# " ++ str
         _ -> "\t" ++ case ins of
-            AssignBin res le o ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
+            AssignBin res o le ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
             AssignUn  res o n     -> show res ++ " := " ++ show o  ++ " " ++ show n
             Assign d s            -> show d ++ " := " ++ show s
-            BeginFunction nb      -> "begin_function " ++ show nb
-            EndFunction nb        -> "end_function " ++ show nb
+            BeginFunction by      -> "begin_function " ++ show by
+            EndFunction           -> "end_function"
             PushParameter a       -> "param " ++ show a
-            PopParameters         -> "unparam"
-            Return                -> "return"
+            PopParameters n       -> "unparam " ++ show n
+            Return a              -> "return " ++ show a
             PCall la i            -> "call " ++ la ++ ", " ++ show i
             FCall d la i          -> show d ++ " := " ++ "call " ++ la ++ ", " ++ show i
-            Goto l                -> "goto " ++ show l
-            IfGoto le r ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
+            Goto la               -> "goto " ++ la
+            IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
             IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la
             IfFalseGoto a la      -> "ifnot " ++ show a ++ " goto " ++ la
-
 
 data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW
@@ -107,7 +107,7 @@ data UnOperator
     = NOT | NEG
 
 instance Show BinOperator where
-    show op = case op of
+    show = \case
         ADD   -> "+"
         SUB   -> "-"
         MUL   -> "*"
@@ -121,7 +121,7 @@ instance Show BinOperator where
         Rel r -> show r
 
 instance Show UnOperator where
-    show op = case op of
+    show = \case
         NOT -> "!"
         NEG -> "-"
 
@@ -132,7 +132,7 @@ data Relation
     deriving (Eq)
 
 instance Show Relation where
-    show r = case r of
+    show = \case
         EQ -> "=="
         NE -> "/="
         LT -> "<"
@@ -141,16 +141,17 @@ instance Show Relation where
         GE -> ">="
 
 binaryToRelation :: Binary -> Relation
-binaryToRelation op = case op of
+binaryToRelation = \case
     OpEqual   -> EQ
     OpUnequal -> NE
     OpLess    -> LT
     OpLessEq  -> LE
     OpGreat   -> GT
     OpGreatEq -> GE
+    _         -> error "TAC.binaryToRelation: trying to convert a non-relation binary operator to a intermediate code relation operator"
 
 binaryToBinOperator :: Binary -> BinOperator
-binaryToBinOperator op = case op of
+binaryToBinOperator = \case
     OpPlus    -> ADD
     OpMinus   -> SUB
     OpTimes   -> MUL
@@ -166,9 +167,10 @@ binaryToBinOperator op = case op of
     OpLessEq  -> Rel LE
     OpGreat   -> Rel GT
     OpGreatEq -> Rel GE
+    _         -> error "TAC.binaryToBinOperator: trying to convert '@' or '..' to a intermediate code binary operator"
     -- OpBelongs ->
 
 unaryToUnOperator :: Unary -> UnOperator
-unaryToUnOperator op = case op of
+unaryToUnOperator = \case
     OpNot    -> NOT
     OpNegate -> NEG
