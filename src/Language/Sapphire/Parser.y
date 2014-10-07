@@ -4,16 +4,16 @@ module Language.Sapphire.Parser
     ( parseProgram
     ) where
 
+import           Language.Sapphire.Error
 import           Language.Sapphire.Lexer
 import           Language.Sapphire.Program
-import           Language.Sapphire.Error
 
 import           Control.Monad             (unless)
 import           Data.Foldable             (toList)
-import           Data.Functor              ((<$>),(<$))
+import           Data.Functor              ((<$), (<$>))
 import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             hiding (length, zip)
-import           Prelude                   hiding (concatMap, foldr)
+import           Data.Sequence             (Seq, empty, fromList, index,
+                                            singleton, (><), (|>))
 }
 
 %name parse
@@ -518,7 +518,7 @@ expandStatement stL = case lexInfo stL of
         then fromList [ StPrint (LitString (fromJust mayStr) <$ (fromJust mayStr)) <$ stL, StRead accL <$ accL ]
         else singleton $ StRead accL <$ accL
     -- No other statement needs compacting, yet
-    _      -> singleton stL
+    _ -> singleton stL
 
 -- For the syntactic sugar of defining several fields of the same type using commas
 expandField :: Lexeme DataType -> Seq (Lexeme Identifier) -> Seq Field

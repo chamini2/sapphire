@@ -138,14 +138,13 @@ sizeOffsetStatement stL = case lexInfo stL of
             addOffset parmWdt
 
         -- Restarts the offset in 0 for this scope
-        parmsWdt <- currentOffset
         resetOffset
 
         sizeOffsetStatements block
         exitScope
 
-        blockWdt <- exitFunction
-        modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { width = blockWdt + parmsWdt })
+        wdt <- exitFunction
+        modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { width = wdt })
 
     StIf _ trueBlock falseBlock -> do
         enterScope

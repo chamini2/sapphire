@@ -4,21 +4,21 @@ import           Language.Sapphire.Definition
 import           Language.Sapphire.Parser
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SizeOffset
-import           Language.Sapphire.TypeChecker
 import           Language.Sapphire.TACGenerator
+import           Language.Sapphire.TypeChecker
 
-import           Control.Monad                 (guard, void, when)
-import           Control.Monad.Trans           (liftIO)
-import           Control.Monad.Trans.Maybe     (runMaybeT)
-import           Data.Foldable                 (mapM_)
-import           Data.List                     (nub)
-import           Data.Sequence                 (null)
-import           Prelude                       hiding (mapM_, null)
-import qualified Prelude                       as P (null)
-import           System.Console.GetOpt         (ArgDescr (..), ArgOrder (..),
-                                                OptDescr (..), getOpt,
-                                                usageInfo)
-import           System.Environment            (getArgs)
+import           Control.Monad                  (guard, void, when)
+import           Control.Monad.Trans            (liftIO)
+import           Control.Monad.Trans.Maybe      (runMaybeT)
+import           Data.Foldable                  (mapM_)
+import           Data.List                      (nub)
+import           Data.Sequence                  (null)
+import           Prelude                        hiding (mapM_, null)
+import qualified Prelude                        as P (null)
+import           System.Console.GetOpt          (ArgDescr (..), ArgOrder (..),
+                                                 OptDescr (..), getOpt,
+                                                 usageInfo)
+import           System.Environment             (getArgs)
 
 main :: IO ()
 main = void $ runMaybeT $ do

@@ -51,6 +51,7 @@ module Language.Sapphire.Program
     , Unary(..)
     , binaryOperation
     , unaryOperation
+    , isComparable
 
     , Access(..)
     , AccessHistory(..)

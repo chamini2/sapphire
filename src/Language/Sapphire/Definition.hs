@@ -23,8 +23,8 @@ import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (Seq, empty, index, null,
                                                 singleton)
 import           Data.Traversable              (forM)
-import           Prelude                       hiding (all, filter, length,
-                                                lookup, mapM_, maximum, null)
+import           Prelude                       hiding (all, lookup, mapM_,
+                                                maximum, null)
 
 --------------------------------------------------------------------------------
 

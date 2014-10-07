@@ -5,6 +5,7 @@ module Language.Sapphire.Expression
     , Unary(..)
     , binaryOperation
     , unaryOperation
+    , isComparable
 
     , Access(..)
     , AccessHistory(..)
@@ -78,25 +79,6 @@ instance Show Binary where
         OpGreatEq -> ">="
         OpBelongs -> "@"
 
---instance Show Binary where
---    show = \case
---        OpPlus    -> "arithmetic addition"
---        OpMinus   -> "arithmetic substraction"
---        OpTimes   -> "arithmetic multiplication"
---        OpDivide  -> "arithmetic division"
---        OpModulo  -> "arithmetic Modulo"
---        OpPower   -> "arithmetic power"
---        OpFromTo  -> "range construction operator"
---        OpOr      -> "logical disjunction"
---        OpAnd     -> "logical conjunction"
---        OpEqual   -> "equal to"
---        OpUnequal -> "not equal to"
---        OpLess    -> "less than"
---        OpLessEq  -> "less than or equal to"
---        OpGreat   -> "greater than"
---        OpGreatEq -> "greater than or equal to"
---        OpBelongs -> "belongs to Range"
-
 binaryOperation :: Binary -> (DataType, DataType) -> Maybe DataType
 binaryOperation op dts = snd <$> find ((dts==) . fst) (binaryOperator op)
 
@@ -132,11 +114,6 @@ instance Show Unary where
         OpNegate -> "-"
         OpNot    -> "not"
 
---instance Show Unary where
---    show = \case
---        OpNegate -> "arithmetic negation"
---        OpNot    -> "logical negation"
-
 unaryOperation :: Unary -> DataType -> Maybe DataType
 unaryOperation op dt = snd <$> find ((dt==) . fst) (unaryOperator op)
 
@@ -144,6 +121,11 @@ unaryOperator :: Unary -> Seq (DataType, DataType)
 unaryOperator = fromList . \case
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
+
+----------------------------------------
+
+isComparable :: Binary -> Bool
+isComparable = flip elem [OpEqual,OpUnequal,OpLess,OpLessEq,OpGreat,OpGreatEq]
 
 --------------------------------------------------------------------------------
 
