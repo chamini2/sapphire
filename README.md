@@ -15,9 +15,15 @@ Tools:
 
 *just install `haskell-platform`*
 
-Compiling a Sapphire program:
+Compiling a Sapphire program
+
+On the repository's root run the following commands:
 
 1. cabal install
 2. running the compiler:
     * `sapphire`: write a program directly on the command line, until `ctrl-D` is pressed.
     * `sapphire examples/tac/<file>.sp`: compiles a program written in the given file.
+    * `sapphire --help`: displays a help menu.
+
+Tips:   
+Use cabal sandbox for better isolation of the execution environment.
