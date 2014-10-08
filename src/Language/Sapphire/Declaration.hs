@@ -15,7 +15,7 @@ data Declaration = Declaration
 
 
 instance Show Declaration where
-    show (Declaration idnL dtL cat) = lexInfo idnL ++ " : " ++ show (lexInfo dtL)
+    show (Declaration idnL dtL _) = lexInfo idnL ++ " : " ++ show (lexInfo dtL)
 
 data Category
     = CatVariable
