@@ -17,14 +17,7 @@ Tools:
 
 Compiling a Sapphire program:
 
-1. cd to path *src/*
-2. `make`
-3. running the compiler:
-    * `make run`: write a program directly on the command line, until `ctrl-D` is pressed.
-    * `make run ../examples/<file>.sp`: compiles a program written in the given file.
-
-
-Extra usage:
-
-- `make clean`: erase all compilation files.
-- `make happyinfo`: generates the file `info.txt` with the grammar information.
+1. cabal install
+2. running the compiler:
+    * `sapphire`: write a program directly on the command line, until `ctrl-D` is pressed.
+    * `sapphire examples/tac/<file>.sp`: compiles a program written in the given file.

@@ -353,6 +353,12 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
         OpNot -> jumpingCode unExpL falseLabel trueLabel
         _     -> void $ linearizeExpression expL
 
+    Variable accL -> do
+        (accA, accT) <- getAccessAddress accL
+        case accT of
+            Bool      -> generate $ IfGoto EQ accA (Constant $ ValBool True) trueLabel 
+            otherwise -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
+
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
 linearizeExpression :: Lexeme Expression -> TACGenerator (Address)
