@@ -137,7 +137,7 @@ typeCheckStatements = liftM or . mapM typeCheckStatement
 typeCheckStatement :: Lexeme Statement -> TypeChecker Returned
 typeCheckStatement (Lex st posn) = case st of
 
-    StAssign accL expL -> const (return False) $ runMaybeT $ do
+    StAssign accL expL -> flip (>>) (return False) . runMaybeT $ do
         expDt           <- lift $ typeCheckExpression expL
         (accIdn, accDt) <- accessDataType accL
 
@@ -146,7 +146,7 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
-    StReturn expL -> const (return True) $ runMaybeT $ do
+    StReturn expL -> flip (>>) (return True) . runMaybeT $ do
         expDt                     <- lift $ typeCheckExpression expL
         (idn, retDt, funcScopeId) <- lift currentFunction
 
@@ -170,14 +170,14 @@ typeCheckStatement (Lex st posn) = case st of
         unless (isVoid dt || ret) $ tellSError posn (NoReturn idn)
         return False
 
-    StProcedureCall idnL expLs -> const (return False) $ runMaybeT (checkArguments idnL expLs False)
+    StProcedureCall idnL expLs -> flip (>>) (return False) . runMaybeT $ checkArguments idnL expLs False
 
-    StRead accL -> const (return False) $ runMaybeT $ do
+    StRead accL -> flip (>>) (return False) . runMaybeT $ do
         (accIdn, accDt) <- accessDataType accL
         guard (isValid accDt)
         unless (isScalar accDt) $ tellSError posn (ReadNonReadable accDt accIdn)
 
-    StPrint exprL -> const (return False) $ runMaybeT $ do
+    StPrint exprL -> flip (>>) (return False) . runMaybeT $ do
         dt <- lift $ typeCheckExpression exprL
         guard (isValid dt)
         unless (dt == String || isScalar dt) $ tellSError posn (PrintNonPrintable dt)
