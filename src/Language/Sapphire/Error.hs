@@ -132,7 +132,7 @@ data StaticError
     | WrongCategory   Identifier SymbolCategory SymbolCategory
     | NotDefined      Identifier
     | AlreadyDeclared Identifier Position
-    deriving Show
+    deriving (Show)
 
 --instance Show StaticError where
 --    show = \case

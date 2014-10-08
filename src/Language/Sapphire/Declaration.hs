@@ -11,7 +11,11 @@ data Declaration = Declaration
     { dclIdentifier :: Lexeme Identifier
     , dclDataType   :: Lexeme DataType
     , dclCategory   :: Category
-    } deriving (Show)
+    }
+
+
+instance Show Declaration where
+    show (Declaration idnL dtL cat) = lexInfo idnL ++ " : " ++ show (lexInfo dtL)
 
 data Category
     = CatVariable
