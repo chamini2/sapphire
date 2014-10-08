@@ -3,7 +3,7 @@ Sapphire
 
 Programming Language developed by Matteo Ferrando and Germán León
 
-The [language design](doc/design.md) is currently on development.
+The [language design](doc/design.md) is currently on development, it's in spanish, though.
 
 ---
 
@@ -28,4 +28,4 @@ On the repository's root run the following commands:
     * `sapphire --help`: displays a help menu.
 
 Tips:   
-* Use cabal sandbox for better isolation of the execution environment.
+* Use *cabal sandboxes* for better isolation of the execution environment.
