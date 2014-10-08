@@ -49,7 +49,7 @@ data Token
     | TkBelongs
 
     -- -- String
-    | TkConcat
+--    | TkConcat
 
     -- -- Identifiers
     | TkIden   { unTkIden   :: String }
