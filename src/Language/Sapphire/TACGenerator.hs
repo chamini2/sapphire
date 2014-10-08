@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-|
  - TAC Generator Monad
  -
@@ -14,17 +15,21 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC
+import           Language.Sapphire.TypeChecker (processExpressionChecker)
 
-import           Control.Arrow                 ((&&&))
-import           Control.Monad                 (liftM, void, unless)
+-- import           Control.Arrow                 ((&&&))
+import           Control.Monad                 (liftM, unless, void)
 import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
-import           Data.Foldable                 (mapM_, forM_)
+import           Data.Foldable                 (forM_, mapM_)
 import           Data.Maybe                    (fromJust)
-import           Data.Sequence                 (Seq, empty, singleton, length, null, zip, reverse)
-import           Data.Traversable              (mapM, forM)
-import           Prelude                       hiding (Ordering(..), exp, mapM, mapM_, length, null, zip, reverse)
+import           Data.Sequence                 (Seq, empty, length, null,
+                                                reverse, singleton, zip)
+import           Data.Traversable              (forM, mapM)
+import           Prelude                       hiding (Ordering (..), exp,
+                                                length, mapM, mapM_, null,
+                                                reverse, zip)
 
 --------------------------------------------------------------------------------
 
@@ -153,11 +158,12 @@ linearizeStatement nextLabel (Lex st posn) = do
     case st of
 
         StAssign accL expL ->  do
-
-            (resAddr, accDt) <- getAccessAddress accL
+            tab <- gets table
+            let expDt = processExpressionChecker tab expL
+            resAddr <- getAccessAddress accL
 
             -- When assigning a Boolean expression, use jumping code
-            if accDt == Bool then do
+            if expDt == Bool then do
                 trueLabel  <- newLabel
                 falseLabel <- newLabel
                 jumpingCode expL trueLabel falseLabel
@@ -180,7 +186,7 @@ linearizeStatement nextLabel (Lex st posn) = do
         StReturn expL -> linearizeExpression expL >>= generate . Return
 
         StFunctionDef idnL _ block -> do
-            (blockWdt, prmsWdt) <- liftM fromJust $ getsSymbol (lexInfo idnL) (blockWidth &&& prmsWidth)
+            blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
 
             generate $ BeginFunction blockWdt
             enterScope
@@ -195,7 +201,20 @@ linearizeStatement nextLabel (Lex st posn) = do
             -- PopParameters
 
         -- StRead       (Lexeme Access)
-        -- StPrint      (Lexeme Expression)
+
+        StPrint expL -> do
+            tab <- gets table
+            let expDt          = processExpressionChecker tab expL
+                LitString strL = lexInfo expL
+
+            expAddr <- linearizeExpression expL
+
+            case expDt of
+                Int    -> generate $ PrintInt    expAddr
+                Float  -> generate $ PrintFloat  expAddr
+                Bool   -> generate $ PrintBool   expAddr
+                Char   -> generate $ PrintChar   expAddr
+                String -> generate $ PrintString (lexInfo strL)
 
         StIf expL trueBlock falseBlock -> do
             trueLabel  <- newLabel
@@ -248,8 +267,8 @@ linearizeStatement nextLabel (Lex st posn) = do
             -- For every when, with the block's label
             forM_ (zip whenLabels whnLs) $ \(whnLabel, Lex (When whnExpLs _) _) ->
                 forM_ whnExpLs $ \whnExpL -> do
-                    whnAddr <- linearizeExpression whnExpL
-                    generate $ IfGoto EQ expAddr whnAddr whnLabel
+                    whnAddrs <- linearizeExpression whnExpL
+                    generate $ IfGoto EQ expAddr whnAddrs whnLabel
 
             -- Only jump when there is an 'otherwise'
             unless (null othrBlock) . generate $ Goto othrLabel
@@ -298,8 +317,8 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ AssignBin idnAddr ADD idnAddr (Constant $ ValInt 1)
             generate $ Goto condLabel
 
-        StBreak    -> (liftM snd) currentLoop >>= generate . Goto
-        StContinue -> (liftM fst) currentLoop >>= generate . Goto
+        StBreak    -> currentLoop >>= generate . Goto . snd
+        StContinue -> currentLoop >>= generate . Goto . fst
 
         _ -> return ()
 
@@ -336,19 +355,17 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
 
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
-
-linearizeExpression :: Lexeme Expression -> TACGenerator Address
+linearizeExpression :: Lexeme Expression -> TACGenerator (Address)
 linearizeExpression (Lex exp _) = case exp of
 
-    LitInt   v -> return . Constant . ValInt   $ lexInfo v
-    LitFloat v -> return . Constant . ValFloat $ lexInfo v
-    LitBool  v -> return . Constant . ValBool  $ lexInfo v
-    LitChar  v -> return . Constant . ValChar  $ lexInfo v
-
-    LitString str -> newTemporary
+    LitInt    v -> return . Constant . ValInt    $ lexInfo v
+    LitFloat  v -> return . Constant . ValFloat  $ lexInfo v
+    LitBool   v -> return . Constant . ValBool   $ lexInfo v
+    LitChar   v -> return . Constant . ValChar   $ lexInfo v
+    LitString v -> return . Constant . ValString $ lexInfo v
 
     Variable accL -> do
-        (accAddr, _) <- getAccessAddress accL
+        accAddr <- getAccessAddress accL
 
         resTemp <- newTemporary
         generate $ Assign resTemp accAddr
@@ -357,13 +374,14 @@ linearizeExpression (Lex exp _) = case exp of
     FunctionCall idnL prmLs -> do
         resTemp  <- newTemporary
         prmAddrs <- mapM linearizeExpression (reverse prmLs)
+
         mapM_ (generate . PushParameter) prmAddrs
         generate $ FCall resTemp (lexInfo idnL) (length prmAddrs)
         return resTemp
 
     ExpBinary (Lex op _) lExpL rExpL -> do
-        lAddr   <- linearizeExpression lExpL
-        rAddr   <- linearizeExpression rExpL
+        lAddr <- linearizeExpression lExpL
+        rAddr <- linearizeExpression rExpL
         resTemp <- newTemporary
         generate $ AssignBin resTemp (binaryToBinOperator op) lAddr rAddr
         return resTemp
@@ -376,13 +394,13 @@ linearizeExpression (Lex exp _) = case exp of
 
 --------------------------------------------------------------------------------
 
-getAccessAddress :: Lexeme Access -> TACGenerator (Address, DataType)
+getAccessAddress :: Lexeme Access -> TACGenerator Address
 getAccessAddress accL = do
     -- It works only for Variable for now
     let VariableAccess idnL = lexInfo accL
         idn                 = lexInfo idnL
-    (dt, off) <- liftM (fromJust) $ getsSymbol idn (lexInfo . dataType &&& offset)
-    return (Name idn off, dt)
+    off<- liftM (fromJust) $ getsSymbol idn offset
+    return $ Name idn off
 
 -- getAccessAddress :: Lexeme Access -> TACGenerator Address
 -- getAccessAddress accL = do

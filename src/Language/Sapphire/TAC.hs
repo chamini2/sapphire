@@ -30,18 +30,19 @@ instance Show Address where
         Temporary t -> t
 
 data Value
-    = ValInt   Int
-    | ValFloat Float
-    | ValBool  Bool
-    | ValChar  Char
+    = ValInt    Int
+    | ValFloat  Float
+    | ValBool   Bool
+    | ValChar   Char
+    | ValString String
 
 instance Show Value where
     show = \case
-        ValInt   v -> show v
-        ValFloat v -> show v
-        ValBool  v -> map toLower (show v)
-        ValChar  v -> [v]
-
+        ValInt    v -> show v
+        ValFloat  v -> show v
+        ValBool   v -> map toLower (show v)
+        ValChar   v -> [v]
+        ValString v -> v
 
 data Instruction
     = Comment String
@@ -71,6 +72,12 @@ data Instruction
     | Return Address
     | PCall         Label Int
     | FCall Address Label Int
+    -- Print
+    | PrintInt    Address
+    | PrintFloat  Address
+    | PrintChar   Address
+    | PrintBool   Address
+    | PrintString String
     -- Goto
     | Goto Label
     | IfGoto      Relation Address Address Label
@@ -92,6 +99,11 @@ instance Show Instruction where
             Return a              -> "return " ++ show a
             PCall la i            -> "call " ++ la ++ ", " ++ show i
             FCall d la i          -> show d ++ " := " ++ "call " ++ la ++ ", " ++ show i
+            PrintInt    a         -> "print_int "    ++ show a
+            PrintFloat  a         -> "print_float "  ++ show a
+            PrintChar   a         -> "print_char "   ++ show a
+            PrintBool   a         -> "print_bool "   ++ show a
+            PrintString str       -> "print_string " ++ show str
             Goto la               -> "goto " ++ la
             IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
             IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la

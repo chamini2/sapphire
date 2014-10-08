@@ -3,6 +3,8 @@ module Language.Sapphire.TypeChecker
 
     , TypeChecker
     , processTypeChecker
+
+    , processExpressionChecker
     ) where
 
 import           Language.Sapphire.Error
@@ -14,7 +16,7 @@ import           Control.Arrow             ((&&&))
 import           Control.Monad             (guard, liftM, unless, void, when,
                                             (>=>))
 import           Control.Monad.Reader      (asks)
-import           Control.Monad.RWS         (RWS, lift, runRWS)
+import           Control.Monad.RWS         (RWS, lift, runRWS, evalRWS)
 import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Control.Monad.Writer      (tell)
@@ -25,7 +27,6 @@ import           Data.Sequence             (Seq, empty, length, zipWith)
 import           Data.Traversable          (mapM, forM)
 import           Prelude                   hiding (all, and, or, exp, length,
                                             lookup, mapM, zipWith)
-import qualified Prelude                   as P (length)
 
 --------------------------------------------------------------------------------
 
@@ -40,7 +41,6 @@ data TypeState = TypeState
     , scopeId      :: ScopeNum
     , ast          :: Program
     , funcStack    :: Stack (Identifier, DataType, ScopeNum)
-    , stringOffset :: Offset
     }
 
 ----------------------------------------
@@ -69,7 +69,6 @@ initialState = TypeState
     , scopeId      = topScopeNum
     , ast          = Program empty
     , funcStack    = singletonStack ("sapphire", Void, topScopeNum)
-    , stringOffset = 0
     }
 
 --------------------------------------------------------------------------------
@@ -103,6 +102,17 @@ processTypeChecker r w tab = runTypeChecker r . buildTypeChecker w tab
 
 runTypeChecker :: SappReader -> TypeChecker a -> (TypeState, SappWriter)
 runTypeChecker r = (\(_,s,w) -> (s,w)) . flip (flip runRWS r) initialState
+
+processExpressionChecker :: SymbolTable -> Lexeme Expression -> DataType
+processExpressionChecker tab = evalExpressionChecker . buildExpressionChecker tab
+
+evalExpressionChecker :: TypeChecker DataType -> DataType
+evalExpressionChecker = fst . flip (flip evalRWS initialReader) initialState
+
+buildExpressionChecker :: SymbolTable -> Lexeme Expression -> TypeChecker DataType
+buildExpressionChecker tab expL = do
+    modify $ \s -> s { table = tab }
+    typeCheckExpression expL
 
 --------------------------------------------------------------------------------
 -- Monad handling
@@ -255,24 +265,7 @@ typeCheckExpression (Lex exp posn) = case exp of
     LitFloat  _ -> return Float
     LitBool   _ -> return Bool
     LitChar   _ -> return Char
-
-    LitString strL -> do
-        strOff <- gets stringOffset
-        let strWdt = P.length $ lexInfo strL
-            info = emptySymInfo
-                { dataType   = fillLex String
-                , category   = CatConstant
-                , offset     = strOff
-                , width      = strWdt
-                , used       = True
-                , scopeStack = globalStack
-                , defPosn    = lexPosn strL
-                }
-        -- Set the new global offset
-        modify $ \s -> s { stringOffset = strOff + strWdt}
-        -- '$' means it's a constant
-        addSymbol (show $ lexInfo strL) info
-        return String
+    LitString _ -> return String
 
     Variable accL -> liftM (fromMaybe TypeError) $ runMaybeT $ do
         (accIdn, accDt) <- accessDataType accL

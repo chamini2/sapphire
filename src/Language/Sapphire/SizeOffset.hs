@@ -17,7 +17,7 @@ import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (forM_, mapM_)
 import           Data.Maybe                    (fromJust)
 import           Data.Sequence                 (empty)
-import           Prelude                       hiding (mapM_)
+import           Prelude                       hiding (mapM_, exp)
 
 --------------------------------------------------------------------------------
 
@@ -32,6 +32,7 @@ data SizeState = SizeState
     , scopeId  :: ScopeNum
     , ast      :: Program
     , offStack :: Stack Offset
+    , stringOffset :: Offset
     }
 
 ----------------------------------------
@@ -55,11 +56,12 @@ instance Show SizeState where
 
 initialState :: SizeState
 initialState = SizeState
-    { table    = emptyTable
-    , stack    = topStack
-    , scopeId  = topScopeNum
-    , ast      = Program empty
-    , offStack = singletonStack 0
+    { table        = emptyTable
+    , stack        = topStack
+    , scopeId      = topScopeNum
+    , ast          = Program empty
+    , offStack     = singletonStack 0
+    , stringOffset = 0
     }
 
 --------------------------------------------------------------------------------
@@ -142,6 +144,8 @@ sizeOffsetStatement stL = case lexInfo stL of
         blockWdt <- exitFunction
         modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt })
 
+    StPrint expL -> addStrings expL
+
     StIf _ trueBlock falseBlock -> do
         enterScope
         sizeOffsetStatements trueBlock
@@ -181,11 +185,34 @@ sizeOffsetStatement stL = case lexInfo stL of
         exitScope
 
     _ -> return ()
-    --StAssign
+    -- StAssign
     -- StStructDefinition
-    --StReturn
-    --StProcedureCall
-    --StRead
-    --StPrint
-    --StBreak
-    --StContinue
+    -- StReturn
+    -- StProcedureCall
+    -- StRead
+    -- StBreak
+    -- StContinue
+
+--------------------------------------------------------------------------------
+
+-- We only need to check for Strings to add them to the SymbolTable
+addStrings :: Lexeme Expression -> SizeOffset ()
+addStrings (Lex exp _) = case exp of
+
+    LitString strL -> do
+        strOff <- gets stringOffset
+        let strWdt = length $ lexInfo strL
+            info = emptySymInfo
+                { dataType   = fillLex String
+                , category   = CatConstant
+                , offset     = strOff
+                , width      = strWdt
+                , used       = True
+                , scopeStack = globalStack
+                , defPosn    = lexPosn strL
+                }
+        -- Set the new global offset
+        modify $ \s -> s { stringOffset = strOff + strWdt}
+        addSymbol (show $ lexInfo strL) info
+
+    _ -> return ()
