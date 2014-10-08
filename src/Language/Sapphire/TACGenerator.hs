@@ -15,7 +15,7 @@ import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC
 
--- import           Control.Arrow                 ((&&&))
+import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, void, unless)
 import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
@@ -175,15 +175,17 @@ linearizeStatement nextLabel (Lex st posn) = do
 
         -- StVariableDeclaration
 
-        StStructDefinition _ _ -> enterScope >> exitScope      -- For scopeStack maintenance
+        -- StStructDefinition
 
         StReturn expL -> linearizeExpression expL >>= generate . Return
 
-        StFunctionDef idnL sign block -> do
-            wdt <- liftM fromJust $ getsSymbol (lexInfo idnL) width
+        StFunctionDef idnL _ block -> do
+            (blockWdt, prmsWdt) <- liftM fromJust $ getsSymbol (lexInfo idnL) (blockWidth &&& prmsWidth)
 
-            generate $ BeginFunction wdt
+            generate $ BeginFunction blockWdt
+            enterScope
             linearizeStatements block
+            exitScope
             generate $ EndFunction
 
         StProcedureCall idnL prmLs -> do
@@ -271,9 +273,13 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ Goto befLabel
 
         StFor idnL expL block -> do
-            let idnAddr = Name $ lexInfo idnL
             condLabel  <- newLabel
             blockLabel <- newLabel
+
+            enterScope >> enterLoop condLabel nextLabel
+
+            off <- liftM fromJust $ getsSymbol (lexInfo idnL) offset
+            let idnAddr = Name (lexInfo idnL) off
 
             let ExpBinary _ fromExpL toExpL = lexInfo expL
             fromAddr <- linearizeExpression fromExpL
@@ -286,7 +292,6 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ IfGoto GT idnAddr toAddr nextLabel
 
             generate $ PutLabel blockLabel "block label for `for`"
-            enterScope >> enterLoop condLabel nextLabel
             linearizeStatements block
             exitLoop >> exitScope
 
@@ -342,7 +347,12 @@ linearizeExpression (Lex exp _) = case exp of
 
     LitString str -> newTemporary
 
-    Variable accL -> liftM fst $ getAccessAddress accL
+    Variable accL -> do
+        (accAddr, _) <- getAccessAddress accL
+
+        resTemp <- newTemporary
+        generate $ Assign resTemp accAddr
+        return resTemp
 
     FunctionCall idnL prmLs -> do
         resTemp  <- newTemporary
@@ -371,8 +381,8 @@ getAccessAddress accL = do
     -- It works only for Variable for now
     let VariableAccess idnL = lexInfo accL
         idn                 = lexInfo idnL
-    dt <- liftM (fromJust) $ getsSymbol idn (lexInfo . dataType)
-    return (Name idn, dt)
+    (dt, off) <- liftM (fromJust) $ getsSymbol idn (lexInfo . dataType &&& offset)
+    return (Name idn off, dt)
 
 -- getAccessAddress :: Lexeme Access -> TACGenerator Address
 -- getAccessAddress accL = do

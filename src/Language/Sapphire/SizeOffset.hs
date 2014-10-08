@@ -71,8 +71,6 @@ buildSizeOffset w tab program@(Program block) = do
     tell w
     sizeOffsetStatements block
 
-----------------------------------------
-
 --------------------------------------------------------------------------------
 -- Using the Monad
 
@@ -103,7 +101,6 @@ addOffset off = modify $ \s -> s { offStack = modifyStack (+off) (offStack s) }
 resetOffset :: SizeOffset ()
 resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }
 
-
 --------------------------------------------------------------------------------
 -- Statements
 
@@ -121,30 +118,29 @@ sizeOffsetStatement stL = case lexInfo stL of
         modifySymbolWithScope idn symStk (\sym -> sym { offset = off })
         addOffset symWdt
 
-    StStructDefinition _ _ -> enterScope >> exitScope       -- For scopeStack maintenance
-
-    StFunctionDef (Lex idn _) (Sign parms _) block ->  do
+    StFunctionDef (Lex idn _) (Sign prms _) block ->  do
         sym <- liftM fromJust $ getSymbol idn
 
         enterFunction
         enterScope
 
         -- Parameters offsets
-        forM_ parms $ \(Lex dcl _) -> do
-            let parmIdn = lexInfo $ dclIdentifier dcl
-            (parmStk, parmWdt) <- liftM fromJust $ getsSymbol parmIdn (scopeStack &&& width)
-            off                <- currentOffset
-            modifySymbolWithScope parmIdn parmStk (\sym' -> sym' { offset = negate off }) -- (-1) For the execution stack
-            addOffset parmWdt
+        forM_ prms $ \(Lex dcl _) -> do
+            let prmIdn = lexInfo $ dclIdentifier dcl
+            (prmstk, prmWdt) <- liftM fromJust $ getsSymbol prmIdn (scopeStack &&& width)
+            off              <- currentOffset
+            modifySymbolWithScope prmIdn prmstk (\sym' -> sym' { offset = negate off })     -- (-1) For the execution stack
+            addOffset prmWdt
 
-        -- Restarts the offset in 0 for this scope
+        -- Restarts the offset in 0 for the statements block
+        prmsWdt <- currentOffset
         resetOffset
 
         sizeOffsetStatements block
         exitScope
 
-        wdt <- exitFunction
-        modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { width = wdt })
+        blockWdt <- exitFunction
+        modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt })
 
     StIf _ trueBlock falseBlock -> do
         enterScope
@@ -186,7 +182,7 @@ sizeOffsetStatement stL = case lexInfo stL of
 
     _ -> return ()
     --StAssign
-    --StStructDefinition
+    -- StStructDefinition
     --StReturn
     --StProcedureCall
     --StRead

@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE LambdaCase                 #-}
 {- |
     Symbol table based on the LeBlanc-Cook symbol table definition
  -}
@@ -22,7 +23,7 @@ module Language.Sapphire.SymbolTable
     , emptySymInfo
     , emptySymType
     , emptySymFunction
-    --, isProcedure
+    -- , isProcedure
 
     , Used
     , LanguageDefined
@@ -40,16 +41,17 @@ module Language.Sapphire.SymbolTable
     , push
     , modifyStack
     , topStack
+    , globalStack
     , emptyStack
     , singletonStack
 
     -- From Scope
     , Scope(..)
     , ScopeNum
-    , topScopeNum
-    --, langScopeNum
     -- , topScope
     --, langScope
+    , topScopeNum
+    --, langScopeNum
     ) where
 
 import           Language.Sapphire.Program
@@ -138,7 +140,8 @@ data Symbol = SymInfo
                 , body       :: StBlock
                 , returned   :: Returned
                 , langDef    :: LanguageDefined
-                , width      :: Width
+                , blockWidth :: Width
+                , prmsWidth  :: Width
                 , used       :: Used
                 , scopeStack :: Stack Scope
                 , defPosn    :: Position
@@ -156,7 +159,7 @@ instance Show Symbol where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showDT    = show $ lexInfo dt
                 showFlds  = maybe "NO Symbol Table" ((++) "\n" . showTable 3) flds
-        SymFunction prms rt _ _ lDef by u stk p -> intercalate ", " [showP p, showLDef, showSign, showU u, showW by, showStk stk]
+        SymFunction prms rt _ _ lDef bBy pBy u stk p -> intercalate ", " [showP p, showLDef, showSign, showU u, showW bBy, showW pBy, showStk stk]
             where
                 showLDef = if lDef then "language-defined" else "user-defined"
                 showSign = "(" ++ intercalate "," (map (show . lexInfo) $ toList prms) ++ ") -> " ++ show (lexInfo rt)
@@ -174,7 +177,13 @@ scopeNum = serial . top . scopeStack
 data SymbolCategory = CatInfo
                     | CatType
                     | CatFunction
-                    deriving (Eq, Show)
+                    deriving (Eq)
+
+instance Show SymbolCategory where
+    show = \case
+        CatInfo     -> "variable"
+        CatType     -> "data type"
+        CatFunction -> "function"
 
 -- To sort types first, variables second, and functions last in SymbolTable.allSymbols
 instance Ord SymbolCategory where
@@ -226,7 +235,8 @@ emptySymFunction = SymFunction
     , returned   = False
     , body       = empty
     , langDef    = False
-    , width      = 0
+    , blockWidth = 0
+    , prmsWidth  = 0
     , used       = False
     , scopeStack = langStack
     , defPosn    = defaultPosn
