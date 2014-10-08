@@ -10,12 +10,12 @@ import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SymbolTable
 
 import           Control.Arrow                 ((&&&))
-import           Control.Monad                 (liftM)
+import           Control.Monad                 (liftM, unless)
 import           Control.Monad.RWS             (RWS, runRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (forM_, mapM_)
-import           Data.Maybe                    (fromJust)
+import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (empty)
 import           Prelude                       hiding (mapM_, exp)
 
@@ -211,8 +211,11 @@ addStrings (Lex exp _) = case exp of
                 , scopeStack = globalStack
                 , defPosn    = lexPosn strL
                 }
-        -- Set the new global offset
-        modify $ \s -> s { stringOffset = strOff + strWdt}
-        addSymbol (show $ lexInfo strL) info
+        let idn = (show $ lexInfo strL)
+        maySymbol <- getSymbol idn
+        unless (isJust maySymbol) $ do
+            -- Set the new global offset
+            modify $ \s -> s { stringOffset = strOff + strWdt}
+            addSymbol idn info
 
     _ -> return ()
