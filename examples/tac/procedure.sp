@@ -1,3 +1,4 @@
+#   Procedure - Procedure defintion and call
 def proc : Int a -> ()
     print "My arg is " , a
 end
