@@ -1,9 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.Expression
     ( Expression(..)
     , Binary(..)
     , Unary(..)
     , binaryOperation
     , unaryOperation
+    , isComparable
 
     , Access(..)
     , AccessHistory(..)
@@ -24,14 +26,14 @@ import           Language.Sapphire.DataType
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable                (find)
+import           Data.Char                    (toLower)
+import           Data.Foldable                (concatMap, find)
 import           Data.Functor                 ((<$), (<$>))
 import           Data.Maybe                   (fromJust)
 import           Data.Sequence                (Seq, fromList)
+import           Prelude                      hiding (concatMap)
 
 data Expression
-    -- Error
---    = NoExpression                              -- Only used in Parser
     -- Literals
     = LitInt    (Lexeme Int)
     | LitFloat  (Lexeme Float)
@@ -46,7 +48,19 @@ data Expression
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression)
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression)
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+instance Show Expression where
+    show = \case
+        LitInt   vL               -> show (lexInfo vL)
+        LitFloat vL               -> show (lexInfo vL)
+        LitBool  vL               -> map toLower $ show (lexInfo vL)
+        LitChar  vL               -> show (lexInfo vL)
+        LitString strL            -> show (lexInfo strL)
+        Variable accL             -> show (lexInfo accL)
+        FunctionCall idnL expLs   -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
+        ExpBinary opL lExpL rExpL -> show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL)
+        ExpUnary  opL expL        -> show (lexInfo opL) ++ " " ++ show (lexInfo expL)
 
 --instance Show Expression where
 --    show = runPrinter . printExpression
@@ -59,7 +73,7 @@ data Binary
     deriving (Eq, Ord)
 
 instance Show Binary where
-    show op = case op of
+    show = \case
         OpPlus    -> "+"
         OpMinus   -> "-"
         OpTimes   -> "*"
@@ -77,30 +91,11 @@ instance Show Binary where
         OpGreatEq -> ">="
         OpBelongs -> "@"
 
---instance Show Binary where
---    show op = case op of
---        OpPlus    -> "arithmetic addition"
---        OpMinus   -> "arithmetic substraction"
---        OpTimes   -> "arithmetic multiplication"
---        OpDivide  -> "arithmetic division"
---        OpModulo  -> "arithmetic Modulo"
---        OpPower   -> "arithmetic power"
---        OpFromTo  -> "range construction operator"
---        OpOr      -> "logical disjunction"
---        OpAnd     -> "logical conjunction"
---        OpEqual   -> "equal to"
---        OpUnequal -> "not equal to"
---        OpLess    -> "less than"
---        OpLessEq  -> "less than or equal to"
---        OpGreat   -> "greater than"
---        OpGreatEq -> "greater than or equal to"
---        OpBelongs -> "belongs to Range"
-
 binaryOperation :: Binary -> (DataType, DataType) -> Maybe DataType
 binaryOperation op dts = snd <$> find ((dts==) . fst) (binaryOperator op)
 
 binaryOperator :: Binary -> Seq ((DataType, DataType), DataType)
-binaryOperator op = fromList $ case op of
+binaryOperator = fromList . \case
     OpPlus    -> arithmetic
     OpMinus   -> arithmetic
     OpTimes   -> arithmetic
@@ -127,22 +122,22 @@ data Unary = OpNegate | OpNot
     deriving (Eq, Ord)
 
 instance Show Unary where
-    show op = case op of
+    show = \case
         OpNegate -> "-"
         OpNot    -> "not"
-
---instance Show Unary where
---    show op = case op of
---        OpNegate -> "arithmetic negation"
---        OpNot    -> "logical negation"
 
 unaryOperation :: Unary -> DataType -> Maybe DataType
 unaryOperation op dt = snd <$> find ((dt==) . fst) (unaryOperator op)
 
 unaryOperator :: Unary -> Seq (DataType, DataType)
-unaryOperator op = fromList $ case op of
+unaryOperator = fromList . \case
     OpNegate -> [(Int, Int), (Float, Float)]
     OpNot    -> [(Bool, Bool)]
+
+----------------------------------------
+
+isComparable :: Binary -> Bool
+isComparable = flip elem [OpEqual,OpUnequal,OpLess,OpLessEq,OpGreat,OpGreatEq]
 
 --------------------------------------------------------------------------------
 
@@ -152,13 +147,13 @@ data Access = VariableAccess (Lexeme Identifier)
             deriving (Eq, Ord)
 
 instance Show Access where
-    show acc = case acc of
+    show = \case
         VariableAccess idnL      -> lexInfo idnL
         ArrayAccess    accL indL -> show (lexInfo accL) ++ "[" ++ show (lexInfo indL) ++ "]"
         StructAccess   accL fldL -> show (lexInfo accL) ++ "." ++ lexInfo fldL
 
 {-
- - deriving the AccessHistory data
+ - derivating the AccessHistory data
  -
  - Access        = acc
  - AccessHistory = acc'
@@ -174,7 +169,6 @@ instance Show Access where
 
 data AccessHistory = HistoryArray  (Lexeme Expression)
                    | HistoryStruct (Lexeme Identifier)
-                   deriving (Show)
 
 type Thread = [Lexeme AccessHistory]
 

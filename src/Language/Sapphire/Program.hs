@@ -16,9 +16,11 @@ module Language.Sapphire.Program
 
     -- From Lexeme
     , Lexeme(..)
-    , fillLex
+    , pure
     , Position(..)
     , defaultPosn
+    , row
+    , col
 
     -- From DataType
     , DataType(..)
@@ -49,6 +51,7 @@ module Language.Sapphire.Program
     , Unary(..)
     , binaryOperation
     , unaryOperation
+    , isComparable
 
     , Access(..)
     , AccessHistory(..)
@@ -73,12 +76,6 @@ import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 import           Language.Sapphire.Statement
 
--- import           Data.Foldable                 (concatMap)
--- import           Prelude                       hiding (concatMap)
-
 --------------------------------------------------------------------------------
 
 newtype Program = Program StBlock
-
--- instance Show Program where
---     show (Program sts) = concatMap ((++) "\n" . show) sts

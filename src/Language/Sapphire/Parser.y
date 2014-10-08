@@ -4,16 +4,16 @@ module Language.Sapphire.Parser
     ( parseProgram
     ) where
 
+import           Language.Sapphire.Error
 import           Language.Sapphire.Lexer
 import           Language.Sapphire.Program
-import           Language.Sapphire.Error
 
 import           Control.Monad             (unless)
 import           Data.Foldable             (toList)
-import           Data.Functor              ((<$>),(<$))
+import           Data.Functor              ((<$), (<$>))
 import           Data.Maybe                (fromJust, isJust)
-import           Data.Sequence             hiding (length, zip)
-import           Prelude                   hiding (concatMap, foldr)
+import           Data.Sequence             (Seq, empty, fromList, index,
+                                            singleton, (><), (|>))
 }
 
 %name parse
@@ -105,7 +105,7 @@ import           Prelude                   hiding (concatMap, foldr)
     "@"             { Lex TkBelongs     _ }
 
     -- -- Identifiers
-    idnid           { Lex (TkIden   _)  _ }
+    ident           { Lex (TkIden   _)  _ }
     typeid          { Lex (TkTypeId _)  _ }
 
 --------------------------------------------------------------------------------
@@ -195,6 +195,8 @@ Statement :: { Lexeme Statement }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
 
+----------------------------------------
+
     -- Errors
     -- -- Assignment
     | Access "="                {% do
@@ -260,23 +262,6 @@ Statement :: { Lexeme Statement }
                                                                                        return const
                                                                                    }
 
-    -- -- I/O
---    | "read"              String         "," Access         { StReadString (Just $2) $4 <$ $1 }
---    | "read"  "(" MaybeNL String MaybeNL "," AccessNL ")"   { StReadString (Just $4) $7 <$ $1 }
---    | "read"      Access                                    { StReadString Nothing   $2 <$ $1 }
---    | "read"  "(" AccessNL ")"                              { StReadString Nothing   $3 <$ $1 }
---    | "print"     ExpressionList            { StPrintList $2 <$ $1 }
---    | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
-
-    -- -- Loops
---    | "while" Expression "do" StatementList "end"                                           { StLoop empty $2          $4    <$ $1 }
---    | "until" Expression "do" StatementList "end"                                           { StLoop empty (notExp $2) $4    <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "while" Expression                               { StLoop $2    $6          empty <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "until" Expression                               { StLoop $2    (notExp $6) empty <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"      { StLoop $2    $6          $8    <$ $1 }
---    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"      { StLoop $2    (notExp $6) $8    <$ $1 }
---    | "for" VariableId "in" Expression "do" StatementList "end"                             { StFor  $2    $4          $6    <$ $1 }
-
 ---------------------------------------
 -- Structures
 
@@ -304,7 +289,8 @@ AccessNL :: { Lexeme Access }
 -- Identifiers
 
 VariableId :: { Lexeme Identifier }
-    : idnid         { unTkIden `fmap` $1 }
+    : ident         { unTkIden `fmap` $1 }
+    -- Errors
     | typeid        {% do
                         let const = unTkTypeId `fmap` $1
                         tellPError (lexPosn $1) (TypeIdInsteadOfVarId $ lexInfo const)
@@ -313,7 +299,8 @@ VariableId :: { Lexeme Identifier }
 
 TypeId :: { Lexeme Identifier }
     : typeid        { unTkTypeId `fmap` $1 }
-    | idnid         {% do
+    -- Errors
+    | ident         {% do
                         let const = unTkIden `fmap` $1
                         tellPError (lexPosn $1) (VarIdInsteadOfTypeId $ lexInfo const)
                         return const
@@ -322,6 +309,7 @@ TypeId :: { Lexeme Identifier }
 VariableList :: { Seq (Lexeme Identifier) }
     : VariableId                    { singleton $1 }
     | VariableList "," VariableId   { $1     |> $3 }
+    -- Errors
     | VariableList     VariableId   {% do
                                         let const = $1 |> $2
                                         tellPError (lexPosn $2) VariableListComma
@@ -337,6 +325,11 @@ DataType :: { Lexeme DataType }
                                     unless (lexInfo $3 > 0) $ tellPError (lexPosn $3) (ParseError "size of array must be positive")
                                     return $ Array $1 $3 <$ $1
                                 }
+    | DataType "[" "-" Int "]"  {% do
+                                    tellPError (lexPosn $3) (ParseError "size of array must be positive")
+                                    return $ Array $1 $4 <$ $1
+                                }
+    -- Errors
     | DataType "["     "]"      {% do
                                     let const = Void <$ $1
                                     tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
@@ -359,6 +352,7 @@ DataType :: { Lexeme DataType }
 FieldList :: { Seq Field }
     : MaybeNL Field MaybeNL                 { $2       }
     | FieldList "," MaybeNL Field MaybeNL   { $1 >< $4 }
+    -- Errors
     | FieldList             Field MaybeNL   {% do
                                                 let const = $1 >< $2
                                                 tellPError (lexPosn . snd $ index $2 0) FieldListComma
@@ -383,6 +377,7 @@ ReturnType :: { Lexeme DataType }
 ParameterList :: { Seq (Lexeme Declaration) }
     : DataType VariableId                       { singleton (Declaration $2 $1 CatParameter <$ $1) }
     | ParameterList "," DataType VariableId     { $1     |> (Declaration $4 $3 CatParameter <$ $3) }
+    -- Errors
     | ParameterList     DataType VariableId     {% do
                                                     let const = $1 |> (Declaration $3 $2 CatParameter <$ $2)
                                                     tellPError (lexPosn $2) ParameterListComma
@@ -392,6 +387,7 @@ ParameterList :: { Seq (Lexeme Declaration) }
 ParameterListNL :: { Seq (Lexeme Declaration) }
     : MaybeNL DataType VariableId MaybeNL                       { singleton (Declaration $3 $2 CatParameter <$ $2) }
     | ParameterListNL "," MaybeNL DataType VariableId MaybeNL   { $1     |> (Declaration $5 $4 CatParameter <$ $4) }
+    -- Errors
     | ParameterListNL             DataType VariableId MaybeNL   {% do
                                                                     let const = $1 |> (Declaration $3 $2 CatParameter <$ $2)
                                                                     tellPError (lexPosn $2) ParameterListComma
@@ -526,7 +522,7 @@ expandStatement stL = case lexInfo stL of
         then fromList [ StPrint (LitString (fromJust mayStr) <$ (fromJust mayStr)) <$ stL, StRead accL <$ accL ]
         else singleton $ StRead accL <$ accL
     -- No other statement needs compacting, yet
-    _      -> singleton stL
+    _ -> singleton stL
 
 -- For the syntactic sugar of defining several fields of the same type using commas
 expandField :: Lexeme DataType -> Seq (Lexeme Identifier) -> Seq Field

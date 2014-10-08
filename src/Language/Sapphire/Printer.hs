@@ -1,6 +1,7 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.Printer
     ( processPrinter
-    )where
+    ) where
 
 import           Language.Sapphire.Program
 
@@ -10,6 +11,8 @@ import           Data.Char            (toLower)
 import           Data.Sequence        (Seq, singleton)
 import           Data.Foldable        (concat, mapM_, forM_)
 import           Prelude              hiding (concat, mapM_, exp)
+
+--------------------------------------------------------------------------------
 
 instance Show Program where
     show = processPrinter
@@ -62,10 +65,10 @@ printString str = get >>= \t -> tell . singleton $ tabs t ++ str ++ "\n"
 -- Tabs
 
 raiseTabs :: Printer ()
-raiseTabs = modify (\t -> t + 1)
+raiseTabs = modify succ
 
 lowerTabs :: Printer ()
-lowerTabs = modify (\t -> t - 1)
+lowerTabs = modify pred
 
 --------------------------------------------------------------------------------
 
@@ -216,11 +219,12 @@ printStatement (Lex st posn) = case st of
 
 
     StBreak    -> printString $ "BREAK"    ++ show posn
-
     StContinue -> printString $ "CONTINUE" ++ show posn
 
+    _ -> error $ "Printer.printStatement: statement '" ++ show st ++ "' should not shown in the AST"
+
 printExpression :: Expression -> Printer ()
-printExpression exp = case exp of
+printExpression = \case
 
     LitInt    i -> printString $ "Int literal: "   ++ show (lexInfo i)
     LitChar   c -> printString $ "Char literal: " ++ show (lexInfo c)

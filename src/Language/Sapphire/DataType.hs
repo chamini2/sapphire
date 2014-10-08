@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.DataType
     ( DataType(..)
     , Field
@@ -25,24 +26,22 @@ module Language.Sapphire.DataType
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable                (toList)
 import           Data.Functor                 ((<$))
-import           Data.List                    (intercalate)
+import           Data.Function                (on)
 import           Data.Maybe                   (fromJust)
-import           Data.Sequence                (Seq)
 
 data DataType
-    = DataType (Lexeme Identifier)
+    = DataType (Lexeme Identifier)                  -- For compiler use
     | Int | Float | Bool | Char | Range | Type
     | String
-    | Record (Lexeme Identifier)
-    | Union  (Lexeme Identifier)
+    | Record { structIdentifier :: (Lexeme Identifier) }
+    | Union  { structIdentifier :: (Lexeme Identifier) }
     | Array  (Lexeme DataType)   (Lexeme Int)
-    | Void | TypeError                          -- For compiler use
-    deriving (Ord, Eq)
+    | Void | TypeError                              -- For compiler use
+    deriving (Ord)
 
 instance Show DataType where
-    show dt = case dt of
+    show = \case
         DataType idnL   -> "DataType " ++ lexInfo idnL
         Int             -> "Int"
         Float           -> "Float"
@@ -55,10 +54,27 @@ instance Show DataType where
         Union  idnL     -> "union "  ++ lexInfo idnL
         Array  dtL sizL -> show (lexInfo dtL) ++ "[" ++ show (lexInfo sizL) ++ "]"
         Void            -> "()"
-        TypeError       -> error "DataType TypeError should never be shown"
+        TypeError       -> error "DataType.DataType.show: TypeError should never be shown"
+
+instance Eq DataType where
+    a == b = case (a,b) of
+        (DataType idnAL, DataType idnBL)     -> comp idnAL idnBL
+        (Int, Int)                           -> True
+        (Float, Float)                       -> True
+        (Bool, Bool)                         -> True
+        (Char, Char)                         -> True
+        (Range, Range)                       -> True
+        (Type, Type)                         -> True
+        (String, String)                     -> True
+        (Record idnAL, Record idnBL)         -> comp idnAL idnBL
+        (Union  idnAL, Union  idnBL)         -> comp idnAL idnBL
+        (Array dtAL sizAL, Array dtBL sizBL) -> (comp dtAL dtBL) && (comp sizAL sizBL)
+        (Void, Void)                         -> True
+        (TypeError, TypeError)               -> True
+        _                                    -> False
         where
-            showFields :: Seq Field -> String
-            showFields flds = " {" ++ intercalate ", " (toList $ fmap (\(i,d) -> lexInfo i ++ " : " ++ show d) flds) ++ "}"
+            comp :: Eq a => Lexeme a -> Lexeme a -> Bool
+            comp = (==) `on` lexInfo
 
 ----------------------------------------
 
@@ -68,20 +84,20 @@ type Field = (Lexeme Identifier, Lexeme DataType)
 
 -- For lookups in the SymbolTable
 toIdentifier :: DataType -> Identifier
-toIdentifier dt = case dt of
+toIdentifier = \case
     DataType idnL -> lexInfo idnL
-    Int    -> "Int"
-    Float  -> "Float"
-    Bool   -> "Bool"
-    Char   -> "Char"
-    Range  -> "Range"
-    Type   -> "Type"
-    String -> "String"
+    Int         -> "Int"
+    Float       -> "Float"
+    Bool        -> "Bool"
+    Char        -> "Char"
+    Range       -> "Range"
+    Type        -> "Type"
+    String      -> "String"
     Record idnL -> lexInfo idnL
     Union  idnL -> lexInfo idnL
     Array dtL _ -> toIdentifier $ lexInfo dtL
-    Void      -> "()"
-    TypeError -> "Error"
+    Void        -> "()"
+    TypeError   -> "Error"
 
 ----------------------------------------
 
@@ -92,30 +108,28 @@ isScalar :: DataType -> Bool
 isScalar = flip elem [Int , Float , Bool , Char]
 
 isValid :: DataType -> Bool
-isValid dt = case dt of
-    TypeError -> False
-    _         -> True
+isValid = (/= TypeError)
 
 isArray :: DataType -> Bool
-isArray dt = case dt of
+isArray = \case
     Array _ _ -> True
     _         -> False
 
 isStruct :: DataType -> Bool
-isStruct dt = case dt of
+isStruct = \case
     Record _   -> True
     Union  _   -> True
     _          -> False
 
 arrayInnerDataType :: DataType -> DataType
-arrayInnerDataType dt = case dt of
+arrayInnerDataType = \case
     Array dtL _ -> lexInfo dtL
     _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
 
 --------------------------------------------------------------------------------
 
 {-
- - deriving the DataTypeHistory data
+ - derivating the DataTypeHistory data
  -
  - DataType = dt
  - DataTypeHistory = dt'
@@ -135,7 +149,6 @@ arrayInnerDataType dt = case dt of
  -}
 
 data DataTypeHistory = HistoryDataType (Lexeme Int)
-    deriving (Show)
 
 type Thread = [Lexeme DataTypeHistory]
 

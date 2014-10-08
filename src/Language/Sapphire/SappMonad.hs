@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.SappMonad where
 
 import           Language.Sapphire.Error
-import           Language.Sapphire.Printer ()
+import           Language.Sapphire.Printer ()   -- For the Show instance of Program
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 
@@ -13,7 +14,7 @@ import           Data.Function        (on)
 import           Data.Functor         ((<$>))
 import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
-import           Data.Sequence        (Seq, singleton)
+import           Data.Sequence        (Seq, singleton, empty)
 
 --------------------------------------------------------------------------------
 -- Monadic functions
@@ -87,6 +88,12 @@ defaultArchitecture = Arch
 
 type SappWriter = Seq Error
 
+----------------------------------------
+-- Initial
+
+initialWriter :: SappWriter
+initialWriter = empty
+
 --------------------------------------------------------------------------------
 -- State
 
@@ -130,9 +137,9 @@ tellWarn posn = tell . singleton . Warn posn
 
 enterScope :: (SappState s, MonadState s m) => m ()
 enterScope = do
-    scp <- gets getScopeId
-    let scope = Scope { serial = scp + 1 }
-    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId (scp + 1) s
+    scp <- liftM succ $ gets getScopeId
+    let scope = Scope { serial = scp }
+    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId scp s
 
 exitScope :: (SappState s, MonadState s m) => m ()
 exitScope = modify $ \s -> putStack (pop $ getStack s) s
@@ -163,9 +170,7 @@ getsSymbol idn f = do
 
 getsSymbolWithStack :: (SappState s, MonadState s m)
                     => Identifier -> Stack Scope -> (Symbol -> a) -> m (Maybe a)
-getsSymbolWithStack idn stk f = do
-    tab <- gets getTable
-    return $ f <$> lookupWithScope idn stk tab
+getsSymbolWithStack idn stk f = gets getTable >>= return . fmap f . lookupWithScope idn stk
 
 ----------------------------------------
 
@@ -178,11 +183,9 @@ modifySymbolWithScope idn stk f = do
 
 modifySymbol :: (SappState s, MonadState s m)
              => Identifier -> (Symbol -> Symbol) -> m ()
-modifySymbol idn f = do
-    mayStk <- getsSymbol idn scopeStack
-    case mayStk of
-        Nothing        -> return ()
-        Just stk -> modifySymbolWithScope idn stk f
+modifySymbol idn f = getsSymbol idn scopeStack >>= \case
+    Nothing  -> return ()
+    Just stk -> modifySymbolWithScope idn stk f
 
 ----------------------------------------
 -- Used

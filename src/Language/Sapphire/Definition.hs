@@ -1,8 +1,5 @@
 module Language.Sapphire.Definition
     ( DefState(..)
-    --, Definition
-    --, buildDefinition
-    --, runProgramDefinition
     , processDefinition
     ) where
 
@@ -14,7 +11,7 @@ import           Language.Sapphire.SymbolTable
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void, when)
 import           Control.Monad.Reader          (asks)
-import           Control.Monad.RWS             (RWS, runRWS)
+import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Trans.Maybe     (MaybeT, runMaybeT)
 import           Control.Monad.Writer          (listen, tell)
@@ -23,10 +20,10 @@ import           Data.Foldable                 (all, foldl', foldlM, forM_,
 import           Data.Functor                  ((<$))
 import qualified Data.Map.Strict               as Map (toList)
 import           Data.Maybe                    (fromJust, isJust)
-import           Data.Sequence                 (Seq, empty, filter, index, null,
+import           Data.Sequence                 (Seq, empty, index, null,
                                                 singleton)
 import           Data.Traversable              (forM)
-import           Prelude                       hiding (all, filter, length,
+import           Prelude                       hiding (all, length,
                                                 lookup, mapM_, maximum, null)
 
 --------------------------------------------------------------------------------
@@ -84,12 +81,9 @@ buildDefinition w program@(Program block) = do
 
     (_, defW) <- listen (return ())
 
-    when (null defW) $ do
-        tab <- liftM allSymbols $ gets table
-        -- First we define every DataType in the program,
-        -- Then we get said DataTypes for the variables/parameters
-        fixDataTypes $ filter ((==) CatType . symbolCategory . snd) tab
-        fixDataTypes $ filter ((/=) CatType . symbolCategory . snd) tab
+    -- First we define every DataType in the program,
+    -- Then we get said DataTypes for the variables/parameters
+    when (null defW) $ gets (allSymbols . table) >>= fixDataTypes
 
 ----------------------------------------
 
@@ -97,7 +91,7 @@ initializeTable :: Definition ()
 initializeTable = asks (Map.toList . types . arch) >>= \tuples -> forM_ tuples $
     \(dt, by) -> do
         let info = emptySymType
-                { dataType = fillLex dt
+                { dataType = pure dt
                 , langDef  = True
                 , used     = True
                 , width    = by
@@ -111,16 +105,16 @@ processDefinition :: SappReader -> SappWriter -> Program -> (DefState, SappWrite
 processDefinition r w = runDefinition r . buildDefinition w
 
 runDefinition :: SappReader -> Definition a -> (DefState, SappWriter)
-runDefinition r = (\(_,s,w) -> (s,w)) . flip (flip runRWS r) initialState
+runDefinition r = flip (flip execRWS r) initialState
 
 --------------------------------------------------------------------------------
 -- Monad handling
 
 enterLoop :: Definition ()
-enterLoop = modify (\s -> s { loopLvl = loopLvl s + 1 })
+enterLoop = modify $ \s -> s { loopLvl = succ $ loopLvl s }
 
 exitLoop :: Definition ()
-exitLoop = modify (\s -> s { loopLvl = loopLvl s - 1 })
+exitLoop = modify $ \s -> s { loopLvl = pred $ loopLvl s }
 
 --------------------------------------------------------------------------------
 -- Declaration
@@ -155,15 +149,12 @@ definitionStatement (Lex st posn) = case st of
     StVariableDeclaration dclL -> processDeclaration dclL
 
     StStructDefinition dtL flds -> void $ runMaybeT $ do
-        let idn = case lexInfo dtL of
-                Record idnL -> lexInfo idnL
-                Union  idnL -> lexInfo idnL
+        let idn = lexInfo . structIdentifier $ lexInfo dtL
 
         current <- currentScope
-        unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
 
-        enterScope
-        stk <- gets stack
+        -- Can only define structures in the top scope
+        unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
 
         -- Fields SymbolTable
         fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
@@ -172,21 +163,19 @@ definitionStatement (Lex st posn) = case st of
                     , category   = CatField
                     , used       = True
                     , defPosn    = fldP
-                    , scopeStack = stk
+                    , scopeStack = topStack
                     }
                 maySymI = lookup fldIdn fldsTab
             case maySymI of
                 Nothing   -> return $ insert fldIdn info fldsTab
                 Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
 
-        exitScope
-        stk' <- gets stack
-
+        stk <- gets stack
         let info = emptySymType
                 { dataType   = dtL
                 , fields     = Just fldsTab
                 , defPosn    = lexPosn dtL
-                , scopeStack = stk'
+                , scopeStack = stk
                 }
 
         maySymI <- getsSymbol idn (langDef &&& defPosn)
@@ -196,11 +185,11 @@ definitionStatement (Lex st posn) = case st of
                 | symLangD  -> tellSError (lexPosn dtL) (TypeLanguageDefined idn)
                 | otherwise -> tellSError (lexPosn dtL) (TypeAlreadyDefined idn symDefP)
 
-    StFunctionDef idnL (Sign parms dtL) block -> do
+    StFunctionDef idnL (Sign prms dtL) block -> do
         stk <- gets stack
         let idn = lexInfo idnL
             info = emptySymFunction
-                { paramTypes = fmap (dclDataType . lexInfo) parms
+                { paramTypes = fmap (dclDataType . lexInfo) prms
                 , returnType = dtL
                 , body       = block
                 , defPosn    = lexPosn idnL
@@ -215,7 +204,7 @@ definitionStatement (Lex st posn) = case st of
                 | otherwise             -> addSymbol idn info
 
         enterScope
-        mapM_ processDeclaration parms
+        mapM_ processDeclaration prms
         definitionStatements block
         exitScope
 
@@ -250,15 +239,14 @@ definitionStatement (Lex st posn) = case st of
 
 
     StFor idnL _ block -> do
-        let dcl = Declaration idnL (DataType (fillLex "Int") <$ idnL) CatVariable <$ idnL
+        let dcl = Declaration idnL (DataType (pure "Int") <$ idnL) CatVariable <$ idnL
         enterScope >> enterLoop
         processDeclaration dcl
         definitionStatements block
         exitLoop >> exitScope
 
-    StBreak -> gets loopLvl >>= \lvl -> unless (lvl > topScopeNum) $ tellSError posn BreakOutsideLoop
-
-    StContinue -> gets loopLvl >>= \lvl -> unless (lvl > topScopeNum) $ tellSError posn BreakOutsideLoop
+    StBreak    -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn BreakOutsideLoop
+    StContinue -> gets loopLvl >>= \lvl -> unless (lvl > 0) $ tellSError posn ContinueOutsideLoop
 
     _ -> return ()
     --StAssign
@@ -289,9 +277,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
 
             -- We only need to check the user-defined types
             unless (langDef sym) $ do
-                let strIdn = case lexInfo symDtL of
-                        Record idnL -> lexInfo idnL
-                        Union  idnL -> lexInfo idnL
+                let strIdn = lexInfo . structIdentifier $ lexInfo symDtL
 
                 unless (isJust symTab) $ error "Definition.fixDataTypes: user-defined type has no fields SymbolTable"
 

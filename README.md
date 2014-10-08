@@ -3,28 +3,29 @@ Sapphire
 
 Programming Language developed by Matteo Ferrando and Germán León
 
-The [language design](doc/diseno.md) is currently on development.
+The [language design](doc/design.md) is currently on development.
 
 ---
 
 Tools:
 
-* `ghc`:   version 7.6.3
-* `alex`:  version 3.0.5
-* `happy`: version 1.18.10
+* **`ghc`**:   version 7.8.3
+* **`alex`**:  version 3.1.2
+* **`happy`**: version 1.19.4
 
-*just install `haskell-platform`*
+You can just install *Haskell Platform*
 
-Compiling a Sapphire program:
+---
 
-1. cd to path *src/*
-2. `make`
-3. running the compiler:
-    * `make run`: write a program directly on the command line, until `ctrl-D` is pressed.
-    * `make run ../examples/<file>.sp`: compiles a program written in the given file.
+Compiling a Sapphire program
 
+On the repository's root run the following commands:
 
-Extra usage:
+1. cabal install
+2. using the compiler:
+    * `sapphire`: write a program directly on the command line, until `ctrl-D` is pressed.
+    * `sapphire examples/tac/<file>.sp`: compiles a program written in the given file.
+    * `sapphire --help`: displays a help menu.
 
-- `make clean`: erase all compilation files.
-- `make happyinfo`: generates the file `info.txt` with the grammar information.
+Tips:   
+* Use cabal sandbox for better isolation of the execution environment.

@@ -2,9 +2,9 @@ module Main where
 
 import           Language.Sapphire.Definition
 import           Language.Sapphire.Parser
--- import           Language.Sapphire.Printer
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SizeOffset
+import           Language.Sapphire.TACGenerator
 import           Language.Sapphire.TypeChecker
 
 import           Control.Monad                 (guard, void, when)
@@ -36,23 +36,27 @@ main = void $ runMaybeT $ do
         else liftIO . readFile $ head args
 
     let (prog, plErrs) = parseProgram input
-    mapM_ (liftIO . print) plErrs
-    guard (null plErrs)
+    unlessGuard (null plErrs) $ mapM_ (liftIO . print) plErrs
     -- When there are no lexer or parser errors
 
     let (defS, dfErrs) = processDefinition reader plErrs prog
-    mapM_ (liftIO . print) dfErrs
-    guard (null dfErrs)
+    unlessGuard (null dfErrs) $ mapM_ (liftIO . print) dfErrs
     -- When there are no definition errors
 
-    let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) (getAst defS)
-    mapM_ (liftIO . print) tpErrs
-    guard (null tpErrs)
+    let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) prog
+    unlessGuard (null tpErrs) $ mapM_ (liftIO . print) tpErrs
     -- When there are no type checking errors
 
-    let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) (getAst typS)
-    liftIO $ print sizS
-    mapM_ (liftIO . print) szErrs
+    let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) prog
+    unlessGuard (null szErrs) $ mapM_ (liftIO . print) szErrs
+    -- When there are no size or offset errors
+
+    when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
+    when (ShowAST         `elem` flgs) . liftIO $ print prog
+
+    let tacW = processTACGenerator () (getTable sizS) prog
+
+    mapM_ (liftIO . print) tacW
 
     liftIO $ putStrLn "done."
 
@@ -63,8 +67,8 @@ options :: [OptDescr Flag]
 options =
     [ Option "h"  ["help"]         (NoArg  Help)              "shows this help message"
     , Option "v"  ["version"]      (NoArg  Version)           "shows version number"
-    , Option "W"  ["Wall"]         (NoArg  AllWarnings)       "show all warnings"
-    , Option "w"  ["Wnone"]        (NoArg  SuppressWarnings)  "suppress all warnings"
+    , Option "W"  ["all-warnings"] (NoArg  AllWarnings)       "show all warnings"
+    , Option "w"  ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
     , Option "o"  ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
     , Option "st" ["symbol-table"] (NoArg ShowSymbolTable)    "shows the symbol table"
     , Option "a " ["ast"]          (NoArg ShowAST)            "shows the AST"
@@ -96,3 +100,5 @@ arguments = do
                     then flgs
                     else flg : flgs
             OutputFile _     -> flg : flgs
+            ShowSymbolTable  -> flg : flgs
+            ShowAST          -> flg : flgs
