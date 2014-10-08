@@ -17,7 +17,7 @@ import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC
 import           Language.Sapphire.TypeChecker (processExpressionChecker)
 
--- import           Control.Arrow                 ((&&&))
+import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void)
 import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
@@ -198,7 +198,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             prmAddrs <- mapM linearizeExpression (reverse prmLs)
             mapM_ (generate . PushParameter) prmAddrs
             generate $ PCall (lexInfo idnL) (length prmAddrs)
-            -- PopParameters
+            generate . PopParameters $ length prmAddrs
 
         -- StRead       (Lexeme Access)
 
@@ -206,15 +206,16 @@ linearizeStatement nextLabel (Lex st posn) = do
             tab <- gets table
             let expDt          = processExpressionChecker tab expL
                 LitString strL = lexInfo expL
+                idn            = show $ lexInfo strL
 
-            expAddr <- linearizeExpression expL
-
-            case expDt of
-                Int    -> generate $ PrintInt    expAddr
-                Float  -> generate $ PrintFloat  expAddr
-                Bool   -> generate $ PrintBool   expAddr
-                Char   -> generate $ PrintChar   expAddr
-                String -> generate $ PrintString (lexInfo strL)
+            if expDt == String
+                then getsSymbol idn (offset &&& width) >>=
+                    generate . uncurry PrintString . fromJust
+                else linearizeExpression expL >>= case expDt of
+                    Int   -> generate . PrintInt
+                    Float -> generate . PrintFloat
+                    Bool  -> generate . PrintBool
+                    Char  -> generate . PrintChar
 
         StIf expL trueBlock falseBlock -> do
             trueLabel  <- newLabel
@@ -354,21 +355,35 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
         _     -> void $ linearizeExpression expL
 
     Variable accL -> do
-        (accA, accT) <- getAccessAddress accL
-        case accT of
-            Bool      -> generate $ IfGoto EQ accA (Constant $ ValBool True) trueLabel 
-            otherwise -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
+        accAddr <- getAccessAddress accL
+        generate $ IfTrueGoto accAddr trueLabel
 
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
 linearizeExpression :: Lexeme Expression -> TACGenerator (Address)
 linearizeExpression (Lex exp _) = case exp of
 
-    LitInt    v -> return . Constant . ValInt    $ lexInfo v
-    LitFloat  v -> return . Constant . ValFloat  $ lexInfo v
-    LitBool   v -> return . Constant . ValBool   $ lexInfo v
-    LitChar   v -> return . Constant . ValChar   $ lexInfo v
-    LitString v -> return . Constant . ValString $ lexInfo v
+    LitInt    v -> do
+        resTemp <- newTemporary
+        generate $ Assign resTemp (Constant . ValInt   $ lexInfo v)
+        return resTemp
+
+    LitFloat  v -> do
+        resTemp <- newTemporary
+        generate $ Assign resTemp (Constant . ValFloat $ lexInfo v)
+        return resTemp
+
+    LitBool   v -> do
+        resTemp <- newTemporary
+        generate $ Assign resTemp (Constant . ValBool  $ lexInfo v)
+        return resTemp
+
+    LitChar   v -> do
+        resTemp <- newTemporary
+        generate $ Assign resTemp (Constant . ValChar  $ lexInfo v)
+        return resTemp
+
+    LitString _ -> error "TACGenerator.linearizeExpression: should not get address for a String"
 
     Variable accL -> do
         accAddr <- getAccessAddress accL

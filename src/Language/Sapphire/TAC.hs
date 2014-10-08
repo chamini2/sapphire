@@ -65,7 +65,7 @@ data Instruction
 --    | AssignArrR
 --    | AssignArrL
     -- Function related instructions
-    | BeginFunction Int
+    | BeginFunction Width
     | EndFunction
     | PushParameter Address
     | PopParameters Int
@@ -77,7 +77,7 @@ data Instruction
     | PrintFloat  Address
     | PrintChar   Address
     | PrintBool   Address
-    | PrintString String
+    | PrintString Offset  Width
     -- Goto
     | Goto Label
     | IfGoto      Relation Address Address Label
@@ -103,7 +103,7 @@ instance Show Instruction where
             PrintFloat  a         -> "print_float "  ++ show a
             PrintChar   a         -> "print_char "   ++ show a
             PrintBool   a         -> "print_bool "   ++ show a
-            PrintString str       -> "print_string " ++ show str
+            PrintString o w       -> "print_string " ++ show o ++ " " ++ show w
             Goto la               -> "goto " ++ la
             IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
             IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la

@@ -52,15 +52,15 @@ data Expression
 
 instance Show Expression where
     show = \case
-        LitInt   vL -> show (lexInfo vL)
-        LitFloat vL -> show (lexInfo vL)
-        LitBool  vL -> map toLower $ show (lexInfo vL)
-        LitChar  vL -> show (lexInfo vL)
-        LitString strL -> lexInfo strL
-        Variable accL -> show (lexInfo accL)
-        FunctionCall idnL expLs -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
+        LitInt   vL               -> show (lexInfo vL)
+        LitFloat vL               -> show (lexInfo vL)
+        LitBool  vL               -> map toLower $ show (lexInfo vL)
+        LitChar  vL               -> show (lexInfo vL)
+        LitString strL            -> show (lexInfo strL)
+        Variable accL             -> show (lexInfo accL)
+        FunctionCall idnL expLs   -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
         ExpBinary opL lExpL rExpL -> show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL)
-        ExpUnary  opL expL -> show (lexInfo opL) ++ " " ++ show (lexInfo expL)
+        ExpUnary  opL expL        -> show (lexInfo opL) ++ " " ++ show (lexInfo expL)
 
 --instance Show Expression where
 --    show = runPrinter . printExpression
