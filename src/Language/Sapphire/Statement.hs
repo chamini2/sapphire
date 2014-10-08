@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.Statement
     ( Statement(..)
     , StBlock
@@ -11,9 +12,10 @@ import           Language.Sapphire.Expression
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable                 (foldl')
+import           Data.Foldable                 (foldl', concatMap)
 import           Data.Sequence                 (Seq)
 import           Data.List                     (intercalate)
+import           Prelude                       hiding (exp, concatMap)
 
 type StBlock    = Seq (Lexeme Statement)
 
@@ -38,45 +40,44 @@ data Statement
     | StPrintList  (Seq (Lexeme Expression))                -- Only used in Parser
     -- Conditional
     | StIf   (Lexeme Expression) StBlock StBlock
-    | StCase (Lexeme Expression) (Seq (Lexeme When))      StBlock
+    | StCase (Lexeme Expression) (Seq (Lexeme When))     StBlock
     -- Loops
     | StLoop     StBlock (Lexeme Expression) StBlock
-    | StFor      (Lexeme Identifier) (Lexeme Expression)  StBlock
+    | StFor      (Lexeme Identifier) (Lexeme Expression) StBlock
     | StBreak
     | StContinue
 
 instance Show Statement where
-    show st = case st of
-        StNoop                  -> "Noop"
-        StAssign _ _            -> "Assign"
-        StVariableDeclaration _ -> "VariableDeclaration"
-        StDeclarationList _     -> "DeclarationList"
-        StStructDefinition _ _  -> "StructDefinition"
-        StReturn _              -> "Return"
-        StFunctionDef _ _ _     -> "FunctionDef"
-        StProcedureCall _ _     -> "ProcedureCall"
-        StRead _                -> "Read"
-        StReadString _ _        -> "ReadString"
-        StPrint _               -> "Print"
-        StPrintList _           -> "PrintList"
-        StIf _ _ _              -> "If"
-        StCase _ _ _            -> "Case"
-        StLoop _ _ _            -> "Loop"
-        StFor _ _ _             -> "For"
-        StBreak                 -> "Break"
-        StContinue              -> "Continue"
+    show = \case
+        StAssign accL expL         -> show (lexInfo accL) ++ " = " ++ show (lexInfo expL)
+        StVariableDeclaration dclL -> show (lexInfo dclL)
+        StStructDefinition dtL _   -> show (lexInfo dtL)
+        StReturn expL              -> "return " ++ show (lexInfo expL)
+        StFunctionDef idnL _ _     -> "def " ++ lexInfo idnL
+        StProcedureCall idnL expLs -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
+        StRead accL                -> "read " ++ show (lexInfo accL)
+        StPrint expL               -> "print " ++ show (lexInfo expL)
+        StIf expL _ _              -> "if " ++ show (lexInfo expL)
+        StCase expL _ _            -> "case " ++ show (lexInfo expL)
+        StLoop _ expL _            -> "repeat .. while " ++ show (lexInfo expL) ++ "do .. end"
+        StFor idnL expL _          -> "for " ++ lexInfo idnL ++ " in " ++ show (lexInfo expL) ++ " do "
+        StBreak                    -> "break"
+        StContinue                 -> "continue"
+        _                          -> error "Statement.Statement.show: should not show these statements"
+        -- StNoop
+        -- StDeclarationList
+        -- StReadString
+        -- StPrintList
 
 ----------------------------------------
 
 data When = When (Seq (Lexeme Expression)) StBlock
-    deriving (Show)
-
 
 data Signature = Sign (Seq (Lexeme Declaration)) (Lexeme DataType)
 
 instance Show Signature where
-    show (Sign parmLs retDtL) = showParms ++ showRetDt
+    show (Sign prmLs retDtL) = showPrms ++ showRetDt
         where
-            showParms = intercalate ", " $ foldl' func [] parmLs
+            showPrms = intercalate ", " $ foldl' func [] prmLs
             showRetDt = " -> " ++ show (lexInfo retDtL)
             func ls (Lex dcl _) = (show (lexInfo $ dclDataType dcl) ++ " " ++ lexInfo (dclIdentifier dcl)) : ls

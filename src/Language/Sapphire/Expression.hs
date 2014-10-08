@@ -26,14 +26,14 @@ import           Language.Sapphire.DataType
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable                (find)
+import           Data.Char                    (toLower)
+import           Data.Foldable                (concatMap, find)
 import           Data.Functor                 ((<$), (<$>))
 import           Data.Maybe                   (fromJust)
 import           Data.Sequence                (Seq, fromList)
+import           Prelude                      hiding (concatMap)
 
 data Expression
-    -- Error
---    = NoExpression                              -- Only used in Parser
     -- Literals
     = LitInt    (Lexeme Int)
     | LitFloat  (Lexeme Float)
@@ -48,7 +48,19 @@ data Expression
     -- Operators
     | ExpBinary (Lexeme Binary) (Lexeme Expression) (Lexeme Expression)
     | ExpUnary  (Lexeme Unary)  (Lexeme Expression)
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+instance Show Expression where
+    show = \case
+        LitInt   vL -> show (lexInfo vL)
+        LitFloat vL -> show (lexInfo vL)
+        LitBool  vL -> map toLower $ show (lexInfo vL)
+        LitChar  vL -> show (lexInfo vL)
+        LitString strL -> lexInfo strL
+        Variable accL -> show (lexInfo accL)
+        FunctionCall idnL expLs -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
+        ExpBinary opL lExpL rExpL -> show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL)
+        ExpUnary  opL expL -> show (lexInfo opL) ++ " " ++ show (lexInfo expL)
 
 --instance Show Expression where
 --    show = runPrinter . printExpression
@@ -141,7 +153,7 @@ instance Show Access where
         StructAccess   accL fldL -> show (lexInfo accL) ++ "." ++ lexInfo fldL
 
 {-
- - deriving the AccessHistory data
+ - derivating the AccessHistory data
  -
  - Access        = acc
  - AccessHistory = acc'
@@ -157,7 +169,6 @@ instance Show Access where
 
 data AccessHistory = HistoryArray  (Lexeme Expression)
                    | HistoryStruct (Lexeme Identifier)
-                   deriving (Show)
 
 type Thread = [Lexeme AccessHistory]
 

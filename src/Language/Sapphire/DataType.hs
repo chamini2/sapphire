@@ -54,7 +54,7 @@ instance Show DataType where
         Union  idnL     -> "union "  ++ lexInfo idnL
         Array  dtL sizL -> show (lexInfo dtL) ++ "[" ++ show (lexInfo sizL) ++ "]"
         Void            -> "()"
-        TypeError       -> error "DataType TypeError should never be shown"
+        TypeError       -> error "DataType.DataType.show: TypeError should never be shown"
 
 instance Eq DataType where
     a == b = case (a,b) of
@@ -107,9 +107,7 @@ isScalar :: DataType -> Bool
 isScalar = flip elem [Int , Float , Bool , Char]
 
 isValid :: DataType -> Bool
-isValid = \case
-    TypeError -> False
-    _         -> True
+isValid = (/= TypeError)
 
 isArray :: DataType -> Bool
 isArray = \case
@@ -130,7 +128,7 @@ arrayInnerDataType = \case
 --------------------------------------------------------------------------------
 
 {-
- - deriving the DataTypeHistory data
+ - derivating the DataTypeHistory data
  -
  - DataType = dt
  - DataTypeHistory = dt'
@@ -150,7 +148,6 @@ arrayInnerDataType = \case
  -}
 
 data DataTypeHistory = HistoryDataType (Lexeme Int)
-    deriving (Show)
 
 type Thread = [Lexeme DataTypeHistory]
 

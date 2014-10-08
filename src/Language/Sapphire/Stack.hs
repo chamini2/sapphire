@@ -6,6 +6,7 @@ module Language.Sapphire.Stack
     , modifyStack
 
     , topStack
+    , globalStack
     , langStack
     , emptyStack
     , singletonStack
@@ -62,10 +63,13 @@ modifyStack f (Stack (x : xs)) = Stack (f x : xs)
     The scope stack has the inital scope by default.
 -}
 topStack :: Stack Scope
-topStack = Stack [ topScope, langScope ]
+topStack = push topScope globalStack
+
+globalStack :: Stack Scope
+globalStack = push globalScope langStack
 
 langStack :: Stack Scope
-langStack = singletonStack langScope
+langStack = push langScope emptyStack
 
 emptyStack :: Stack a
 emptyStack = Stack [ ]

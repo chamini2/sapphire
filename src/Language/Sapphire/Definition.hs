@@ -160,7 +160,6 @@ definitionStatement (Lex st posn) = case st of
         -- Can only define structures in the top scope
         unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
 
-        enterScope
         stk <- gets stack
 
         -- Fields SymbolTable
@@ -170,21 +169,18 @@ definitionStatement (Lex st posn) = case st of
                     , category   = CatField
                     , used       = True
                     , defPosn    = fldP
-                    , scopeStack = stk
+                    , scopeStack = topStack
                     }
                 maySymI = lookup fldIdn fldsTab
             case maySymI of
                 Nothing   -> return $ insert fldIdn info fldsTab
                 Just symI -> tellSError fldP (AlreadyDeclared fldIdn (defPosn symI)) >> return fldsTab
 
-        exitScope
-        stk' <- gets stack
-
         let info = emptySymType
                 { dataType   = dtL
                 , fields     = Just fldsTab
                 , defPosn    = lexPosn dtL
-                , scopeStack = stk'
+                , scopeStack = stk
                 }
 
         maySymI <- getsSymbol idn (langDef &&& defPosn)
@@ -194,11 +190,11 @@ definitionStatement (Lex st posn) = case st of
                 | symLangD  -> tellSError (lexPosn dtL) (TypeLanguageDefined idn)
                 | otherwise -> tellSError (lexPosn dtL) (TypeAlreadyDefined idn symDefP)
 
-    StFunctionDef idnL (Sign parms dtL) block -> do
+    StFunctionDef idnL (Sign prms dtL) block -> do
         stk <- gets stack
         let idn = lexInfo idnL
             info = emptySymFunction
-                { paramTypes = fmap (dclDataType . lexInfo) parms
+                { paramTypes = fmap (dclDataType . lexInfo) prms
                 , returnType = dtL
                 , body       = block
                 , defPosn    = lexPosn idnL
@@ -213,7 +209,7 @@ definitionStatement (Lex st posn) = case st of
                 | otherwise             -> addSymbol idn info
 
         enterScope
-        mapM_ processDeclaration parms
+        mapM_ processDeclaration prms
         definitionStatements block
         exitScope
 

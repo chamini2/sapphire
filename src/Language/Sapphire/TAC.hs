@@ -5,6 +5,7 @@
 module Language.Sapphire.TAC where
 
 import           Language.Sapphire.Program
+import           Language.Sapphire.SymbolTable
 
 import           Data.Char                 (toLower)
 import           Prelude                   hiding (Ordering (..))
@@ -18,13 +19,13 @@ type Temporary = String
 type Serial    = Int
 
 data Address
-    = Name      Identifier
+    = Name      Identifier Offset
     | Constant  Value
     | Temporary Temporary
 
 instance Show Address where
     show = \case
-        Name idn    -> idn
+        Name idn o  -> idn ++ "(" ++ show o ++ ")"
         Constant v  -> "\\" ++ show v
         Temporary t -> t
 

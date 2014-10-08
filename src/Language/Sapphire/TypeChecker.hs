@@ -18,13 +18,13 @@ import           Control.Monad.RWS         (RWS, lift, runRWS)
 import           Control.Monad.State       (gets, modify)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Control.Monad.Writer      (tell)
-import           Data.Foldable             (all, and, forM_, mapM_)
+import           Data.Foldable             (all, and, or, forM_)
 import           Data.Functor              ((<$>))
 import           Data.Maybe                (fromJust, fromMaybe, isJust)
 import           Data.Sequence             (Seq, empty, length, zipWith)
-import           Data.Traversable          (mapM)
-import           Prelude                   hiding (all, and, exp, length,
-                                            lookup, mapM, mapM_, zipWith)
+import           Data.Traversable          (mapM, forM)
+import           Prelude                   hiding (all, and, or, exp, length,
+                                            lookup, mapM, zipWith)
 import qualified Prelude                   as P (length)
 
 --------------------------------------------------------------------------------
@@ -79,7 +79,7 @@ buildTypeChecker :: SappWriter -> SymbolTable -> Program -> TypeChecker ()
 buildTypeChecker w tab program@(Program block) = do
     modify $ \s -> s { table = tab, ast = program }
     tell w
-    typeCheckStatements block
+    void $ typeCheckStatements block
 
     syms <- liftM allSymbols $ gets table
 
@@ -91,11 +91,9 @@ buildTypeChecker w tab program@(Program block) = do
 
 checkTable :: Seq (Identifier, Symbol) -> TypeChecker ()
 checkTable syms = forM_ syms $ \(idn, sym) -> case symbolCategory sym of
-        CatInfo -> unless (used sym) $ tellWarn (defPosn sym) (DefinedNotUsed idn)
-        CatType -> unless (used sym) $ tellWarn (defPosn sym) (TypeDefinedNotUsed idn)
-        CatFunction -> void $ runMaybeT $ do
-            unlessGuard (returned sym) $ tellSError (defPosn sym) (NoReturn idn)
-            unlessGuard (used sym)     $ tellWarn   (defPosn sym) (FunctionDefinedNotUsed idn)
+        CatInfo     -> unless (used sym) $ tellWarn (defPosn sym) (DefinedNotUsed idn)
+        CatType     -> unless (used sym) $ tellWarn (defPosn sym) (TypeDefinedNotUsed idn)
+        CatFunction -> unless (used sym) $ tellWarn (defPosn sym) (FunctionDefinedNotUsed idn)
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -123,13 +121,13 @@ currentFunction = gets (top . funcStack)
 --------------------------------------------------------------------------------
 -- Statements
 
-typeCheckStatements :: StBlock -> TypeChecker ()
-typeCheckStatements = mapM_ typeCheckStatement
+typeCheckStatements :: StBlock -> TypeChecker Returned
+typeCheckStatements = liftM or . mapM typeCheckStatement
 
-typeCheckStatement :: Lexeme Statement -> TypeChecker ()
+typeCheckStatement :: Lexeme Statement -> TypeChecker Returned
 typeCheckStatement (Lex st posn) = case st of
 
-    StAssign accL expL -> void $ runMaybeT $ do
+    StAssign accL expL -> const (return False) $ runMaybeT $ do
         expDt           <- lift $ typeCheckExpression expL
         (accIdn, accDt) <- accessDataType accL
 
@@ -138,10 +136,8 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
-    StStructDefinition _ _ -> enterScope >> exitScope       -- For scopeStack maintenance
-
-    StReturn expL -> void $ runMaybeT $ do
-        expDt <- lift $ typeCheckExpression expL
+    StReturn expL -> const (return True) $ runMaybeT $ do
+        expDt                     <- lift $ typeCheckExpression expL
         (idn, retDt, funcScopeId) <- lift currentFunction
 
         unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScopeNum
@@ -152,24 +148,26 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unlessGuard (retDt == expDt) $ tellSError posn (ReturnType retDt expDt idn)
 
-        modifySymbol idn (\s -> s { returned = True })
-
     StFunctionDef (Lex idn _) _ block -> do
-        dtL <- liftM fromJust $ getsSymbol idn returnType
+        dt <- liftM (lexInfo . fromJust) $ getsSymbol idn returnType
         enterScope
-        enterFunction idn (lexInfo dtL)
-        typeCheckStatements block
+        enterFunction idn dt
+        ret <- typeCheckStatements block
         exitFunction
         exitScope
 
-    StProcedureCall idnL expLs -> void $ runMaybeT $ checkArguments idnL expLs False
+        -- When is a function and it wasn't properly returned
+        unless (isVoid dt || ret) $ tellSError posn (NoReturn idn)
+        return False
 
-    StRead accL -> void $ runMaybeT $ do
+    StProcedureCall idnL expLs -> const (return False) $ runMaybeT (checkArguments idnL expLs False)
+
+    StRead accL -> const (return False) $ runMaybeT $ do
         (accIdn, accDt) <- accessDataType accL
         guard (isValid accDt)
         unless (isScalar accDt) $ tellSError posn (ReadNonReadable accDt accIdn)
 
-    StPrint exprL -> void $ runMaybeT $ do
+    StPrint exprL -> const (return False) $ runMaybeT $ do
         dt <- lift $ typeCheckExpression exprL
         guard (isValid dt)
         unless (dt == String || isScalar dt) $ tellSError posn (PrintNonPrintable dt)
@@ -181,12 +179,14 @@ typeCheckStatement (Lex st posn) = case st of
             when (expDt /= Bool) $ tellSError posn (ConditionDataType expDt)
 
         enterScope
-        typeCheckStatements trueBlock
+        trueRet  <- typeCheckStatements trueBlock
         exitScope
 
         enterScope
-        typeCheckStatements falseBlock
+        falseRet <- typeCheckStatements falseBlock
         exitScope
+
+        return $ trueRet && falseRet
 
     StCase expL whnLs othrBlock -> do
         expDt <- typeCheckExpression expL
@@ -195,7 +195,7 @@ typeCheckStatement (Lex st posn) = case st of
         when (expDt == Bool) $ tellWarn (lexPosn expL) CaseOfBool
 
         -- For every when
-        forM_ whnLs $ \(Lex (When whnExpLs whnBlock) whnP) -> do
+        whnRets <- forM whnLs $ \(Lex (When whnExpLs whnBlock) whnP) -> do
             -- For every expression in said when
             forM_ whnExpLs $ typeCheckExpression >=> \whnExpDt -> runMaybeT $ do
                 guard (isValid whnExpDt)
@@ -204,12 +204,15 @@ typeCheckStatement (Lex st posn) = case st of
 
             -- Check statements
             enterScope
-            typeCheckStatements whnBlock
+            whnRet <- typeCheckStatements whnBlock
             exitScope
+            return whnRet
 
         enterScope
-        typeCheckStatements othrBlock
+        othrRet <- typeCheckStatements othrBlock
         exitScope
+
+        return $ and whnRets && othrRet
 
     StLoop befBlock expL aftBlock -> do
         expDt <- typeCheckExpression expL
@@ -218,12 +221,14 @@ typeCheckStatement (Lex st posn) = case st of
             when (expDt /= Bool) $ tellSError posn (ConditionDataType expDt)
 
         enterScope
-        typeCheckStatements befBlock
+        befRet <- typeCheckStatements befBlock
         exitScope
 
         enterScope
-        typeCheckStatements aftBlock
+        aftRet <- typeCheckStatements aftBlock
         exitScope
+
+        return $ befRet && aftRet
 
     StFor _ expL block -> do
         expDt <- typeCheckExpression expL
@@ -232,13 +237,16 @@ typeCheckStatement (Lex st posn) = case st of
             when (expDt /= Range) $ tellSError posn (ForInDataType expDt)
 
         enterScope
-        typeCheckStatements block
+        void $ typeCheckStatements block
         exitScope
 
-    _ -> return ()
-    --StVariableDeclaration
-    --StBreak
-    --StContinue
+        return False
+
+    _ -> return False
+    -- StVariableDeclaration
+    -- StStructDefinition
+    -- StBreak
+    -- StContinue
 
 typeCheckExpression :: Lexeme Expression -> TypeChecker DataType
 typeCheckExpression (Lex exp posn) = case exp of
@@ -257,13 +265,13 @@ typeCheckExpression (Lex exp posn) = case exp of
                 , offset     = strOff
                 , width      = strWdt
                 , used       = True
-                , scopeStack = topStack
+                , scopeStack = globalStack
                 , defPosn    = lexPosn strL
                 }
         -- Set the new global offset
         modify $ \s -> s { stringOffset = strOff + strWdt}
         -- '$' means it's a constant
-        addSymbol "$String" info
+        addSymbol (show $ lexInfo strL) info
         return String
 
     Variable accL -> liftM (fromMaybe TypeError) $ runMaybeT $ do

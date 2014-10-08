@@ -9,12 +9,10 @@ module Language.Sapphire.Lexer
     ( Alex (..)
     , Token (..)
     , Lexeme (..)
-    -- , AlexUserState (..)
     , alexMonadScan
     , runAlex'
     , tellLError
     , tellPError
-    -- , alexGetPosition
     ) where
 
 import           Language.Sapphire.Error
@@ -55,7 +53,7 @@ $backslash = ["\\abfnrtv]
 
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
-@char   = \'$printable\'
+@char   = \'($printable # ['\\] | \\' | \\$backslash)\'
 
 @string                 = \"@inside_string*\"
 @string_error           = \"@inside_string*
@@ -131,7 +129,7 @@ tokens :-
         "true"                  { tok' (TkBool True)    }
         "false"                 { tok' (TkBool False)   }
         @float                  { tok  (TkFloat . read) }
-        @char                   { tok  (TkChar . read)  }
+        @char                   { tok  (TkChar . read . backslash)  }
         -- -- -- Filtering newlines
         @string                 { tok  (TkString . dropQuotationMarks 1 1 . backslash) }
         @multiline_string       { tok  (TkString . dropQuotationMarks 3 3 . backslash) }
