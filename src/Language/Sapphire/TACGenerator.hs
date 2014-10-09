@@ -15,7 +15,7 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC
-import           Language.Sapphire.TypeChecker (processExpressionChecker)
+import           Language.Sapphire.TypeChecker (processExpressionChecker, processAccessChecker)
 
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void)
@@ -160,7 +160,7 @@ linearizeStatement nextLabel (Lex st posn) = do
         StAssign accL expL ->  do
             tab <- gets table
             let expDt = processExpressionChecker tab expL
-            resAddr <- getAccessAddress accL
+            accAddr <- getAccessAddress accL
 
             -- When assigning a Boolean expression, use jumping code
             if expDt == Bool then do
@@ -169,19 +169,15 @@ linearizeStatement nextLabel (Lex st posn) = do
                 jumpingCode expL trueLabel falseLabel
 
                 generate $ PutLabel trueLabel "true label for assignment"
-                generate $ Assign resAddr (Constant $ ValBool True)
+                generate $ Assign accAddr (Constant $ ValBool True)
                 generate $ Goto nextLabel
 
                 generate $ PutLabel falseLabel "false label for assignment"
-                generate $ Assign resAddr (Constant $ ValBool False)
+                generate $ Assign accAddr (Constant $ ValBool False)
 
             else do
                 expAddr <- linearizeExpression expL
-                generate $ Assign resAddr expAddr
-
-        -- StVariableDeclaration
-
-        -- StStructDefinition
+                generate $ Assign accAddr expAddr
 
         StReturn expL -> linearizeExpression expL >>= generate . Return
 
@@ -200,7 +196,16 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ PCall (lexInfo idnL) (length prmAddrs)
             generate . PopParameters $ length prmAddrs
 
-        -- StRead       (Lexeme Access)
+        StRead accL -> do
+            tab <- gets table
+            let accDt = processAccessChecker tab accL
+            accAddr <- getAccessAddress accL
+
+            generate $ case accDt of
+                Int   -> ReadInt   accAddr
+                Float -> ReadFloat accAddr
+                Bool  -> ReadBool  accAddr
+                Char  -> ReadChar  accAddr
 
         StPrint expL -> do
             tab <- gets table
@@ -211,11 +216,11 @@ linearizeStatement nextLabel (Lex st posn) = do
             if expDt == String
                 then getsSymbol idn (offset &&& width) >>=
                     generate . uncurry PrintString . fromJust
-                else linearizeExpression expL >>= case expDt of
-                    Int   -> generate . PrintInt
-                    Float -> generate . PrintFloat
-                    Bool  -> generate . PrintBool
-                    Char  -> generate . PrintChar
+                else linearizeExpression expL >>= generate . case expDt of
+                    Int   -> PrintInt
+                    Float -> PrintFloat
+                    Bool  -> PrintBool
+                    Char  -> PrintChar
 
         StIf expL trueBlock falseBlock -> do
             trueLabel  <- newLabel
@@ -322,6 +327,8 @@ linearizeStatement nextLabel (Lex st posn) = do
         StContinue -> currentLoop >>= generate . Goto . fst
 
         _ -> return ()
+        -- StVariableDeclaration
+        -- StStructDefinition
 
 --------------------------------------------------------------------------------
 -- Expressions

@@ -78,6 +78,11 @@ data Instruction
     | PrintChar   Address
     | PrintBool   Address
     | PrintString Offset  Width
+    -- Read
+    | ReadInt    Address
+    | ReadFloat  Address
+    | ReadChar   Address
+    | ReadBool   Address
     -- Goto
     | Goto Label
     | IfGoto      Relation Address Address Label
@@ -104,6 +109,10 @@ instance Show Instruction where
             PrintChar   a         -> "print_char "   ++ show a
             PrintBool   a         -> "print_bool "   ++ show a
             PrintString o w       -> "print_string " ++ show o ++ " " ++ show w
+            ReadInt    a          -> "read_int "   ++ show a
+            ReadFloat  a          -> "read_float " ++ show a
+            ReadChar   a          -> "read_char "  ++ show a
+            ReadBool   a          -> "read_bool "  ++ show a
             Goto la               -> "goto " ++ la
             IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
             IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la

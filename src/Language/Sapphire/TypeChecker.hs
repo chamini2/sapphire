@@ -4,7 +4,9 @@ module Language.Sapphire.TypeChecker
     , TypeChecker
     , processTypeChecker
 
+    -- For usage of other modules
     , processExpressionChecker
+    , processAccessChecker
     ) where
 
 import           Language.Sapphire.Error
@@ -103,6 +105,9 @@ processTypeChecker r w tab = runTypeChecker r . buildTypeChecker w tab
 runTypeChecker :: SappReader -> TypeChecker a -> (TypeState, SappWriter)
 runTypeChecker r = flip (flip execRWS r) initialState
 
+----------------------------------------
+-- Expression
+
 processExpressionChecker :: SymbolTable -> Lexeme Expression -> DataType
 processExpressionChecker tab = evalExpressionChecker . buildExpressionChecker tab
 
@@ -113,6 +118,20 @@ buildExpressionChecker :: SymbolTable -> Lexeme Expression -> TypeChecker DataTy
 buildExpressionChecker tab expL = do
     modify $ \s -> s { table = tab }
     typeCheckExpression expL
+
+----------------------------------------
+-- Access
+
+processAccessChecker :: SymbolTable -> Lexeme Access -> DataType
+processAccessChecker tab = evalAccessChecker . buildAccessChecker tab
+
+evalAccessChecker :: TypeChecker DataType -> DataType
+evalAccessChecker = fst . flip (flip evalRWS initialReader) initialState
+
+buildAccessChecker :: SymbolTable -> Lexeme Access -> TypeChecker DataType
+buildAccessChecker tab accL = do
+    modify $ \s -> s { table = tab }
+    liftM (snd . fromJust) $ runMaybeT $ accessDataType accL
 
 --------------------------------------------------------------------------------
 -- Monad handling
