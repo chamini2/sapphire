@@ -218,47 +218,47 @@ Statement :: { Lexeme Statement }
                                     }
     | VariableList ":"              {% do
                                         let const = StNoop <$ index $1 0
-                                        tellPError (lexPosn $2) (ParseError "variable definition missing data type")
+                                        tellPError (lexPosn $2) VariableDefinitionWithoutDataType
                                         return const
                                     }
     | Structure        "as" FieldList "end"     {% do
                                                     let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) (ParseError "type must have a data type identifier")
+                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
                                                     return const
                                                 }
     | Structure TypeId "as"           "end"     {% do
                                                     let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) (ParseError "type must have at least one field")
+                                                    tellPError (lexPosn $2) NoFieldsInType
                                                     return const
                                                 }
     | Structure        "as"           "end"     {% do
                                                     let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) (ParseError "type must have a data type identifier")
-                                                    tellPError (lexPosn $2) (ParseError "type must have at least one field")
+                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
+                                                    tellPError (lexPosn $2) NoFieldsInType
                                                     return const
                                                 }
 
     -- -- Functions
     | "def"            ":" Signature Separator StatementList "end"      {% do
                                                                             let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $2) (ParseError "missing identifier for function definition")
+                                                                            tellPError (lexPosn $2) FunctionDefinitionIdentifier
                                                                             return const
                                                                         }
     | "return"                                                          {% do
                                                                             let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $1) (ParseError "return statement must have an expression")
+                                                                            tellPError (lexPosn $1) EmptyReturn
                                                                             return const
                                                                         }
 
     -- -- Conditionals
    | "case" Expression MaybeNL          "end"                                      {% do
                                                                                        let const = StNoop <$ $1
-                                                                                       tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
+                                                                                       tellPError (lexPosn $4) NoWhensInCase
                                                                                        return const
                                                                                    }
    | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
                                                                                        let const = StNoop <$ $1
-                                                                                       tellPError (lexPosn $4) (ParseError "case statement must have at least one 'when'")
+                                                                                       tellPError (lexPosn $4) NoWhensInCase
                                                                                        return const
                                                                                    }
 
@@ -330,27 +330,27 @@ VariableList :: { Seq (Lexeme Identifier) }
 DataType :: { Lexeme DataType }
     : TypeId                    { DataType $1 <$ $1 }
     | DataType "[" Int "]"      {% do
-                                    unless (lexInfo $3 > 0) $ tellPError (lexPosn $3) (ParseError "size of array must be positive")
+                                    unless (lexInfo $3 > 0) $ tellPError (lexPosn $3) ArraySize
                                     return $ Array $1 $3 <$ $1
                                 }
     | DataType "[" "-" Int "]"  {% do
-                                    tellPError (lexPosn $3) (ParseError "size of array must be positive")
+                                    tellPError (lexPosn $3) ArraySize
                                     return $ Array $1 $4 <$ $1
                                 }
     -- Errors
     | DataType "["     "]"      {% do
                                     let const = Void <$ $1
-                                    tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
+                                    tellPError (lexPosn $3) ArrayDataTypeSize
                                     return const
                                 }
     | DataType     Int          {% do
                                     let const = Void <$ $1
-                                    tellPError (lexPosn $2) (ParseError "array data type size must be a literal integer between brackets")
+                                    tellPError (lexPosn $2) ArrayDataTypeSize
                                     return const
                                 }
     | DataType "[" Access "]"   {% do
                                     let const = Void <$ $1
-                                    tellPError (lexPosn $3) (ParseError "array data type size must be a literal integer between brackets")
+                                    tellPError (lexPosn $3) ArrayDataTypeSize
                                     return const
                                 }
 

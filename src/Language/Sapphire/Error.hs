@@ -61,17 +61,22 @@ data ParseError
     | FieldListComma
     | ParameterListComma
     -- Statements
+    -- -- Assignment
     | AssignmentMissingExpression
     | AssignmentMissingAccess
+    -- -- Definitions
+    | VariableDefinitionWithoutDataType
+    | TypeDefinitionIdentifier
+    | ArraySize
+    | ArrayDataTypeSize
     | VariableDefinitionMissingColon
+    | NoFieldsInType
+    -- -- Functions
+    | FunctionDefinitionIdentifier
+    | EmptyReturn
+    -- -- Conditional
+    | NoWhensInCase
 
---    | VariableDefinitionWithoutDataType "variable definition missing data type"
---    | TypeDefinitionIdentifier "type must have a data type identifier"
---    | NoFieldsInType "type must have at least one field"
---    | FunctionDefinitionIdentifier "missing identifier for function definition"
---    | EmptyReturn "return statement must have an expression"
---    | NoWhensInCase "case statement must have at least one 'when'"
---    | ArrayDataTypeSize "array data type size must be a literal integer between brackets"
 
 instance Show ParseError where
     show = \case
@@ -85,9 +90,23 @@ instance Show ParseError where
         FieldListComma     -> "fields must be separated with commas"
         ParameterListComma -> "parameters must be separated with commas"
         -- Statements
-        AssignmentMissingExpression    -> "assignment missing expression"
-        AssignmentMissingAccess        -> "assignment missing variable"
-        VariableDefinitionMissingColon -> "variable definition missing colon"
+        -- -- Assignment
+        AssignmentMissingExpression -> "assignment missing expression"
+        AssignmentMissingAccess     -> "assignment missing variable"
+        -- -- Definitions
+        VariableDefinitionWithoutDataType -> "variable definition missing data type"
+        TypeDefinitionIdentifier          -> "type must have a data type identifier"
+        ArraySize                         -> "size of array must be positive"
+        ArrayDataTypeSize                 -> "array data type size must be a literal integer between brackets"
+        VariableDefinitionMissingColon    -> "variable definition missing colon"
+        NoFieldsInType                    -> "type must have at least one field"
+        -- -- Functions
+        FunctionDefinitionIdentifier -> "missing identifier for function definition"
+        EmptyReturn                  -> "return statement must have an expression"
+        -- -- Conditional
+        NoWhensInCase -> "case statement must have at least one 'when'"
+
+
 
 ----------------------------------------
 
