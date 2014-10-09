@@ -199,13 +199,11 @@ linearizeStatement nextLabel (Lex st posn) = do
         StRead accL -> do
             tab <- gets table
             let accDt = processAccessChecker tab accL
-            accAddr <- getAccessAddress accL
-
-            generate $ case accDt of
-                Int   -> ReadInt   accAddr
-                Float -> ReadFloat accAddr
-                Bool  -> ReadBool  accAddr
-                Char  -> ReadChar  accAddr
+            getAccessAddress accL >>= generate . case accDt of
+                Int   -> ReadInt
+                Float -> ReadFloat
+                Bool  -> ReadBool
+                Char  -> ReadChar
 
         StPrint expL -> do
             tab <- gets table
