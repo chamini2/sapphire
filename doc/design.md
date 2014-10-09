@@ -64,7 +64,7 @@ Las palabras reservadas son las siguientes
     for, in, repeat, while, do, until, break, continue
     print, read
     Void, Int, Bool, Float, Char
-    String, Range, Union, Record
+    String, Range, union, record
 
     #
     ::, ->
@@ -87,7 +87,7 @@ Las palabras reservadas son las siguientes
 
 Se dispone de los siguientes tipos de datos:
 
-**`Void`**
+**`(Void)`**
 
 > el *no-valor*, también usado para funciones que no devuelven valores *(aka. procedimientos)*.
 
@@ -111,15 +111,15 @@ Se dispone de los siguientes tipos de datos:
 
 > cadenas de caracteres, esencialmente `[Char]`.
 
-**`[<Type>]`**
+**`<Type>[<expr Int>]`**
 
 > arreglos, se permiten arreglos de arreglos.
 
-**`Union`**
+**`union`**
 
 > unions arbitrarimente anidados, equivalentes a los unions de `C`.
 
-**`Record`**
+**`record`**
 
 > records arbitrarimente anidados, equivalentes a los `struct` de `C`.
 
@@ -127,7 +127,7 @@ Se dispone de los siguientes tipos de datos:
 
 > rangos de enteros.
 
-**`def id :: firma`**
+**`def <id> : <signature>`**
 
 > funciones, debe especificarse los tipos de entrada y salida.
 
@@ -163,7 +163,7 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    <var> = <expr>
+    <acc> = <expr>
 ~~~
 
 Ejecutar esta instrucción tiene el efecto de evaluar la expresión del lado derecho y almacenarla en la variable del lado izquierdo. La variable tiene que haber sido declarada previamente y su tipo debe coincidir con el tipo de la expresión, en caso contrario debe arrojarse un error.
@@ -227,21 +227,21 @@ Se encierra el tipo del que se quiere declarar el arreglo en corchetes (`[`, `]`
 Ejemplos:
 
 ~~~ruby
-    Record Automovil as
-        placa : String
-        ano   : Int
-        marca : String
+    record Date as
+        day   : Int,
+        month : Int,
+        year  : Int
     end
 
-    Record Punto as x,y : Int; nombre : String end
+    record Punto as x,y : Int end
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    Record <Id> as
-        <declaracion>
-        [ <declaracion>... ]
+    record <Id> as
+        <declaration>
+        [ <declaration>... ]
     end
 ~~~
 
@@ -252,8 +252,8 @@ Estructuras como `struct` del lenguaje `C`.
 Ejemplos:
 
 ~~~ruby
-    Union Precision as
-        integer  : Int
+    union Precision as
+        integer  : Int,
         floating : Float
     end
 ~~~
@@ -261,25 +261,25 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    Union <Id> as
+    union <Id> as
         <declaracion>
         [ <declaracion>... ]
     end
 ~~~
 
-Uniones como `union` del lenguaje `C`.
+Estructuras como `union` del lenguaje `C`.
 
 ### Declaración de funciones
 
 Ejemplos:
 
 ~~~ruby
-    def iguales : Int a, Int b -> Bool
+    def iguales : (Int a, Int b) -> Bool
         return a == b
     end
 
     def say_hi_n_times : Int n -> () 
-        for i in 0..n+1
+        for i in 1..n
             print "hi!\n"
         end
     end
@@ -297,11 +297,11 @@ Sintaxis:
     end
 ~~~
 
-Declara una función, especificando parametros de entrada y de salida.
+Declara una función, especificando parametros de entrada y de salida; y su bloque correspondiente.
 
-Podemos ver que la entrada consta de dos `Int` y tiene una salida de `Bool`.
+Se especifica la entrada de la función en `<params>`, la entrada puede ser, ningún valor o uno, este único valor puede ser una *tupla*, pasándole a la función más de un argumento.
 
-Nótese que la definir una función no obliga la implementación inmediata, pero debe ser implementada luego, en caso de no hacerlo se lanzaria un error si intenta hacerse una llamada a dicha funcion. La `<firma>` especifica la entrada y salida de la función, para cada entrada debe haber una especificación en la firma y una extra señalando la salida.
+Siempre se debe especificar el valor de salida de una función; el valor de entrada en caso de ser *vacío* ( `()` ), puede no colocarse.
 
 
 ### Retorno de valores
@@ -318,47 +318,47 @@ Sintaxis:
     return <expr>
 ~~~
 
-Instrucción `return` típica.
-
+Instrucción `return` típica. Siempre debe regresar un valor, no se puede usar para cortar la ejecución de un procedimiento.
 
 ### Entrada
 
 Ejemplos:
 
 ~~~ruby
-    read "dame dos número ", uno, dos
+    read "dame tres números ", uno, dos
     read tres
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    read [ <String>, ] <id> [, <id>.. ]
+    read [ <expr String>, ] <acc> [, <acc>.. ]
 ~~~
 
-Instruccion encargada de la lectura de datos. Los `<ids..>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del sistema (`String`, `Char`, `Int`, `Float`, `Bool`, `Range`).
+Instruccion encargada de la lectura de datos. Los `<acc>` sería una o más variables previamente declaradas. Dichas variables solo pueden ser de alguno de los tipos de datos primitivos del lenguaje (`Char`, `Int`, `Float`, `Bool`).
 
 ### Salida
 
 Ejemplos:
 
 ~~~ruby
-    print "El número vale: ", i_to_s(num)
+    print "El número vale: ", num
 
-    print ( "Este es un print muy largo"
+    print ( "Este es un print muy largo "
           , "con varias líneas, de hecho son "
-          , i_to_s(3), " líneas"
+          , 5 - 1 , " líneas que luego se verán"
+          , " como una solamente en la salida estándar"
           )
 ~~~
 
 Sintaxis:
 
 ~~~ruby
-    print <String> [, <String>.. ]
-    print (<String> [,<String>.. ])
+    print  <expr> [, <expr>.. ]
+    print (<expr> [, <expr>.. ])
 ~~~
 
-Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<exprs..>` se evalúan completamente antes de imprimir los valores por pantalla.
+Instruccion encargada de la escritura de datos hacia la salida estandar. Las `<expr>` se evalúan completamente antes de imprimir los valores por pantalla.
 
 ### Condicional
 
@@ -368,7 +368,9 @@ Ejemplos:
     if x%2==0 then
         print "even\n"
     elif x%3 == 0 then
-        print "threeven"    # esto no existe.
+        print "threeven"    # esto no existe, creo
+    elif x%5 == 0 then
+        print "fiven"       # esto no existe, creo
     else
         print "I dunno\n"
     end
@@ -386,17 +388,13 @@ Sintaxis:
     if <expr Bool> then
         <statements..>
     [elif <expr Bool> then
-        <statements..>]
+        <statements..> ..]
     [else
         <statements..>]
     end
-
-    if (<expr <Bool> [ \n ]) then
-        <statements..>
-    end
 ~~~
 
-Condicional típico. La condición debe ser la `<expresion>` de tipo `Bool` y en caso de ser cierta, se ejecuta la `<stat>` , sino se ejecuta la `<stat>` despues del `else` (en caso de haber).
+Condicional típico. La condición debe ser la `<expr Bool>` de tipo `Bool` y en caso de ser cierta, se ejecuta la `<statements..>` , sino se ejecuta la `<statements..>` despues del `else` (en caso de haber).
 
 ### Condicional invertido
 
@@ -418,11 +416,10 @@ Sintaxis:
     end
 ~~~
 
-
 Es opuesto a un condicional `if`. Es equivalente a:
 
 ~~~ruby
-    if not (<expr Bool>) then
+    if not <expr Bool> then
         <statements..>
     [else
         <statements..>]
@@ -467,7 +464,7 @@ Ejemplos:
 
 ~~~ruby
     print 0
-    for i in 1 .. 10 do
+    for i in 1..10 do
         print "," , i*2
     end
 ~~~
@@ -475,12 +472,12 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    for <id> in <range> do
+    for <id> in <expr Int> .. <expr Int> do
         <statements..>
     end
 ~~~
 
-El campo para `<range>` debe ser del estilo `Int..Int`, puede ser con identificadores o expresiones. El `<id>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración éste deja de existir.
+El `<id>` puede ser modificado dentro del `for`. Vale la pena mencionar que dicho identificador es alcanzable unicamente en el cuerpo de la iteración, al finalizar la iteración éste deja de existir.
 
 ### Iteración indeterminada
 
@@ -590,11 +587,11 @@ Una expresión aritmética estará formada por números naturales (secuencias de
 
 La precedencia de los operadores (ordenados comenzando por la menor precedencia) son:
 
-* `+`, `-` binario
+* `+`, `-` *binario*
 
 * `*`, `/`, `%`
 
-* `-` unario, `^`
+* `-` *unario*, `^`
 
 Para los operadores binarios `+`, `-`, `*`, `/` y `%` sus operandos deben ser del mismo tipo. Si sus operandos son de tipo `Int`, su resultado también será de tipo `Int`.
 
@@ -612,6 +609,7 @@ Los operandos de `and`, `or` y `not` deben tener tipo `Bool`, y su resultado tam
 
 También hay operadores relacionales capaces de comparar enteros. Los operadores relacionales disponibles son menor `<`, menor o igual `<=`, igual `==`, mayor o igual `>=`, mayor `>)` y desigual `/=`. Ambos operandos deben ser del mismo tipo y el resultado será de tipo `Bool`.
 También es posible comparar expresiones de tipo `Bool` utilizando los operadores `==` y `/=`.
+
 Los operadores relacionales no son asociativos, a excepción de los operadores `==` y `/=` cuando se comparan expresiones de tipo `Bool`.
 La precedencia de los operadores relacionales son las siguientes:
 
@@ -633,12 +631,4 @@ Las siguientes funciones están embebidas en el lenguaje para convertir tipos:
 
 * `def length : [a] -> Int`
 
-* `def map : ((a -> b), [a]) -> [b]`
-
-* `def i_to_s : Int   -> String`
-
-* `def f_to_s : Float -> String`
-
-* `def c_to_s : Char  -> String`
-
-* `def b_to_s : Bool  -> String`
+* `def map : ((a -> b), [a]) -> [b]` *may not happen*

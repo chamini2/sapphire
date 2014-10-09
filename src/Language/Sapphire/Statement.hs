@@ -23,11 +23,11 @@ type StBlock    = Seq (Lexeme Statement)
 
 data Statement
     -- Language
-    = StNoop                                                -- Only used in Parser
+    = StNoop                                                        -- Only used in Parser
     | StAssign (Lexeme Access) (Lexeme Expression)
     -- Definitions
     | StVariableDeclaration (Lexeme Declaration)
-    | StDeclarationList     (Seq (Lexeme Declaration))      -- Only used in Parser
+    | StDeclarationList     (Seq (Lexeme Declaration))              -- Only used in Parser
     | StStructDefinition    (Lexeme DataType) (Seq Field)
     -- Functions
     | StReturn        (Lexeme Expression)
@@ -35,9 +35,9 @@ data Statement
     | StProcedureCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- I/O
     | StRead       (Lexeme Access)
-    | StReadString (Maybe (Lexeme String)) (Lexeme Access)  -- Only used in Parser
+    | StReadString (Maybe (Lexeme String)) (Seq (Lexeme Access))    -- Only used in Parser
     | StPrint      (Lexeme Expression)
-    | StPrintList  (Seq (Lexeme Expression))                -- Only used in Parser
+    | StPrintList  (Seq (Lexeme Expression))                        -- Only used in Parser
     -- Conditional
     | StIf   (Lexeme Expression) StBlock StBlock
     | StCase (Lexeme Expression) (Seq (Lexeme When)) StBlock

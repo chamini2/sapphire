@@ -13,7 +13,7 @@ import           Data.Foldable             (toList)
 import           Data.Functor              ((<$), (<$>))
 import           Data.Maybe                (fromJust, isJust)
 import           Data.Sequence             (Seq, empty, fromList, index,
-                                            singleton, (><), (|>))
+                                            singleton, (><), (|>), (<|))
 }
 
 %name parse
@@ -112,27 +112,27 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 
 -- Precedence
 -- -- Language
-%right ","
+%right    ","
 
 -- -- String
---%right "++"
+%right    "++"
 
 -- -- Bool
-%left "or"
-%left "and"
-%right "not"
+%left     "or"
+%left     "and"
+%right    "not"
 
 -- -- -- Compare
 %nonassoc "@"
-%nonassoc "==" "/="
+%left     "==" "/="
 %nonassoc "<" "<=" ">" ">="
 
 -- -- Arithmetic
-%left "+" "-"
-%left "*" "/" "%"
-%left ".."
-%right "-"
-%right "^"
+%left     "+" "-"
+%left     "*" "/" "%"
+%left     ".."
+%right    "-"
+%right    "^"
 
 %%
 
@@ -176,10 +176,10 @@ Statement :: { Lexeme Statement }
     | "case" Expression MaybeNL WhenList "otherwise" StatementList "end"            { StCase $2 $4 $6    <$ $1 }
 
     -- I/O
-    | "read"              String         "," Access         { StReadString (Just $2) $4 <$ $1 }
-    | "read"  "(" MaybeNL String MaybeNL "," AccessNL ")"   { StReadString (Just $4) $7 <$ $1 }
-    | "read"      Access                                    { StReadString Nothing   $2 <$ $1 }
-    | "read"  "(" AccessNL ")"                              { StReadString Nothing   $3 <$ $1 }
+    | "read"              String         "," AccessList         { StReadString (Just $2) $4 <$ $1 }
+    | "read"  "(" MaybeNL String MaybeNL "," AccessListNL ")"   { StReadString (Just $4) $7 <$ $1 }
+    | "read"      AccessList                                    { StReadString Nothing   $2 <$ $1 }
+    | "read"  "(" AccessListNL ")"                              { StReadString Nothing   $3 <$ $1 }
     | "print"     ExpressionList            { StPrintList $2 <$ $1 }
     | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
 
@@ -284,6 +284,14 @@ AccessNL :: { Lexeme Access }
     : MaybeNL VariableId MaybeNL                { VariableAccess $2    <$ $2 }
     | AccessNL "[" ExpressionNL "]" MaybeNL     { ArrayAccess    $1 $3 <$ $1 }
     | AccessNL "." MaybeNL VariableId MaybeNL   { StructAccess   $1 $4 <$ $1 }
+
+AccessList :: { Seq (Lexeme Access) }
+    : Access                    { singleton $1 }
+    | AccessList "," Access     { $1     |> $3 }
+
+AccessListNL :: { Seq (Lexeme Access) }
+    : AccessNL                      { singleton $1 }
+    | AccessListNL "," AccessNL     { $1     |> $3 }
 
 ---------------------------------------
 -- Identifiers
@@ -517,11 +525,10 @@ expandStatement stL = case lexInfo stL of
     StDeclarationList dcls -> fmap (\dcl -> StVariableDeclaration dcl <$ dcl) dcls
     -- For the syntactic sugar of printing several strings with the same print statement using commas
     StPrintList exps -> fmap (\exp -> StPrint exp <$ stL) exps
-    -- For the syntactic sugar of printing a string before reading a value
-    StReadString mayStr accL -> if isJust mayStr
-        then fromList [ StPrint (LitString (fromJust mayStr) <$ (fromJust mayStr)) <$ stL, StRead accL <$ accL ]
-        else singleton $ StRead accL <$ accL
-    -- No other statement needs compacting, yet
+    -- For the syntactic sugar of printing a string before reading values
+    -- For the syntactic sugar of reading several values with the same read statement using commas
+    StReadString mayStr accLs -> maybe id (\strL -> (<|) (StPrint (LitString strL <$ strL) <$ strL)) mayStr $ fmap (\accL -> StRead accL <$ accL) accLs
+    -- No other statement needs expanding
     _ -> singleton stL
 
 -- For the syntactic sugar of defining several fields of the same type using commas

@@ -475,18 +475,3 @@ getAccessAddress accL = do
 --             return off
 
 --     Nothing -> return off
-
--- {-|
---     TAC Pretty printer
--- -}
--- type TACPrinter = undefined
-
--- type Tabs = Int
-
--- initialPrintState :: TACPrintState
--- initialPrintState = TACPrintState 0
-
--- type Printer a = State Tabs (WriterT (Seq String)) a
-
--- printTAC :: Instruction -> TACPrinter ()
--- printTAC _ = undefined

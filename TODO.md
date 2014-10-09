@@ -18,10 +18,13 @@
 * Find strings in intermediate code (add it to the symbol table with a unique id or add it to symbol table by its content?) -- DONE, maybe
 * Functions may not return some times
 * Fix offsets for scopes
+* Create missing Error construtors (mostly in Parser.y, there are more)
 
 * data SymbolTable = SymTab (Map Identifier (Map ScopeNum Symbol))
 * add applicative code for Lexeme
 * change name `Lexeme`
+
+* remove self-assign from design or add it to the language
 
 ##Someday
 
