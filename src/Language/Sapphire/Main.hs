@@ -71,11 +71,16 @@ options =
     , Option "w"  ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
     , Option "o"  ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
     , Option "st" ["symbol-table"] (NoArg ShowSymbolTable)    "shows the symbol table"
-    , Option "a " ["ast"]          (NoArg ShowAST)            "shows the AST"
+    , Option "a" ["ast"]          (NoArg ShowAST)            "shows the AST"
     ]
 
 help :: String
-help = usageInfo "Usage: sapphire [OPTION]... [FILE]" options
+help = usageInfo message options
+    where
+        message = "usage: sapphire [OPTION]... [FILE]\n" ++
+                  "\twhen running sapphire without arguments, the compiler " ++
+                  "consumes data it receives from the standard input until " ++
+                  "it receives an EOF ('^D') character"
 
 version :: String
 version = "sapphire 0.1.0.0"
