@@ -19,13 +19,13 @@ type Temporary = String
 type Serial    = Int
 
 data Address
-    = Name      Identifier Offset
+    = Name      Identifier Address
     | Constant  Value
     | Temporary Temporary
 
 instance Show Address where
     show = \case
-        Name idn o  -> idn ++ "(" ++ show o ++ ")"
+        Name idn a  -> idn ++ "(" ++ show a ++ ")"
         Constant v  -> "\\" ++ show v
         Temporary t -> t
 

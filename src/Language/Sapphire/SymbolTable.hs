@@ -58,7 +58,6 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.Scope
 import           Language.Sapphire.Stack
 
-import           Control.Arrow    (second)
 import           Data.Foldable    (Foldable, concatMap, find, foldr, msum,
                                    toList)
 import           Data.Function    (on)

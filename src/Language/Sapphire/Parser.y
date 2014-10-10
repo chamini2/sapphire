@@ -111,11 +111,8 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 --------------------------------------------------------------------------------
 
 -- Precedence
--- -- Language
-%right    ","
-
 -- -- String
-%right    "++"
+-- %right    "++"
 
 -- -- Bool
 %left     "or"

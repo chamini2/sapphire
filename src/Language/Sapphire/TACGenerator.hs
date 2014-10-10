@@ -298,11 +298,14 @@ linearizeStatement nextLabel (Lex st posn) = do
         StFor idnL expL block -> do
             condLabel  <- newLabel
             blockLabel <- newLabel
+            offTemp    <- newTemporary
 
             enterScope >> enterLoop condLabel nextLabel
 
             off <- liftM fromJust $ getsSymbol (lexInfo idnL) offset
-            let idnAddr = Name (lexInfo idnL) off
+
+            generate $ Assign offTemp (Constant $ ValInt off)
+            let idnAddr = Name (lexInfo idnL) offTemp
 
             let ExpBinary _ fromExpL toExpL = lexInfo expL
             fromAddr <- linearizeExpression fromExpL
@@ -334,8 +337,7 @@ linearizeStatement nextLabel (Lex st posn) = do
 jumpingCode :: Lexeme Expression -> Label -> Label -> TACGenerator ()
 jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
 
-    LitBool v -> do
-        generate . Goto $ if lexInfo v then trueLabel else falseLabel
+    LitBool v -> generate $ Goto (if lexInfo v then trueLabel else falseLabel)
 
     ExpBinary (Lex op _) lExpL rExpL -> case op of
         OpOr  -> do
@@ -428,25 +430,45 @@ getAccessAddress accL = do
         deepIdn                 = lexInfo deepIdnL
     (deepOff, deepDtL) <- liftM (fromJust) $ getsSymbol deepIdn (offset &&& dataType)
 
-    off <- calculateRelativeOffset deepZpp deepOff (lexInfo deepDtL)
-    return $ Name deepIdn off
+    offTemp <- newTemporary
+    generate $ Assign offTemp (Constant $ ValInt deepOff)
+
+    offAddr <- calculateAccessOffset deepZpp offTemp (lexInfo deepDtL)
+    return $ Name deepIdn offAddr
 
 ----------------------------------------
 
-calculateRelativeOffset :: AccessZipper -> Offset -> DataType -> TACGenerator Offset
-calculateRelativeOffset accZ off dt = case defocusAccess `fmap` backAccess accZ of
+calculateAccessOffset :: AccessZipper -> Address -> DataType -> TACGenerator Address
+calculateAccessOffset accZ offAddr dt = case defocusAccess `fmap` backAccess accZ of
 
     Just accL -> case lexInfo accL of
 
-        ArrayAccess _ _ -> return off
+        ArrayAccess _ expL -> do
+            let inDt = arrayInnerDataType dt
+            dtWdt   <- liftM fromJust $ getsSymbol (toIdentifier inDt) width
+            wdtTemp <- newTemporary
+            indTemp <- newTemporary
+            resTemp <- newTemporary
+            expAddr <- linearizeExpression expL
+
+            generate $ Assign wdtTemp (Constant $ ValInt dtWdt)
+            generate $ AssignBin indTemp MUL wdtTemp expAddr
+            generate $ AssignBin resTemp ADD offAddr indTemp
+
+            calculateAccessOffset (fromJust $ backAccess accZ) resTemp (arrayInnerDataType dt)
 
         StructAccess _ fldIdnL -> do
             tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
             let (fldOff, fldDtL) = ((offset &&& dataType) . fromJust) $ lookup (lexInfo fldIdnL) tab
 
-            calculateRelativeOffset (fromJust $ backAccess accZ) (off + fldOff) (lexInfo fldDtL)
+            fldTemp <- newTemporary
+            resTemp <- newTemporary
+            generate $ Assign fldTemp (Constant $ ValInt fldOff)
+            generate $ AssignBin resTemp ADD offAddr fldTemp
 
-    Nothing -> return off
+            calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
+
+    Nothing -> return offAddr
 
 -- calculateRelativeOffset :: AccessZipper -> DataTypeZipper -> Address -> Address -> TACGenerator Address
 -- calculateRelativeOffset accZ dtZ wdt off = case defocusAccess `fmap` backAccess accZ of
