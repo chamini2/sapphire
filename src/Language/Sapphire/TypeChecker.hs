@@ -108,30 +108,36 @@ runTypeChecker r = flip (flip execRWS r) initialState
 ----------------------------------------
 -- Expression
 
-processExpressionChecker :: SymbolTable -> Lexeme Expression -> DataType
-processExpressionChecker tab = evalExpressionChecker . buildExpressionChecker tab
+processExpressionChecker :: SappState s => s -> Lexeme Expression -> DataType
+processExpressionChecker st = evalExpressionChecker . buildExpressionChecker st
 
 evalExpressionChecker :: TypeChecker DataType -> DataType
 evalExpressionChecker = fst . flip (flip evalRWS initialReader) initialState
 
-buildExpressionChecker :: SymbolTable -> Lexeme Expression -> TypeChecker DataType
-buildExpressionChecker tab expL = do
-    modify $ \s -> s { table = tab }
+buildExpressionChecker :: SappState s => s -> Lexeme Expression -> TypeChecker DataType
+buildExpressionChecker st expL = do
+    modify $ putTable   (getTable   st)
+    modify $ putStack   (getStack   st)
+    modify $ putScopeId (getScopeId st)
+    modify $ putAst     (getAst     st)
     typeCheckExpression expL
 
 ----------------------------------------
 -- Access
 
-processAccessChecker :: SymbolTable -> Lexeme Access -> DataType
-processAccessChecker tab = evalAccessChecker . buildAccessChecker tab
+processAccessChecker :: SappState s => s -> Lexeme Access -> DataType
+processAccessChecker st = evalAccessChecker . buildAccessChecker st
 
 evalAccessChecker :: TypeChecker DataType -> DataType
 evalAccessChecker = fst . flip (flip evalRWS initialReader) initialState
 
-buildAccessChecker :: SymbolTable -> Lexeme Access -> TypeChecker DataType
-buildAccessChecker tab accL = do
-    modify $ \s -> s { table = tab }
-    liftM (snd . fromJust) $ runMaybeT $ accessDataType accL
+buildAccessChecker :: SappState s => s -> Lexeme Access -> TypeChecker DataType
+buildAccessChecker st accL = do
+    modify $ putTable   (getTable   st)
+    modify $ putStack   (getStack   st)
+    modify $ putScopeId (getScopeId st)
+    modify $ putAst     (getAst     st)
+    liftM (snd . fromJust) . runMaybeT $ accessDataType accL
 
 --------------------------------------------------------------------------------
 -- Monad handling
@@ -383,6 +389,7 @@ constructDataType idnL accZ dt = case defocusAccess <$> backAccess accZ of
 
             expDt <- lift $ typeCheckExpression expL
 
+            guard (isValid expDt)
             unlessGuard (expDt == Int) $ tellSError (lexPosn expL) (IndexDataType (lexInfo expL) expDt)
 
             constructDataType idnL (fromJust $ backAccess accZ) (arrayInnerDataType dt)

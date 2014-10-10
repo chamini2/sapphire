@@ -20,11 +20,11 @@ def binarySearch : Int[10] array, Int elem -> Int
     return -1
 end
 
-n : Int 
+n : Int
 print "Enter number of elements: "
 read n
 
-array : Int[10] 
+array : Int[10]
 print "Enter ", n," integers: "
 for i in 0..(n-1) do
     read array[i]

@@ -20,9 +20,10 @@ import           Language.Sapphire.TypeChecker (processExpressionChecker, proces
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void)
 import           Control.Monad.RWS             (RWS, execRWS)
-import           Control.Monad.State           (gets, modify)
+import           Control.Monad.State           (gets, get, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (forM_, mapM_)
+import           Data.Functor                  ((<$>))
 import           Data.Maybe                    (fromJust)
 import           Data.Sequence                 (Seq, empty, length, null,
                                                 reverse, singleton, zip)
@@ -158,8 +159,8 @@ linearizeStatement nextLabel (Lex st posn) = do
     case st of
 
         StAssign accL expL ->  do
-            tab <- gets table
-            let expDt = processExpressionChecker tab expL
+            state <- get
+            let expDt = processExpressionChecker state expL
             accAddr <- getAccessAddress accL
 
             -- When assigning a Boolean expression, use jumping code
@@ -197,8 +198,8 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate . PopParameters $ length prmAddrs
 
         StRead accL -> do
-            tab <- gets table
-            let accDt = processAccessChecker tab accL
+            state <- get
+            let accDt = processAccessChecker state accL
             getAccessAddress accL >>= generate . case accDt of
                 Int   -> ReadInt
                 Float -> ReadFloat
@@ -206,8 +207,8 @@ linearizeStatement nextLabel (Lex st posn) = do
                 Char  -> ReadChar
 
         StPrint expL -> do
-            tab <- gets table
-            let expDt          = processExpressionChecker tab expL
+            state <- get
+            let expDt          = processExpressionChecker state expL
                 LitString strL = lexInfo expL
                 idn            = show $ lexInfo strL
 
@@ -424,11 +425,10 @@ linearizeExpression (Lex exp _) = case exp of
 
 getAccessAddress :: Lexeme Access -> TACGenerator Address
 getAccessAddress accL = do
-    -- It works only for Variable for now
     let deepZpp                 = deepAccess $ focusAccess accL
         VariableAccess deepIdnL = lexInfo $ defocusAccess deepZpp
         deepIdn                 = lexInfo deepIdnL
-    (deepOff, deepDtL) <- liftM (fromJust) $ getsSymbol deepIdn (offset &&& dataType)
+    (deepOff, deepDtL) <- liftM fromJust $ getsSymbol deepIdn (offset &&& dataType)
 
     offTemp <- newTemporary
     generate $ Assign offTemp (Constant $ ValInt deepOff)
@@ -439,17 +439,19 @@ getAccessAddress accL = do
 ----------------------------------------
 
 calculateAccessOffset :: AccessZipper -> Address -> DataType -> TACGenerator Address
-calculateAccessOffset accZ offAddr dt = case defocusAccess `fmap` backAccess accZ of
+calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ of
 
     Just accL -> case lexInfo accL of
 
         ArrayAccess _ expL -> do
             let inDt = arrayInnerDataType dt
+
             dtWdt   <- liftM fromJust $ getsSymbol (toIdentifier inDt) width
+            expAddr <- linearizeExpression expL
+
             wdtTemp <- newTemporary
             indTemp <- newTemporary
             resTemp <- newTemporary
-            expAddr <- linearizeExpression expL
 
             generate $ Assign wdtTemp (Constant $ ValInt dtWdt)
             generate $ AssignBin indTemp MUL wdtTemp expAddr
@@ -469,32 +471,3 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess `fmap` backAccess acc
             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
 
     Nothing -> return offAddr
-
--- calculateRelativeOffset :: AccessZipper -> DataTypeZipper -> Address -> Address -> TACGenerator Address
--- calculateRelativeOffset accZ dtZ wdt off = case defocusAccess `fmap` backAccess accZ of
-
---     Just accL -> case lexInfo accL of
-
---         ArrayAccess _ expL -> do
-
---             -- Calculate the index's value
---             expAddr <- linearizeExpression expL
-
---             mulTemp <- newTemporary
---             addTemp <- newTemporary
---             generate $ AssignBin mulTemp MUL expAddr wdt
---             generate $ AssignBin addTemp ADD mulTemp off
-
---             calculateRelativeOffset (fromJust $ backAccess accZ) dtZ wdt off
-
---         StructAccess _ fldIdnL -> do
-
---             -- This (fromJust . fromJust) may be dangerous (or not)
---             -- tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
-
---             -- -- Looks for the field in the struct's SymbolTable
---             -- let mayFldDt = (lexInfo . dataType) <$> lookup (lexInfo fldIdnL) tab
---             -- constructDataType (fromJust $ backAccess accZ) (fromJust mayFldDt)
---             return off
-
---     Nothing -> return off

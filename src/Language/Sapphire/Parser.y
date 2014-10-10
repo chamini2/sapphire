@@ -125,9 +125,9 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 %nonassoc "<" "<=" ">" ">="
 
 -- -- Arithmetic
+%left     ".."
 %left     "+" "-"
 %left     "*" "/" "%"
-%left     ".."
 %right    "-"
 %right    "^"
 
