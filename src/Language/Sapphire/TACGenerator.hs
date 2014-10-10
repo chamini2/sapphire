@@ -29,7 +29,7 @@ import           Data.Sequence                 (Seq, empty, length, null,
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (Ordering (..), exp,
                                                 length, mapM, mapM_, null,
-                                                reverse, zip)
+                                                reverse, zip, lookup)
 
 --------------------------------------------------------------------------------
 
@@ -423,34 +423,30 @@ linearizeExpression (Lex exp _) = case exp of
 getAccessAddress :: Lexeme Access -> TACGenerator Address
 getAccessAddress accL = do
     -- It works only for Variable for now
-    let VariableAccess idnL = lexInfo accL
-        idn                 = lexInfo idnL
-    off<- liftM (fromJust) $ getsSymbol idn offset
-    return $ Name idn off
+    let deepZpp                 = deepAccess $ focusAccess accL
+        VariableAccess deepIdnL = lexInfo $ defocusAccess deepZpp
+        deepIdn                 = lexInfo deepIdnL
+    (deepOff, deepDtL) <- liftM (fromJust) $ getsSymbol deepIdn (offset &&& dataType)
 
--- getAccessAddress :: Lexeme Access -> TACGenerator Address
--- getAccessAddress accL = do
---     let deepAccZpp              = deepAccess $ focusAccess accL
---         VariableAccess deepIdnL = lexInfo $ defocusAccess deepAccZpp
---         deepIdn                 = lexInfo deepIdnL
-
---     maySymI <- getsSymbol deepIdn (offset &&& dataType)
---     let (off, dtL) = fromJust maySymI
-
---     let deepDtZpp          = deepDataType $ focusDataType dtL
---         (deepDtL, deepDim) = defocusDataType deepDtZpp
-
---     innerWdt <- getDataTypeWidth dtL
-
---     wdt <- calculateRelativeOffset deepAccZpp deepDtZpp (Constant $ ValInt innerWdt) (Constant $ ValInt 0)
---     return . Constant $ ValInt off
+    off <- calculateRelativeOffset deepZpp deepOff (lexInfo deepDtL)
+    return $ Name deepIdn off
 
 ----------------------------------------
 
--- getDataTypeWidth :: Lexeme DataType -> TACGenerator Width
--- getDataTypeWidth dtL = do
---     let deepDt = lexInfo . fst . defocusDataType . deepDataType $ focusDataType dtL
---     liftM fromJust $ getsSymbol (toIdentifier deepDt) width
+calculateRelativeOffset :: AccessZipper -> Offset -> DataType -> TACGenerator Offset
+calculateRelativeOffset accZ off dt = case defocusAccess `fmap` backAccess accZ of
+
+    Just accL -> case lexInfo accL of
+
+        ArrayAccess _ _ -> return off
+
+        StructAccess _ fldIdnL -> do
+            tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
+            let (fldOff, fldDtL) = ((offset &&& dataType) . fromJust) $ lookup (lexInfo fldIdnL) tab
+
+            calculateRelativeOffset (fromJust $ backAccess accZ) (off + fldOff) (lexInfo fldDtL)
+
+    Nothing -> return off
 
 -- calculateRelativeOffset :: AccessZipper -> DataTypeZipper -> Address -> Address -> TACGenerator Address
 -- calculateRelativeOffset accZ dtZ wdt off = case defocusAccess `fmap` backAccess accZ of

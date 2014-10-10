@@ -92,10 +92,8 @@ showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) sho
             groupIt = groupBy (equalOn scopeNum) sortIt
             groupItKey :: [(ScopeNum, [(Identifier, Symbol)])]
             groupItKey = map (\ls@((_,s):_) -> (scopeNum s,ls)) groupIt
-            sortInner :: [(ScopeNum, [(Identifier, Symbol)])]
-            sortInner = map (second (sortBy (compareOn defPosn))) groupItKey
             showSymbols :: [String]
-            showSymbols = map (uncurry showScpInfs) sortInner
+            showSymbols = map (uncurry showScpInfs) groupItKey
             ----------------------------------------
             tabs :: String
             tabs = replicate t '\t'
