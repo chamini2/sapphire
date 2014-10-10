@@ -34,7 +34,7 @@ instance Eq Error where
 instance Ord Error where
     compare = compare `on` errorPos
 
-----------------------------------------
+--------------------------------------------------------------------------------
 
 data LexerError
     = LexerError     String
@@ -47,7 +47,7 @@ instance Show LexerError where
         UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
         StringError str  -> "missing matching quotation mark for string " ++ show str
 
-----------------------------------------
+--------------------------------------------------------------------------------
 
 data ParseError
     = ParseError      String
@@ -106,9 +106,7 @@ instance Show ParseError where
         -- -- Conditional
         NoWhensInCase -> "case statement must have at least one 'when'"
 
-
-
-----------------------------------------
+--------------------------------------------------------------------------------
 
 data StaticError
     = StaticError String
@@ -205,7 +203,7 @@ data StaticError
 --        NotDefined  iden       -> "identifier '" ++ iden ++ "' has not been defined"
 --        AlreadyDeclared var p  -> "identifier '" ++ var ++ "' has already been declared " ++ show p
 
-----------------------------------------
+--------------------------------------------------------------------------------
 
 data Warning
     = Warning String
