@@ -6,7 +6,7 @@
 
 * Check if `unapram` is done correctly
 
-* Arrays
+* Arrays (not working for multiple dimensions)
 * Structures (Records/Unions)
 * Initialize Variables
 

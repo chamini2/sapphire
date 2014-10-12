@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE MultiWayIf #-}
 {-|
  - TAC Generator Monad
  -
@@ -246,7 +247,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             expAddr <- linearizeExpression expL
             generate $ Goto testLabel
 
-            whenLabels <- forM whnLs $ \(Lex (When _ whnBlock) whnPosn) -> do
+            whenLabels <- forM whnLs $ \(Lex (When _ whnBlock) _) -> do
                 whnLabel <- newLabel
                 generate $ PutLabel whnLabel $ "when label for " ++ showStatement
 
@@ -446,7 +447,8 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
         ArrayAccess _ expL -> do
             let inDt = arrayInnerDataType dt
 
-            dtWdt   <- liftM fromJust $ getsSymbol (toIdentifier inDt) width
+            -- dtWdt   <- liftM fromJust $ getsSymbol (toIdentifier inDt) width
+            dtWdt   <- dataTypeWidth inDt
             expAddr <- linearizeExpression expL
 
             wdtTemp <- newTemporary
@@ -471,3 +473,11 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
 
     Nothing -> return offAddr
+
+
+dataTypeWidth :: DataType -> TACGenerator Width
+dataTypeWidth dt = if isArray dt then do
+        let Array inDtL sizL = dt
+        inDtWdt <- dataTypeWidth $ lexInfo inDtL
+        return $ inDtWdt * lexInfo sizL
+    else liftM fromJust $ getsSymbol (toIdentifier dt) width
