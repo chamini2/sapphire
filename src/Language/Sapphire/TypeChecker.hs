@@ -14,21 +14,21 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SymbolTable
 
-import           Control.Arrow             ((&&&))
-import           Control.Monad             (guard, liftM, unless, void, when,
-                                            (>=>))
-import           Control.Monad.Reader      (asks)
-import           Control.Monad.RWS         (RWS, lift, execRWS, evalRWS)
-import           Control.Monad.State       (gets, modify)
-import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Control.Monad.Writer      (tell)
-import           Data.Foldable             (all, and, or, forM_)
-import           Data.Functor              ((<$>))
-import           Data.Maybe                (fromJust, fromMaybe, isJust)
-import           Data.Sequence             (Seq, empty, length, zipWith)
-import           Data.Traversable          (mapM, forM)
-import           Prelude                   hiding (all, and, or, exp, length,
-                                            lookup, mapM, zipWith)
+import           Control.Arrow                 ((&&&))
+import           Control.Monad                 (guard, liftM, unless, void,
+                                                when, (>=>))
+import           Control.Monad.Reader          (asks)
+import           Control.Monad.RWS             (RWS, evalRWS, execRWS, lift)
+import           Control.Monad.State           (gets, modify)
+import           Control.Monad.Trans.Maybe     (MaybeT, runMaybeT)
+import           Control.Monad.Writer          (tell)
+import           Data.Foldable                 (all, and, forM_, or)
+import           Data.Functor                  ((<$>))
+import           Data.Maybe                    (fromJust, fromMaybe, isJust)
+import           Data.Sequence                 (Seq, empty, length, zipWith)
+import           Data.Traversable              (forM, mapM)
+import           Prelude                       hiding (all, and, exp, length,
+                                                lookup, mapM, or, zipWith)
 
 --------------------------------------------------------------------------------
 
@@ -38,11 +38,11 @@ type TypeChecker = RWS SappReader SappWriter TypeState
 -- State
 
 data TypeState = TypeState
-    { table        :: SymbolTable
-    , stack        :: Stack Scope
-    , scopeId      :: ScopeNum
-    , ast          :: Program
-    , funcStack    :: Stack (Identifier, DataType, ScopeNum)
+    { table     :: SymbolTable
+    , stack     :: Stack Scope
+    , scopeId   :: ScopeNum
+    , ast       :: Program
+    , funcStack :: Stack (Identifier, DataType, ScopeNum)
     }
 
 ----------------------------------------

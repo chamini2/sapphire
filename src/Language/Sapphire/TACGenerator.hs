@@ -15,12 +15,13 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC
-import           Language.Sapphire.TypeChecker (processExpressionChecker, processAccessChecker)
+import           Language.Sapphire.TypeChecker (processAccessChecker,
+                                                processExpressionChecker)
 
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void)
 import           Control.Monad.RWS             (RWS, execRWS)
-import           Control.Monad.State           (gets, get, modify)
+import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (forM_, mapM_)
 import           Data.Functor                  ((<$>))
@@ -29,8 +30,8 @@ import           Data.Sequence                 (Seq, empty, length, null,
                                                 reverse, singleton, zip)
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (Ordering (..), exp,
-                                                length, mapM, mapM_, null,
-                                                reverse, zip, lookup)
+                                                length, lookup, mapM, mapM_,
+                                                null, reverse, zip)
 
 --------------------------------------------------------------------------------
 
@@ -151,11 +152,11 @@ linearizeStatements :: StBlock -> TACGenerator ()
 linearizeStatements = mapM_ $ \stL -> do
     nextLabel <- newLabel
     linearizeStatement nextLabel stL
-    generate $ PutLabel nextLabel $ "next statement of the one in line " ++ show (row $ lexPosn stL)
+    generate $ PutLabel nextLabel $ "next statement of line " ++ show (row $ lexPosn stL)  ++ ", " ++ show (lexInfo stL)
 
 linearizeStatement :: Label -> Lexeme Statement -> TACGenerator ()
 linearizeStatement nextLabel (Lex st posn) = do
-    generate . Comment $ "line " ++ show (row posn) ++ ", " ++ show st
+    generate $ Comment showStatement
     case st of
 
         StAssign accL expL ->  do
@@ -169,11 +170,11 @@ linearizeStatement nextLabel (Lex st posn) = do
                 falseLabel <- newLabel
                 jumpingCode expL trueLabel falseLabel
 
-                generate $ PutLabel trueLabel "true label for assignment"
+                generate $ PutLabel trueLabel $ "true label for " ++ showStatement
                 generate $ Assign accAddr (Constant $ ValBool True)
                 generate $ Goto nextLabel
 
-                generate $ PutLabel falseLabel "false label for assignment"
+                generate $ PutLabel falseLabel $ "false label for " ++ showStatement
                 generate $ Assign accAddr (Constant $ ValBool False)
 
             else do
@@ -224,22 +225,19 @@ linearizeStatement nextLabel (Lex st posn) = do
         StIf expL trueBlock falseBlock -> do
             trueLabel  <- newLabel
             falseLabel <- newLabel
-            endLabel   <- newLabel
 
             jumpingCode expL trueLabel falseLabel
 
-            generate $ PutLabel trueLabel "then label for `if`"
+            generate $ PutLabel trueLabel $ "then label for " ++ showStatement
             enterScope
             linearizeStatements trueBlock
             exitScope
-            generate $ Goto endLabel
+            generate $ Goto nextLabel
 
-            generate $ PutLabel falseLabel "else label for `if`"
+            generate $ PutLabel falseLabel $ "else label for " ++ showStatement
             enterScope
             linearizeStatements falseBlock
             exitScope
-
-            generate $ PutLabel endLabel "end of `if`"
 
         StCase expL whnLs othrBlock -> do
             testLabel <- newLabel
@@ -250,7 +248,7 @@ linearizeStatement nextLabel (Lex st posn) = do
 
             whenLabels <- forM whnLs $ \(Lex (When _ whnBlock) whnPosn) -> do
                 whnLabel <- newLabel
-                generate $ PutLabel whnLabel $ "when label for `case` in line " ++ show (row whnPosn)
+                generate $ PutLabel whnLabel $ "when label for " ++ showStatement
 
                 enterScope
                 linearizeStatements whnBlock
@@ -261,13 +259,13 @@ linearizeStatement nextLabel (Lex st posn) = do
 
             -- Only when there is an 'otherwise'
             unless (null othrBlock) $ do
-                generate $ PutLabel othrLabel "otherwise label for `case`"
+                generate $ PutLabel othrLabel $ "otherwise label for " ++ showStatement
                 enterScope
                 linearizeStatements othrBlock
                 exitScope
                 generate $ Goto nextLabel
 
-            generate $ PutLabel testLabel "test label for `case`"
+            generate $ PutLabel testLabel $ "test label for " ++ showStatement
 
             -- For every when, with the block's label
             forM_ (zip whenLabels whnLs) $ \(whnLabel, Lex (When whnExpLs _) _) ->
@@ -282,14 +280,14 @@ linearizeStatement nextLabel (Lex st posn) = do
             befLabel <- newLabel
             aftLabel <- newLabel
 
-            generate $ PutLabel befLabel "before block for `loop`"
+            generate $ PutLabel befLabel $ "before block for " ++ showStatement
             enterScope >> enterLoop befLabel nextLabel
             linearizeStatements befBlock
             exitScope
 
             jumpingCode expL aftLabel nextLabel
 
-            generate $ PutLabel aftLabel "after block for `loop`"
+            generate $ PutLabel aftLabel $ "after block for " ++ showStatement
             enterScope
             linearizeStatements aftBlock
             exitLoop >> exitScope
@@ -315,10 +313,10 @@ linearizeStatement nextLabel (Lex st posn) = do
             -- Initialize the 'for' variable
             generate $ Assign idnAddr fromAddr
 
-            generate $ PutLabel condLabel "condition label for `for`"
+            generate $ PutLabel condLabel $ "condition label for " ++ showStatement
             generate $ IfGoto GT idnAddr toAddr nextLabel
 
-            generate $ PutLabel blockLabel "block label for `for`"
+            generate $ PutLabel blockLabel $ "block label for " ++ showStatement
             linearizeStatements block
             exitLoop >> exitScope
 
@@ -331,6 +329,8 @@ linearizeStatement nextLabel (Lex st posn) = do
         _ -> return ()
         -- StVariableDeclaration
         -- StStructDefinition
+    where
+        showStatement = "line " ++ show (row posn) ++ ", " ++ show st
 
 --------------------------------------------------------------------------------
 -- Expressions

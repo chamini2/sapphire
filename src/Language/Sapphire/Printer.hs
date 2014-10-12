@@ -5,12 +5,12 @@ module Language.Sapphire.Printer
 
 import           Language.Sapphire.Program
 
-import           Control.Monad.State  (StateT, runStateT, modify, get)
-import           Control.Monad.Writer (Writer, execWriter, tell)
-import           Data.Char            (toLower)
-import           Data.Sequence        (Seq, singleton)
-import           Data.Foldable        (concat, mapM_, forM_)
-import           Prelude              hiding (concat, mapM_, exp)
+import           Control.Monad.State       (StateT, get, modify, runStateT)
+import           Control.Monad.Writer      (Writer, execWriter, tell)
+import           Data.Char                 (toLower)
+import           Data.Foldable             (concat, forM_, mapM_)
+import           Data.Sequence             (Seq, singleton)
+import           Prelude                   hiding (concat, exp, mapM_)
 
 --------------------------------------------------------------------------------
 
