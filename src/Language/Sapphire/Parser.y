@@ -148,7 +148,7 @@ Separator :: { () }
     | newline       { }
 
 MaybeNL :: { () }
-    :                       { }
+    : {- λ -}               { }
     | MaybeNL newline       { }
 
 Statement :: { Lexeme Statement }
@@ -403,7 +403,7 @@ ParameterListNL :: { Seq (Lexeme Declaration) }
 -- Conditionals
 
 ElIfList :: { StBlock }
-    :                                                           { empty }
+    : {- λ -}                                                   { empty }
     | "else" StatementList                                      { $2    }
     | "elif" Expression MaybeNL "then" StatementList ElIfList   { singleton $ StIf $2 $5 $6 <$ $1 }
 

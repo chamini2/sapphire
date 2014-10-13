@@ -68,7 +68,7 @@ data Instruction
     | BeginFunction Width
     | EndFunction
     | PushParameter Address
-    | PopParameters Int
+--    | PopParameters Int
     | Return Address
     | PCall         Label Int
     | FCall Address Label Int
@@ -100,7 +100,7 @@ instance Show Instruction where
             BeginFunction by      -> "begin_function " ++ show by
             EndFunction           -> "end_function"
             PushParameter a       -> "param " ++ show a
-            PopParameters n       -> "unparam " ++ show n
+            -- PopParameters n       -> "unparam " ++ show n
             Return a              -> "return " ++ show a
             PCall la i            -> "call " ++ la ++ ", " ++ show i
             FCall d la i          -> show d ++ " := " ++ "call " ++ la ++ ", " ++ show i

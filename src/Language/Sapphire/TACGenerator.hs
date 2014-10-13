@@ -1,5 +1,4 @@
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE MultiWayIf #-}
 {-|
  - TAC Generator Monad
  -
@@ -187,6 +186,9 @@ linearizeStatement nextLabel (Lex st posn) = do
         StFunctionDef idnL _ block -> do
             blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
 
+            -- I don't know if we actually need this
+            generate $ PutLabel ("FUN_" ++ lexInfo idnL) $ "function name label"
+
             generate $ BeginFunction blockWdt
             enterScope
             linearizeStatements block
@@ -197,7 +199,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             prmAddrs <- mapM linearizeExpression (reverse prmLs)
             mapM_ (generate . PushParameter) prmAddrs
             generate $ PCall (lexInfo idnL) (length prmAddrs)
-            generate . PopParameters $ length prmAddrs
+            -- generate . PopParameters $ length prmAddrs
 
         StRead accL -> do
             state <- get

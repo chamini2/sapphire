@@ -59,8 +59,8 @@ instance Show Expression where
         LitString strL            -> show (lexInfo strL)
         Variable accL             -> show (lexInfo accL)
         FunctionCall idnL expLs   -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
-        ExpBinary opL lExpL rExpL -> show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL)
-        ExpUnary  opL expL        -> show (lexInfo opL) ++ " " ++ show (lexInfo expL)
+        ExpBinary opL lExpL rExpL -> "(" ++ show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL) ++ ")"
+        ExpUnary  opL expL        -> "(" ++ show (lexInfo opL) ++ " " ++ show (lexInfo expL) ++ ")"
 
 --instance Show Expression where
 --    show = runPrinter . printExpression
