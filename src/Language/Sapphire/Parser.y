@@ -409,7 +409,7 @@ ElIfList :: { StBlock }
 
 WhenList :: { Seq (Lexeme When) }
     : When              { singleton $1 }
-    | WhenList When     { $1 |> $2     }
+    | WhenList When     { $1     |> $2 }
 
 When :: { Lexeme When }
     : "when" ExpressionListNL "do" StatementList  { When $2 $4 <$ $1 }
@@ -499,11 +499,11 @@ ExpressionNL :: { Lexeme Expression }
 
 ExpressionList :: { Seq (Lexeme Expression) }
     : Expression                        { singleton $1 }
-    | ExpressionList "," Expression     { $1 |> $3     }
+    | ExpressionList "," Expression     { $1     |> $3 }
 
 ExpressionListNL :: { Seq (Lexeme Expression) }
     : MaybeNL Expression MaybeNL                        { singleton $2 }
-    | ExpressionListNL "," MaybeNL Expression MaybeNL   { $1 |> $4     }
+    | ExpressionListNL "," MaybeNL Expression MaybeNL   { $1     |> $4 }
 
 MaybeExpressionListNL :: { Seq (Lexeme Expression) }
     : MaybeNL               { empty }
