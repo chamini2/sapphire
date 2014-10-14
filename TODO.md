@@ -8,6 +8,8 @@
 * Structures (Records/Unions)
 * Initialize Variables
 
+* Static Chain
+
 ##General
 
 * check Printer.hs
