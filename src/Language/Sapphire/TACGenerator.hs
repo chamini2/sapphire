@@ -368,6 +368,7 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
     Variable accL -> do
         accAddr <- getAccessAddress accL
         generate $ IfTrueGoto accAddr trueLabel
+        generate $ Goto falseLabel
 
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
