@@ -4,8 +4,6 @@
 
 * In any expression we should be using only temporals
 
-* Check if `unapram` is done correctly
-
 * Arrays (not working for multiple dimensions)
 * Structures (Records/Unions)
 * Initialize Variables
@@ -15,16 +13,41 @@
 * check Printer.hs
 * Functions have a `width` that **may be wrong**
 * Decorate the AST `Either Expression (Expression, DataType)` -- or something like this
-* Find strings in intermediate code (add it to the symbol table with a unique id or add it to symbol table by its content?) -- DONE, maybe
-* Functions may not return some times
+* Find strings in intermediate code (add it to the symbol table with a unique id or add it to symbol table by its content?) -- DONE (right?)
+* Functions may not return some times -- DONE
 * Fix offsets for scopes
-* Create missing Error construtors (mostly in Parser.y, there are more)
+* Create missing Error construtors (mostly in Parser.y, there are more) -- DONE
 
 * data SymbolTable = SymTab (Map Identifier (Map ScopeNum Symbol))
 * add applicative code for Lexeme
 * change name `Lexeme`
 
 * remove self-assign from design or add it to the language
+
+##Ask
+
+* What should be happening
+
+    def a : Int[2][3] c -> ()
+    end
+    d : Int[2][3][4]
+    e : Int[4][2][3]
+    a(d[0])
+    a(e[0])
+    Static error at 6:1:
+        FunctionArguments "a" (fromList [Int[2][3]]) (fromList [Int[4][2]])
+
+In C++ the following happens:
+    
+    int main(int argc, char *argv[]) {
+        int x[2][3][4] ;
+
+        /* 24 */ cout << sizeof(x) / 4 << endl;
+        /* 12 */ cout << sizeof(x[0]) / 4 << endl;
+        /* 4  */ cout << sizeof(x[0][0]) / 4 << endl;
+        /* 1  */ cout << sizeof(x[0][0][0]) / 4 << endl;
+        return 0;
+    }
 
 ##Someday
 
