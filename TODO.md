@@ -26,6 +26,9 @@
 
 * pass arrays by reference (width changes between parameter and variable)
 
+* shouldn't be able to return arrays
+* add non-expression return
+
 ##Ask
 
 * What should be happening

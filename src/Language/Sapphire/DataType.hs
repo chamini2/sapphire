@@ -52,7 +52,7 @@ instance Show DataType where
         Type            -> "Type"
         Record idnL     -> "record " ++ lexInfo idnL
         Union  idnL     -> "union "  ++ lexInfo idnL
-        Array  dtL sizL -> show (lexInfo dtL) ++ "[" ++ show (lexInfo sizL) ++ "]"
+        Array  dtL sizL -> "[" ++ show (lexInfo sizL) ++ "]" ++  show (lexInfo dtL)
         Void            -> "()"
         TypeError       -> error "DataType.DataType.show: TypeError should never be shown"
 

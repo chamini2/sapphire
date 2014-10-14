@@ -77,7 +77,7 @@ instance Show Token where
         TkAssign        -> "'='"
         TkDef           -> "'def'"
         TkAs            -> "'as'"
-        TkSignature     -> "'::'"
+        TkSignature     -> "':'"
         TkArrow         -> "'->'"
         TkDot           -> "'.'"
         TkRead          -> "'read'"

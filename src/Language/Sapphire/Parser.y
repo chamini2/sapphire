@@ -208,11 +208,6 @@ Statement :: { Lexeme Statement }
                                 }
 
     -- -- Definitions
-    | VariableList     DataType     {% do
-                                        let const = StNoop <$ index $1 0
-                                        tellPError (lexPosn $2) VariableDefinitionMissingColon
-                                        return const
-                                    }
     | VariableList ":"              {% do
                                         let const = StNoop <$ index $1 0
                                         tellPError (lexPosn $2) VariableDefinitionWithoutDataType
@@ -326,28 +321,28 @@ VariableList :: { Seq (Lexeme Identifier) }
 
 DataType :: { Lexeme DataType }
     : TypeId                    { DataType $1 <$ $1 }
-    | DataType "[" Int "]"      {% do
-                                    unless (lexInfo $3 > 0) $ tellPError (lexPosn $3) ArraySize
-                                    return $ Array $1 $3 <$ $1
-                                }
-    | DataType "[" "-" Int "]"  {% do
-                                    tellPError (lexPosn $3) ArraySize
-                                    return $ Array $1 $4 <$ $1
+    | "[" Int "]" DataType      {% do
+                                    unless (lexInfo $2 > 0) $ tellPError (lexPosn $2) ArraySize
+                                    return $ Array $4 $2 <$ $1
                                 }
     -- Errors
-    | DataType "["     "]"      {% do
-                                    let const = Void <$ $1
-                                    tellPError (lexPosn $3) ArrayDataTypeSize
-                                    return const
+    |  "[" "-" Int "]" DataType {% do
+                                    tellPError (lexPosn $2) ArraySize
+                                    return $ Array $5 (negate `fmap` $3) <$ $1
                                 }
-    | DataType     Int          {% do
+    | "["     "]" DataType      {% do
                                     let const = Void <$ $1
                                     tellPError (lexPosn $2) ArrayDataTypeSize
                                     return const
                                 }
-    | DataType "[" Access "]"   {% do
+    |     Int     DataType      {% do
                                     let const = Void <$ $1
-                                    tellPError (lexPosn $3) ArrayDataTypeSize
+                                    tellPError (lexPosn $2) ArrayDataTypeSize
+                                    return const
+                                }
+    | "[" Access "]" DataType   {% do
+                                    let const = Void <$ $1
+                                    tellPError (lexPosn $2) ArrayDataTypeSize
                                     return const
                                 }
 
