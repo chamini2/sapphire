@@ -24,6 +24,8 @@
 
 * remove self-assign from design or add it to the language
 
+* pass arrays by reference (width changes between parameter and variable)
+
 ##Ask
 
 * What should be happening
@@ -48,6 +50,18 @@ In C++ the following happens:
         /* 1  */ cout << sizeof(x[0][0][0]) / 4 << endl;
         return 0;
     }
+
+Look at this
+
+    data Expression = Access Identifier [Access]
+
+    data Access = StructAccess Identifier
+                | ArrayAccess  Expression
+
+    data DataType = Array DataType Int
+
+    -- a[0].x[1].c
+    -- Access "a" [ArrayAccess 0, StructAccess "x", ArrayAccess 1, StructAccess "c"]
 
 ##Someday
 
