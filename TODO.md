@@ -12,6 +12,8 @@
 
 ##General
 
+* add embeded functions to symbol table
+* Get file name from command line, put in reader.
 * check Printer.hs
 * Functions have a `width` that **may be wrong**
 * Decorate the AST `Either Expression (Expression, DataType)` -- or something like this
