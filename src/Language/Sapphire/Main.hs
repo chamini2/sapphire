@@ -36,20 +36,22 @@ main = void $ runMaybeT $ do
         else liftIO . readFile $ head args
 
     let (prog, plErrs) = parseProgram input
-    unlessGuard (null plErrs) $ mapM_ (liftIO . print) plErrs
+    unlessGuard (null $ errors plErrs) $ mapM_ (liftIO . print) plErrs
     -- When there are no lexer or parser errors
 
     let (defS, dfErrs) = processDefinition reader plErrs prog
-    unlessGuard (null dfErrs) $ mapM_ (liftIO . print) dfErrs
+    unlessGuard (null $ errors dfErrs) $ mapM_ (liftIO . print) dfErrs
     -- When there are no definition errors
 
     let (typS, tpErrs) = processTypeChecker reader dfErrs (getTable defS) prog
-    unlessGuard (null tpErrs) $ mapM_ (liftIO . print) tpErrs
+    unlessGuard (null $ errors tpErrs) $ mapM_ (liftIO . print) tpErrs
     -- When there are no type checking errors
 
     let (sizS, szErrs) = processSizeOffset reader tpErrs (getTable typS) prog
-    unlessGuard (null szErrs) $ mapM_ (liftIO . print) szErrs
+    unlessGuard (null $ errors szErrs) $ mapM_ (liftIO . print) szErrs
     -- When there are no size or offset errors
+
+    mapM_ (liftIO . print) $ warnings szErrs
 
     when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
     when (ShowAST         `elem` flgs) . liftIO $ print prog

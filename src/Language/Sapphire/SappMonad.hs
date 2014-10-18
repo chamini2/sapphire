@@ -13,7 +13,9 @@ import           Control.Monad.Writer (MonadWriter, tell)
 import           Data.Function        (on)
 import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
-import           Data.Sequence        (Seq, singleton, empty)
+import           Data.Sequence        (Seq, singleton, empty, filter)
+import           Prelude              hiding (filter)
+
 
 --------------------------------------------------------------------------------
 -- Monadic functions
@@ -92,6 +94,15 @@ type SappWriter = Seq Error
 
 initialWriter :: SappWriter
 initialWriter = empty
+
+----------------------------------------
+-- Error Filtering
+
+errors :: SappWriter -> Seq Error
+errors = filter isError
+
+warnings :: SappWriter -> Seq Error
+warnings = filter (not . isError)
 
 --------------------------------------------------------------------------------
 -- State

@@ -1,9 +1,10 @@
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE OverlappingInstances       #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
-{-# LANGUAGE DeriveTraversable          #-}
-{-# LANGUAGE LambdaCase                 #-}
 {- |
     Symbol table based on the LeBlanc-Cook symbol table definition
  -}
@@ -40,52 +41,45 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.Scope
 import           Language.Sapphire.Stack
 
-import           Data.Foldable    (Foldable, concatMap, find, foldr, msum,
-                                   toList)
-import           Data.Function    (on)
-import           Data.List        (groupBy, intercalate, sortBy)
-import qualified Data.Map.Strict  as Map (Map, alter, empty, lookup, toList)
-import           Data.Sequence    (Seq, ViewL (..), empty, fromList, singleton,
-                                   viewl, (<|))
-import           Data.Traversable (Traversable)
-import           Prelude          hiding (concatMap, foldr, lookup)
+import           Data.Foldable             (concatMap, find, foldr,
+                                            msum, toList)
+import           Data.Function             (on)
+import           Data.List                 (groupBy, intercalate, sortBy)
+import qualified Data.Map.Strict           as Map (Map, alter, empty, lookup,
+                                                   toList)
+import           Data.Sequence             (Seq, ViewL (..), empty, fromList,
+                                            singleton, viewl, (<|))
+import           Prelude                   hiding (concatMap, foldr, lookup)
 
-{- |
-    Symbol Table
--}
-newtype SymbolTable' a = SymTable
-    { getMap :: Map.Map Identifier a
-    } deriving (Functor, Foldable, Traversable)
-
-type SymbolTable = SymbolTable' (Seq Symbol)
+type SymbolTable = Map.Map Identifier (Seq Symbol)
 
 instance Show SymbolTable where
     show = showTable 0
 
 showTable :: Int -> SymbolTable -> String
 showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) showSymbols
-        where
-            allSyms :: [(Identifier, Symbol)]
-            allSyms = toList $ allSymbols tab
-            sortIt :: [(Identifier, Symbol)]
-            sortIt = sortBy (compareOn scope) allSyms
-            groupIt :: [[(Identifier, Symbol)]]
-            groupIt = groupBy (equalOn scope) sortIt
-            groupItKey :: [(Scope, [(Identifier, Symbol)])]
-            groupItKey = map (\ls@((_,s):_) -> (scope s,ls)) groupIt
-            showSymbols :: [String]
-            showSymbols = map (uncurry showScpInfs) groupItKey
-            ----------------------------------------
-            tabs :: String
-            tabs = replicate t '\t'
-            equalOn :: Eq a => (Symbol -> a) -> (Identifier, Symbol) -> (Identifier, Symbol) -> Bool
-            equalOn f = (==) `on` (f . snd)
-            compareOn :: Ord a => (Symbol -> a) -> (Identifier, Symbol) -> (Identifier, Symbol) -> Ordering
-            compareOn f = compare `on` (f . snd)
-            showScpInfs :: Scope -> [(Identifier, Symbol)] -> String
-            showScpInfs scp infs = tabs ++ "\t" ++ show scp ++ " -> " ++ concatMap (uncurry showInf) infs
-            showInf :: Identifier -> Symbol -> String
-            showInf idn sym = "\n\t\t" ++ tabs ++ "'" ++ idn ++ "':" ++ replicate (3 - div (length idn + 3) 4) '\t' ++ show sym
+    where
+        allSyms :: [(Identifier, Symbol)]
+        allSyms = toList $ allSymbols tab
+        sortIt :: [(Identifier, Symbol)]
+        sortIt = sortBy (compareOn scope) allSyms
+        groupIt :: [[(Identifier, Symbol)]]
+        groupIt = groupBy (equalOn scope) sortIt
+        groupItKey :: [(Scope, [(Identifier, Symbol)])]
+        groupItKey = map (\ls@((_,s):_) -> (scope s,ls)) groupIt
+        showSymbols :: [String]
+        showSymbols = map (uncurry showScpInfs) groupItKey
+        ----------------------------------------
+        tabs :: String
+        tabs = replicate t '\t'
+        equalOn :: Eq a => (Symbol -> a) -> (Identifier, Symbol) -> (Identifier, Symbol) -> Bool
+        equalOn f = (==) `on` (f . snd)
+        compareOn :: Ord a => (Symbol -> a) -> (Identifier, Symbol) -> (Identifier, Symbol) -> Ordering
+        compareOn f = compare `on` (f . snd)
+        showScpInfs :: Scope -> [(Identifier, Symbol)] -> String
+        showScpInfs scp infs = tabs ++ "\t" ++ show scp ++ " -> " ++ concatMap (uncurry showInf) infs
+        showInf :: Identifier -> Symbol -> String
+        showInf idn sym = "\n\t\t" ++ tabs ++ "'" ++ idn ++ "':" ++ replicate (3 - div (length idn + 3) 4) '\t' ++ show sym
 
 --------------------------------------------------------------------------------
 
@@ -183,7 +177,7 @@ instance Ord SymbolCategory where
     Empty symbol table
  -}
 emptyTable :: SymbolTable
-emptyTable = SymTable Map.empty
+emptyTable = Map.empty
 
 ----------------------------------------
 
@@ -237,7 +231,7 @@ symbolCategory sym = case sym of
     Adds a symbol to the symbol table along with its information
  -}
 insert :: Identifier -> Symbol -> SymbolTable -> SymbolTable
-insert vn info = SymTable . Map.alter func vn . getMap
+insert vn info = Map.alter func vn
     where
         func Nothing  = Just $ singleton info
         func (Just x) = Just $ info <| x
@@ -248,7 +242,7 @@ insert vn info = SymTable . Map.alter func vn . getMap
     Looks up the symbol identified by var in the symbol table
  -}
 lookup :: Identifier -> SymbolTable -> Maybe Symbol
-lookup idn (SymTable m) = do
+lookup idn m = do
     is <- Map.lookup idn m
     case viewl is of
         EmptyL    -> Nothing
@@ -258,7 +252,7 @@ lookup idn (SymTable m) = do
     Looks up the symbol identifier in the specified scope in the symbol table
  -}
 lookupWithScope :: Identifier -> Stack Scope -> SymbolTable -> Maybe Symbol
-lookupWithScope idn (Stack scopes) (SymTable m) = do
+lookupWithScope idn (Stack scopes) m = do
     is <- Map.lookup idn m
     msum $ map (\sc -> find ((sc==) . scope) is) scopes
 
@@ -268,7 +262,7 @@ lookupWithScope idn (Stack scopes) (SymTable m) = do
     Updates the Symbol of a given idntifier.
  -}
 update :: Identifier -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
-update idn f = SymTable . Map.alter func idn . getMap
+update idn f = Map.alter func idn
     where
         func mayIs = case mayIs of
             Just is -> case viewl is of
@@ -280,7 +274,7 @@ update idn f = SymTable . Map.alter func idn . getMap
     Updates the Symbol of a given identifier, in a given scope.
 -}
 updateWithScope :: Identifier -> Stack Scope -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
-updateWithScope idn sc f = SymTable . Map.alter func idn . getMap
+updateWithScope idn sc f = Map.alter func idn
     where
         func = maybe failure (Just . foldr foldFunc empty)
         failure = error $ "SymbolTable.update: Identifier '" ++ idn ++ "' does not exist in symbol table"
@@ -294,11 +288,11 @@ updateWithScope idn sc f = SymTable . Map.alter func idn . getMap
     Returns all the Symbols
  -}
 allSymbols :: SymbolTable -> Seq (Identifier, Symbol)
-allSymbols = fromList . sortIt . expand . Map.toList . getMap
+allSymbols = fromList . sortIt . expand . Map.toList
     where
         expand   = concatMap (\(idn, syms) -> zip (repeat idn) (toList syms))
         sortIt   = sortBy comp
         comp x y = case compOn symbolCategory x y of
-                EQ    -> compOn defPosn x y
-                other -> other
+            EQ    -> compOn defPosn x y
+            other -> other
         compOn f = compare `on` (f . snd)
