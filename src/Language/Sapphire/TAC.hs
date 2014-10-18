@@ -2,7 +2,24 @@
 {-|
     Three-address code (TAC) generation module
 -}
-module Language.Sapphire.TAC where
+module Language.Sapphire.TAC
+    (
+      Label
+    , Temporary
+    , Serial
+
+    , Address(..)
+    , Value(..)
+
+    , Instruction(..)
+    , BinOperator(..)
+    , UnOperator(..)
+    , Relation(..)
+
+    , binaryToRelation
+    , binaryToBinOperator
+    , unaryToUnOperator
+    ) where
 
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable

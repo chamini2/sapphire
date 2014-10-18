@@ -48,7 +48,7 @@ type TACReader = ()
 data TACState = TACState
     { table       :: SymbolTable
     , stack       :: Stack Scope
-    , scopeId     :: ScopeNum
+    , scopeId     :: Scope
     , ast         :: Program
     , tempSerial  :: Serial
     , labelSerial :: Serial
@@ -78,7 +78,7 @@ initialState :: TACState
 initialState = TACState
     { table       = emptyTable
     , stack       = topStack
-    , scopeId     = topScopeNum
+    , scopeId     = topScope
     , ast         = Program empty
     , tempSerial  = 0
     , labelSerial = 0

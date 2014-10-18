@@ -99,11 +99,11 @@ initialWriter = empty
 class Show s => SappState s where
     getTable   :: s -> SymbolTable
     getStack   :: s -> Stack Scope
-    getScopeId :: s -> ScopeNum
+    getScopeId :: s -> Scope
     getAst     :: s -> Program
     putTable   :: SymbolTable -> s -> s
     putStack   :: Stack Scope -> s -> s
-    putScopeId :: ScopeNum    -> s -> s
+    putScopeId :: Scope    -> s -> s
     putAst     :: Program     -> s -> s
 
 ----------------------------------------
@@ -137,14 +137,13 @@ tellWarn posn = tell . singleton . Warn posn
 enterScope :: (SappState s, MonadState s m) => m ()
 enterScope = do
     scp <- liftM succ $ gets getScopeId
-    let scope = Scope { serial = scp }
-    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId scp s
+    modify $ \s -> putStack (push scp (getStack s)) $ putScopeId scp s
 
 exitScope :: (SappState s, MonadState s m) => m ()
 exitScope = modify $ \s -> putStack (pop $ getStack s) s
 
-currentScope :: (SappState s, MonadState s m) => m ScopeNum
-currentScope = gets (serial . top . getStack)
+currentScope :: (SappState s, MonadState s m) => m Scope
+currentScope = gets (top . getStack)
 
 --------------------------------------------------------------------------------
 -- SymbolTable

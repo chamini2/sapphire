@@ -13,17 +13,15 @@ module Language.Sapphire.SymbolTable
     , insert
     , lookup
     , lookupWithScope
-    --, toListFilter
     , update
     , updateWithScope
     , allSymbols
 
     , Symbol(..)
-    , scopeNum
+    , scope
     , emptySymInfo
     , emptySymType
     , emptySymFunction
-    -- , isProcedure
 
     , Used
     , LanguageDefined
@@ -34,24 +32,8 @@ module Language.Sapphire.SymbolTable
     , SymbolCategory(..)
     , symbolCategory
 
-    -- From Stack
-    , Stack(..)
-    , top
-    , pop
-    , push
-    , modifyStack
-    , topStack
-    , globalStack
-    , emptyStack
-    , singletonStack
-
-    -- From Scope
-    , Scope(..)
-    , ScopeNum
-    -- , topScope
-    --, langScope
-    , topScopeNum
-    --, langScopeNum
+    , module Language.Sapphire.Stack
+    , module Language.Sapphire.Scope
     ) where
 
 import           Language.Sapphire.Program
@@ -86,11 +68,11 @@ showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) sho
             allSyms :: [(Identifier, Symbol)]
             allSyms = toList $ allSymbols tab
             sortIt :: [(Identifier, Symbol)]
-            sortIt = sortBy (compareOn scopeNum) allSyms
+            sortIt = sortBy (compareOn scope) allSyms
             groupIt :: [[(Identifier, Symbol)]]
-            groupIt = groupBy (equalOn scopeNum) sortIt
-            groupItKey :: [(ScopeNum, [(Identifier, Symbol)])]
-            groupItKey = map (\ls@((_,s):_) -> (scopeNum s,ls)) groupIt
+            groupIt = groupBy (equalOn scope) sortIt
+            groupItKey :: [(Scope, [(Identifier, Symbol)])]
+            groupItKey = map (\ls@((_,s):_) -> (scope s,ls)) groupIt
             showSymbols :: [String]
             showSymbols = map (uncurry showScpInfs) groupItKey
             ----------------------------------------
@@ -100,7 +82,7 @@ showTable t tab = tabs ++ "Symbol Table:\n" ++ concatMap (++ ("\n" ++ tabs)) sho
             equalOn f = (==) `on` (f . snd)
             compareOn :: Ord a => (Symbol -> a) -> (Identifier, Symbol) -> (Identifier, Symbol) -> Ordering
             compareOn f = compare `on` (f . snd)
-            showScpInfs :: ScopeNum -> [(Identifier, Symbol)] -> String
+            showScpInfs :: Scope -> [(Identifier, Symbol)] -> String
             showScpInfs scp infs = tabs ++ "\t" ++ show scp ++ " -> " ++ concatMap (uncurry showInf) infs
             showInf :: Identifier -> Symbol -> String
             showInf idn sym = "\n\t\t" ++ tabs ++ "'" ++ idn ++ "':" ++ replicate (3 - div (length idn + 3) 4) '\t' ++ show sym
@@ -168,8 +150,8 @@ instance Show Symbol where
             showW by = show by ++ " bytes"
             showStk  = ("stack: " ++) . show
 
-scopeNum :: Symbol -> ScopeNum
-scopeNum = serial . top . scopeStack
+scope :: Symbol -> Scope
+scope = top . scopeStack
 
 ----------------------------------------
 
@@ -278,7 +260,7 @@ lookup idn (SymTable m) = do
 lookupWithScope :: Identifier -> Stack Scope -> SymbolTable -> Maybe Symbol
 lookupWithScope idn (Stack scopes) (SymTable m) = do
     is <- Map.lookup idn m
-    msum $ map ((\sc -> find ((sc==) . scopeNum) is) . serial) scopes
+    msum $ map (\sc -> find ((sc==) . scope) is) scopes
 
 ----------------------------------------
 
@@ -307,12 +289,6 @@ updateWithScope idn sc f = SymTable . Map.alter func idn . getMap
             else   i <| is
 
 ----------------------------------------
-
---toListFilter :: ScopeNum -> SymbolTable -> Seq (Identifier, Symbol)
---toListFilter sc st@(SymTable m) = fromList $ foldl' func [] $ Map.keys m
---    where
---        func ls idn = maybe ls (\j -> (idn, j) : ls) $ maySI idn
---        maySI idn   = lookupWithScope idn (singletonStack (Scope sc)) st
 
 {- |
     Returns all the Symbols

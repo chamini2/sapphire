@@ -36,7 +36,7 @@ type Definition = RWS SappReader SappWriter DefState
 data DefState = DefState
     { table   :: SymbolTable
     , stack   :: Stack Scope
-    , scopeId :: ScopeNum
+    , scopeId :: Scope
     , ast     :: Program
     , loopLvl :: Int
     }
@@ -64,7 +64,7 @@ initialState :: DefState
 initialState = DefState
     { table     = emptyTable
     , stack     = topStack
-    , scopeId   = topScopeNum
+    , scopeId   = topScope
     , ast       = Program empty
     , loopLvl   = 0
     }
@@ -154,7 +154,7 @@ definitionStatement (Lex st posn) = case st of
         current <- currentScope
 
         -- Can only define structures in the top scope
-        unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
+        unlessGuard (current == topScope) $ tellSError posn TypeInInnerScope
 
         -- Fields SymbolTable
         fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
