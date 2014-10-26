@@ -290,7 +290,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
 
                     (fldDtL, fldWdt) <- getUpdatedDataTypeWidth (scopeStack fldSym) fldP (dataType fldSym)
 
-                    -- Error when defining a field with type of the same strucutre we are defining (recursively)
+                    -- Error when defining a field with type of the same structure we are defining (recursively)
                     unlessGuard (strIdn /= fldDtIdn) $ tellSError fldP (RecursiveStruct strIdn)
 
                     -- Error when it uses a type defined afterwards
