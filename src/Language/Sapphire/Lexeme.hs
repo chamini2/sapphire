@@ -2,11 +2,7 @@ module Language.Sapphire.Lexeme
     ( Lexeme(..)
     , pure
 
-    -- From Position
-    , Position(..)
-    , defaultPosn
-    , row
-    , col
+    , module Language.Sapphire.Position
     ) where
 
 import           Language.Sapphire.Position

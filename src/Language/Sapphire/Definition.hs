@@ -20,11 +20,10 @@ import           Data.Foldable                 (all, foldl', foldlM, forM_,
 import           Data.Functor                  ((<$))
 import qualified Data.Map.Strict               as Map (toList)
 import           Data.Maybe                    (fromJust, isJust)
-import           Data.Sequence                 (Seq, empty, index, null,
-                                                singleton)
+import           Data.Sequence                 (Seq, empty, null)
 import           Data.Traversable              (forM)
-import           Prelude                       hiding (all, length,
-                                                lookup, mapM_, maximum, null)
+import           Prelude                       hiding (all, length, lookup,
+                                                mapM_, maximum, null)
 
 --------------------------------------------------------------------------------
 
@@ -36,7 +35,7 @@ type Definition = RWS SappReader SappWriter DefState
 data DefState = DefState
     { table   :: SymbolTable
     , stack   :: Stack Scope
-    , scopeId :: ScopeNum
+    , scopeId :: Scope
     , ast     :: Program
     , loopLvl :: Int
     }
@@ -64,7 +63,7 @@ initialState :: DefState
 initialState = DefState
     { table     = emptyTable
     , stack     = topStack
-    , scopeId   = topScopeNum
+    , scopeId   = topScope
     , ast       = Program empty
     , loopLvl   = 0
     }
@@ -83,7 +82,7 @@ buildDefinition w program@(Program block) = do
 
     -- First we define every DataType in the program,
     -- Then we get said DataTypes for the variables/parameters
-    when (null defW) $ gets (allSymbols . table) >>= fixDataTypes
+    when (null defW) $ gets (toSeq . table) >>= fixDataTypes
 
 ----------------------------------------
 
@@ -154,7 +153,7 @@ definitionStatement (Lex st posn) = case st of
         current <- currentScope
 
         -- Can only define structures in the top scope
-        unlessGuard (current == topScopeNum) $ tellSError posn TypeInInnerScope
+        unlessGuard (current == topScope) $ tellSError posn TypeInInnerScope
 
         -- Fields SymbolTable
         fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
@@ -282,9 +281,8 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                 unless (isJust symTab) $ error "Definition.fixDataTypes: user-defined type has no fields SymbolTable"
 
                 -- Fields
-                symTab' <- forM (fromJust symTab) $ \fldSymSeq -> runMaybeT $ do
-                    let fldSym   = index fldSymSeq 0
-                        fldP     = defPosn fldSym
+                symTab' <- forM (toSeq $ fromJust symTab) $ \(fldIdn, fldSym) -> runMaybeT $ do
+                    let fldP     = defPosn fldSym
                         -- We need the field's data type identifier for errors
                         fldDtIdn = toIdentifier . lexInfo . fst . defocusDataType . deepDataType . focusDataType $ dataType fldSym
                         -- We need the field's data type position for errors
@@ -299,18 +297,18 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     unlessGuard (symPosn > symDtP) $ tellSError fldP (TypeNotYetDefined strIdn fldDtIdn symDtP)
 
                     let fldSym' = fldSym { dataType = fldDtL, width = fldWdt }
-                    return $ singleton fldSym'
+                    return (fldIdn, fldSym')
 
-                let (symTab'' , typeWidth) = case lexInfo symDtL of
+                let (symTab'', typeWidth) = case lexInfo symDtL of
                         Record _ -> foldRecordTable $ fmap fromJust symTab'
                         Union  _ -> widthUnionTable $ fmap fromJust symTab'
                 when (all isJust symTab') $
                     modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
                 where
-                    widthUnionTable :: SymbolTable -> (SymbolTable, Width)
-                    widthUnionTable symTab = (symTab, maximum . fmap (width . snd) $ allSymbols symTab)
-                    foldRecordTable :: SymbolTable -> (SymbolTable, Width)
-                    foldRecordTable symTab = foldl' recordField (symTab, 0) $ allSymbols symTab
+                    widthUnionTable :: Seq (Identifier, Symbol) -> (SymbolTable, Width)
+                    widthUnionTable syms' = (fromSeq syms', maximum $ fmap (width . snd) syms')
+                    foldRecordTable :: Seq (Identifier, Symbol) -> (SymbolTable, Width)
+                    foldRecordTable syms' = foldl' recordField (fromSeq syms', 0) syms'
                     recordField :: (SymbolTable, Width) -> (Identifier, Symbol) -> (SymbolTable, Width)
                     recordField (tab, accum) (fldIdn, fldSym) = (tab', accum + width fldSym)
                         where

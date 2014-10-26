@@ -1,7 +1,7 @@
 {
 {-# OPTIONS_GHC -w #-}
 {-|
-    Lexer for programming language SAPPHIRE.
+    Lexer for the programming language sapphire
 -}
 
 module Language.Sapphire.Lexer

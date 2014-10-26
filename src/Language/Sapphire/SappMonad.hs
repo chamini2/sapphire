@@ -3,7 +3,6 @@
 module Language.Sapphire.SappMonad where
 
 import           Language.Sapphire.Error
-import           Language.Sapphire.Printer ()   -- For the Show instance of Program
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 
@@ -13,7 +12,9 @@ import           Control.Monad.Writer (MonadWriter, tell)
 import           Data.Function        (on)
 import qualified Data.Map.Strict      as Map (Map, fromList)
 import           Data.Maybe           (isJust)
-import           Data.Sequence        (Seq, singleton, empty)
+import           Data.Sequence        (Seq, singleton, empty, filter)
+import           Prelude              hiding (filter)
+
 
 --------------------------------------------------------------------------------
 -- Monadic functions
@@ -93,17 +94,26 @@ type SappWriter = Seq Error
 initialWriter :: SappWriter
 initialWriter = empty
 
+----------------------------------------
+-- Error Filtering
+
+errors :: SappWriter -> Seq Error
+errors = filter isError
+
+warnings :: SappWriter -> Seq Error
+warnings = filter (not . isError)
+
 --------------------------------------------------------------------------------
 -- State
 
 class Show s => SappState s where
     getTable   :: s -> SymbolTable
     getStack   :: s -> Stack Scope
-    getScopeId :: s -> ScopeNum
+    getScopeId :: s -> Scope
     getAst     :: s -> Program
     putTable   :: SymbolTable -> s -> s
     putStack   :: Stack Scope -> s -> s
-    putScopeId :: ScopeNum    -> s -> s
+    putScopeId :: Scope    -> s -> s
     putAst     :: Program     -> s -> s
 
 ----------------------------------------
@@ -137,14 +147,13 @@ tellWarn posn = tell . singleton . Warn posn
 enterScope :: (SappState s, MonadState s m) => m ()
 enterScope = do
     scp <- liftM succ $ gets getScopeId
-    let scope = Scope { serial = scp }
-    modify $ \s -> putStack (push scope (getStack s)) $ putScopeId scp s
+    modify $ \s -> putStack (push scp (getStack s)) $ putScopeId scp s
 
 exitScope :: (SappState s, MonadState s m) => m ()
 exitScope = modify $ \s -> putStack (pop $ getStack s) s
 
-currentScope :: (SappState s, MonadState s m) => m ScopeNum
-currentScope = gets (serial . top . getStack)
+currentScope :: (SappState s, MonadState s m) => m Scope
+currentScope = gets (top . getStack)
 
 --------------------------------------------------------------------------------
 -- SymbolTable

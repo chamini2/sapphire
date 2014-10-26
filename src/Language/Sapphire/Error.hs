@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Language.Sapphire.Error
     ( Error(..)
+    , isError
+
     , LexerError(..)
     , ParseError(..)
     , StaticError(..)
@@ -33,6 +35,11 @@ instance Eq Error where
 
 instance Ord Error where
     compare = compare `on` errorPos
+
+isError :: Error -> Bool
+isError = \case
+    Warn _ _ -> False
+    _        -> True
 
 --------------------------------------------------------------------------------
 

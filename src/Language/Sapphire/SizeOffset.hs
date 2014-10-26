@@ -29,7 +29,7 @@ type SizeOffset = RWS SappReader SappWriter SizeState
 data SizeState = SizeState
     { table    :: SymbolTable
     , stack    :: Stack Scope
-    , scopeId  :: ScopeNum
+    , scopeId  :: Scope
     , ast      :: Program
     , offStack :: Stack Offset
     , stringOffset :: Offset
@@ -58,7 +58,7 @@ initialState :: SizeState
 initialState = SizeState
     { table        = emptyTable
     , stack        = topStack
-    , scopeId      = topScopeNum
+    , scopeId      = topScope
     , ast          = Program empty
     , offStack     = singletonStack 0
     , stringOffset = 0

@@ -48,7 +48,7 @@ type TACReader = ()
 data TACState = TACState
     { table       :: SymbolTable
     , stack       :: Stack Scope
-    , scopeId     :: ScopeNum
+    , scopeId     :: Scope
     , ast         :: Program
     , tempSerial  :: Serial
     , labelSerial :: Serial
@@ -78,7 +78,7 @@ initialState :: TACState
 initialState = TACState
     { table       = emptyTable
     , stack       = topStack
-    , scopeId     = topScopeNum
+    , scopeId     = topScope
     , ast         = Program empty
     , tempSerial  = 0
     , labelSerial = 0
@@ -368,6 +368,7 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
     Variable accL -> do
         accAddr <- getAccessAddress accL
         generate $ IfTrueGoto accAddr trueLabel
+        generate $ Goto falseLabel
 
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
@@ -449,7 +450,6 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
         ArrayAccess _ expL -> do
             let inDt = arrayInnerDataType dt
 
-            -- dtWdt   <- liftM fromJust $ getsSymbol (toIdentifier inDt) width
             dtWdt   <- dataTypeWidth inDt
             expAddr <- linearizeExpression expL
 
@@ -476,9 +476,11 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
 
     Nothing -> return offAddr
 
+----------------------------------------
 
 dataTypeWidth :: DataType -> TACGenerator Width
-dataTypeWidth dt = if isArray dt then do
+dataTypeWidth dt = if isArray dt
+    then do
         let Array inDtL sizL = dt
         inDtWdt <- dataTypeWidth $ lexInfo inDtL
         return $ inDtWdt * lexInfo sizL

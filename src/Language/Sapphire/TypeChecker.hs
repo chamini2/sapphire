@@ -40,9 +40,9 @@ type TypeChecker = RWS SappReader SappWriter TypeState
 data TypeState = TypeState
     { table     :: SymbolTable
     , stack     :: Stack Scope
-    , scopeId   :: ScopeNum
+    , scopeId   :: Scope
     , ast       :: Program
-    , funcStack :: Stack (Identifier, DataType, ScopeNum)
+    , funcStack :: Stack (Identifier, DataType, Scope)
     }
 
 ----------------------------------------
@@ -68,9 +68,9 @@ initialState :: TypeState
 initialState = TypeState
     { table        = emptyTable
     , stack        = topStack
-    , scopeId      = topScopeNum
+    , scopeId      = topScope
     , ast          = Program empty
-    , funcStack    = singletonStack ("sapphire", Void, topScopeNum)
+    , funcStack    = singletonStack ("sapphire", Void, topScope)
     }
 
 --------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ buildTypeChecker w tab program@(Program block) = do
     tell w
     void $ typeCheckStatements block
 
-    syms <- liftM allSymbols $ gets table
+    syms <- liftM toSeq $ gets table
 
     -- Check warnings only when not suppressed
     flgs <- asks flags
@@ -150,7 +150,7 @@ enterFunction idnL dt = do
 exitFunction :: TypeChecker ()
 exitFunction = modify $ \s -> s { funcStack = pop $ funcStack s }
 
-currentFunction :: TypeChecker (Identifier, DataType, ScopeNum)
+currentFunction :: TypeChecker (Identifier, DataType, Scope)
 currentFunction = gets (top . funcStack)
 
 --------------------------------------------------------------------------------
@@ -175,7 +175,7 @@ typeCheckStatement (Lex st posn) = case st of
         expDt                     <- lift $ typeCheckExpression expL
         (idn, retDt, funcScopeId) <- lift currentFunction
 
-        unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScopeNum
+        unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScope
             then tellSError posn (ReturnInProcedure expDt idn)
             else tellSError posn ReturnInTopScope
 
@@ -329,10 +329,9 @@ typeCheckExpression (Lex exp posn) = case exp of
 checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> MaybeT TypeChecker DataType
 checkArguments (Lex idn posn) args func = do
     maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, returnType sym, paramTypes sym))
+    let (cat, Lex dt _, prms) = fromJust maySymI
 
     unlessGuard (isJust maySymI) $ tellSError posn (FunctionNotDefined idn)
-
-    let (cat, Lex dt _, prms) = fromJust maySymI
 
     -- When is not a function
     unlessGuard (cat == CatFunction) $ tellSError posn (WrongCategory idn CatFunction cat)
