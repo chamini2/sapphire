@@ -450,7 +450,6 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
         ArrayAccess _ expL -> do
             let inDt = arrayInnerDataType dt
 
-            -- dtWdt   <- liftM fromJust $ getsSymbol (toIdentifier inDt) width
             dtWdt   <- dataTypeWidth inDt
             expAddr <- linearizeExpression expL
 
@@ -477,9 +476,11 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
 
     Nothing -> return offAddr
 
+----------------------------------------
 
 dataTypeWidth :: DataType -> TACGenerator Width
-dataTypeWidth dt = if isArray dt then do
+dataTypeWidth dt = if isArray dt
+    then do
         let Array inDtL sizL = dt
         inDtWdt <- dataTypeWidth $ lexInfo inDtL
         return $ inDtWdt * lexInfo sizL

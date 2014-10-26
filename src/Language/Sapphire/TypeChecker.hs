@@ -329,10 +329,9 @@ typeCheckExpression (Lex exp posn) = case exp of
 checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> MaybeT TypeChecker DataType
 checkArguments (Lex idn posn) args func = do
     maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, returnType sym, paramTypes sym))
+    let (cat, Lex dt _, prms) = fromJust maySymI
 
     unlessGuard (isJust maySymI) $ tellSError posn (FunctionNotDefined idn)
-
-    let (cat, Lex dt _, prms) = fromJust maySymI
 
     -- When is not a function
     unlessGuard (cat == CatFunction) $ tellSError posn (WrongCategory idn CatFunction cat)
