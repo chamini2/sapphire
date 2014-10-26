@@ -82,7 +82,7 @@ buildTypeChecker w tab program@(Program block) = do
     tell w
     void $ typeCheckStatements block
 
-    syms <- liftM allSymbols $ gets table
+    syms <- liftM toSeq $ gets table
 
     -- Check warnings only when not suppressed
     flgs <- asks flags
