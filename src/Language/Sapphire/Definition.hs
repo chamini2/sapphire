@@ -302,6 +302,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                 let (symTab'', typeWidth) = case lexInfo symDtL of
                         Record _ -> foldRecordTable $ fmap fromJust symTab'
                         Union  _ -> widthUnionTable $ fmap fromJust symTab'
+                        _        -> error "Definition.fixDataTypes: CatType has non-struct DataType"
                 when (all isJust symTab') $
                     modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
                 where

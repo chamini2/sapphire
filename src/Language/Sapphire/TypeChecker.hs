@@ -405,4 +405,6 @@ constructDataType idnL accZ dt = case defocusAccess <$> backAccess accZ of
 
             constructDataType idnL (fromJust $ backAccess accZ) (fromJust mayFldDt)
 
+        _ -> error "TypeChecker.constructDataType: unrecognized Access"
+
     Nothing -> return dt

@@ -49,7 +49,7 @@ data Token
     | TkBelongs
 
     -- -- String
---    | TkConcat
+   | TkConcat
 
     -- -- Identifiers
     | TkIden   { unTkIden   :: String }
@@ -120,7 +120,7 @@ instance Show Token where
         TkLessEq        -> "'<='"
         TkGreatEq       -> "'>='"
         TkBelongs       -> "'@'"
-        --TkConcat        -> "'++'"
+        TkConcat        -> "'++'"
         TkIden _        -> "variable identifier"
         TkTypeId _      -> "type identifier"
         TkEOF           -> "'EOF'"

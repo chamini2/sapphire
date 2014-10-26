@@ -134,6 +134,7 @@ instance Show Instruction where
             IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
             IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la
             IfFalseGoto a la      -> "ifnot " ++ show a ++ " goto " ++ la
+            _  -> error "TAC.Show Instruction: unrecognized instruction"
 
 data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW

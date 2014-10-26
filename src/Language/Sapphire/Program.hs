@@ -113,6 +113,7 @@ prettyStatement (Lex st posn) = case st of
         let strct = case lexInfo dtL of
                 Record _ -> "RECORD"
                 Union  _ -> "UNION"
+                _        -> error "Program.prettyStatement: StStructDefinition has non-struct DataType"
         prettyString $ strct ++ " DEFINITION " ++ show posn ++ ":"
         raiseTabs
         forM_ flds $ \(Lex fldIdn _, Lex fldDt _) ->

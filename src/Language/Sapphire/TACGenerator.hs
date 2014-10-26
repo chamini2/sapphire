@@ -209,6 +209,7 @@ linearizeStatement nextLabel (Lex st posn) = do
                 Float -> ReadFloat
                 Bool  -> ReadBool
                 Char  -> ReadChar
+                _     -> error "TACGenerator.linearizeStatement.StRead: unreadble DataType"
 
         StPrint expL -> do
             state <- get
@@ -224,6 +225,7 @@ linearizeStatement nextLabel (Lex st posn) = do
                     Float -> PrintFloat
                     Bool  -> PrintBool
                     Char  -> PrintChar
+                    _     -> error "TACGenerator.linearizeStatement.StPrint: unprintable DataType"
 
         StIf expL trueBlock falseBlock -> do
             trueLabel  <- newLabel
@@ -473,6 +475,8 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
             generate $ AssignBin resTemp ADD offAddr fldTemp
 
             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
+
+        _ -> error "TACGenerator.calculateAccessOffset: unrecognized Access"
 
     Nothing -> return offAddr
 
