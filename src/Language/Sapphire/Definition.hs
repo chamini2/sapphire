@@ -299,16 +299,16 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     let fldSym' = fldSym { dataType = fldDtL, width = fldWdt }
                     return (fldIdn, fldSym')
 
-                let (symTab'' , typeWidth) = case lexInfo symDtL of
+                let (symTab'', typeWidth) = case lexInfo symDtL of
                         Record _ -> foldRecordTable $ fmap fromJust symTab'
                         Union  _ -> widthUnionTable $ fmap fromJust symTab'
                 when (all isJust symTab') $
                     modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
                 where
                     widthUnionTable :: Seq (Identifier, Symbol) -> (SymbolTable, Width)
-                    widthUnionTable syms = (fromSeq syms, maximum $ fmap (width . snd) syms)
+                    widthUnionTable syms' = (fromSeq syms', maximum $ fmap (width . snd) syms')
                     foldRecordTable :: Seq (Identifier, Symbol) -> (SymbolTable, Width)
-                    foldRecordTable syms = foldl' recordField (fromSeq syms, 0) syms
+                    foldRecordTable syms' = foldl' recordField (fromSeq syms', 0) syms'
                     recordField :: (SymbolTable, Width) -> (Identifier, Symbol) -> (SymbolTable, Width)
                     recordField (tab, accum) (fldIdn, fldSym) = (tab', accum + width fldSym)
                         where

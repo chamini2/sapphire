@@ -62,9 +62,6 @@ instance Show Expression where
         ExpBinary opL lExpL rExpL -> "(" ++ show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL) ++ ")"
         ExpUnary  opL expL        -> "(" ++ show (lexInfo opL) ++ " " ++ show (lexInfo expL) ++ ")"
 
---instance Show Expression where
---    show = runPrinter . printExpression
-
 data Binary
     = OpPlus  | OpMinus   | OpTimes | OpDivide | OpModulo | OpPower   | OpFromTo
     | OpEqual | OpUnequal | OpLess  | OpLessEq | OpGreat  | OpGreatEq

@@ -107,10 +107,10 @@ data Instruction
     | IfFalseGoto Address Label
 
 instance Show Instruction where
-    show ins = case ins of
+    show = \case
         Comment str     -> "# " ++ str
         PutLabel la str -> la ++ ":" ++ replicate (10 - div (length la + 1) 4) '\t' ++ "# " ++ str
-        _ -> "\t" ++ case ins of
+        ins -> "\t" ++ case ins of
             AssignBin res o le ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
             AssignUn  res o n     -> show res ++ " := " ++ show o  ++ " " ++ show n
             Assign d s            -> show d ++ " := " ++ show s

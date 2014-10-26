@@ -3,7 +3,6 @@
 module Language.Sapphire.SappMonad where
 
 import           Language.Sapphire.Error
-import           Language.Sapphire.Printer ()   -- For the Show instance of Program
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 

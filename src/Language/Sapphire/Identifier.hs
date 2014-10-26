@@ -3,4 +3,4 @@ module Language.Sapphire.Identifier
     ) where
 
 -- General
-type Identifier  = String
+type Identifier = String
