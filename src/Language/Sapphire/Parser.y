@@ -166,7 +166,8 @@ Statement :: { Lexeme Statement }
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
-    | "return" Expression                                               { StReturn $2 <$ $1 }
+    | "return" Expression                                               { StReturn (Just $2) <$ $1 }
+    | "return"                                                          { StReturn Nothing   <$ $1 }
 
     -- Conditionals
     | "if"     Expression MaybeNL "then" StatementList ElIfList "end"               { StIf $2          $5 $6    <$ $1 }
@@ -237,11 +238,6 @@ Statement :: { Lexeme Statement }
     | "def"            ":" Signature Separator StatementList "end"      {% do
                                                                             let const = StNoop <$ $1
                                                                             tellPError (lexPosn $2) FunctionDefinitionIdentifier
-                                                                            return const
-                                                                        }
-    | "return"                                                          {% do
-                                                                            let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $1) EmptyReturn
                                                                             return const
                                                                         }
 

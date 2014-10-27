@@ -17,12 +17,14 @@ import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 import           Language.Sapphire.Statement
 
-import           Control.Monad.State       (StateT, get, modify, runStateT)
-import           Control.Monad.Writer      (Writer, execWriter, tell)
-import           Data.Char                 (toLower)
-import           Data.Foldable             (concat, forM_, mapM_)
-import           Data.Sequence             (Seq, singleton)
-import           Prelude                   hiding (concat, exp, mapM_)
+import           Control.Monad                 (when)
+import           Control.Monad.State           (StateT, get, modify, runStateT)
+import           Control.Monad.Writer          (Writer, execWriter, tell)
+import           Data.Char                     (toLower)
+import           Data.Foldable                 (concat, forM_, mapM_)
+import           Data.Maybe                    (fromJust, isJust)
+import           Data.Sequence                 (Seq, singleton)
+import           Prelude                       hiding (concat, exp, mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -120,11 +122,12 @@ prettyStatement (Lex st posn) = case st of
             prettyString $ "- field: " ++ fldIdn ++ " : " ++ show fldDt
         lowerTabs
 
-    StReturn expL -> do
+    StReturn mayExpL -> do
         prettyString $ "RETURN " ++ show posn ++ ":"
-        raiseTabs
-        prettyExpression (lexInfo expL)
-        lowerTabs
+        when (isJust mayExpL) $ do
+            raiseTabs
+            prettyExpression (lexInfo $ fromJust mayExpL)
+            lowerTabs
 
     StFunctionDef idnL sign block -> do
         prettyString $ "FUNCTION DEFINITION " ++ show posn ++ ":"
