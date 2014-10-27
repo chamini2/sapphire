@@ -26,6 +26,7 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 
     -- Language
     newline         { Lex TkNewLine     _ }
+    "main"          { Lex TkMain        _ }
     "end"           { Lex TkEnd         _ }
     "return"        { Lex TkReturn      _ }
     ";"             { Lex TkSemicolon   _ }
@@ -140,11 +141,7 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 -- Grammar
 
 Program :: { Program }
-    : StatementList         { Program $1 }
-
-StatementList :: { StBlock }
-    : Statement                             { expandStatement $1       }
-    | StatementList Separator Statement     { $1 >< expandStatement $3 }
+    : TopStatementList      { Program $1 }
 
 Separator :: { () }
     : ";"           { }
@@ -154,10 +151,12 @@ MaybeNL :: { () }
     : {- λ -}               { }
     | MaybeNL newline       { }
 
-Statement :: { Lexeme Statement }
+TopStatementList :: { StBlock }
+    : Top                               { expandStatement $1       }
+    | TopStatementList Separator Top    { $1 >< expandStatement $3 }
+
+Top :: { Lexeme Statement }
     : {- λ, no-op -}            { pure StNoop }
-    -- Assignment
-    | Access "=" Expression     { StAssign $1 $3 <$ $1 }
 
     -- Definitions
     | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
@@ -165,6 +164,56 @@ Statement :: { Lexeme Statement }
 
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
+
+    -- Main
+    | "main" StatementList "end"    { StFunctionDef ("main" <$ $1) (Sign empty (pure Void)) $2 <$ $1 }
+
+----------------------------------------
+
+    -- Errors
+    -- -- Definitions
+    | VariableList ":"              {% do
+                                        let const = StNoop <$ index $1 0
+                                        tellPError (lexPosn $2) VariableDefinitionWithoutDataType
+                                        return const
+                                    }
+    | Structure        "as" FieldList "end"     {% do
+                                                    let const = StNoop <$ $1
+                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
+                                                    return const
+                                                }
+    | Structure TypeId "as"           "end"     {% do
+                                                    let const = StNoop <$ $1
+                                                    tellPError (lexPosn $2) NoFieldsInType
+                                                    return const
+                                                }
+    | Structure        "as"           "end"     {% do
+                                                    let const = StNoop <$ $1
+                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
+                                                    tellPError (lexPosn $2) NoFieldsInType
+                                                    return const
+                                                }
+
+    -- -- Functions
+    | "def"            ":" Signature Separator StatementList "end"      {% do
+                                                                            let const = StNoop <$ $1
+                                                                            tellPError (lexPosn $2) FunctionDefinitionIdentifier
+                                                                            return const
+                                                                        }
+
+StatementList :: { StBlock }
+    : Statement                             { expandStatement $1       }
+    | StatementList Separator Statement     { $1 >< expandStatement $3 }
+
+Statement :: { Lexeme Statement }
+    : {- λ, no-op -}            { pure StNoop }
+    -- Assignment
+    | Access "=" Expression     { StAssign $1 $3 <$ $1 }
+
+    -- Definitions
+    | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
+
+    -- Functions
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
     | "return" Expression                                               { StReturn $2 <$ $1 }
 
@@ -216,29 +265,8 @@ Statement :: { Lexeme Statement }
                                         tellPError (lexPosn $2) VariableDefinitionWithoutDataType
                                         return const
                                     }
-    | Structure        "as" FieldList "end"     {% do
-                                                    let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
-                                                    return const
-                                                }
-    | Structure TypeId "as"           "end"     {% do
-                                                    let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) NoFieldsInType
-                                                    return const
-                                                }
-    | Structure        "as"           "end"     {% do
-                                                    let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
-                                                    tellPError (lexPosn $2) NoFieldsInType
-                                                    return const
-                                                }
 
     -- -- Functions
-    | "def"            ":" Signature Separator StatementList "end"      {% do
-                                                                            let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $2) FunctionDefinitionIdentifier
-                                                                            return const
-                                                                        }
     | "return"                                                          {% do
                                                                             let const = StNoop <$ $1
                                                                             tellPError (lexPosn $1) EmptyReturn

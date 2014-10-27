@@ -70,6 +70,7 @@ tokens :-
 
         -- Language
         @skip                   { tok' TkNewLine        }
+        "main"                  { tok' TkMain           }
         "end"                   { tok' TkEnd            }
         "return"                { tok' TkReturn         }
         ";"                     { tok' TkSemicolon      }

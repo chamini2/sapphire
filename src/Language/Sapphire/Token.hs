@@ -6,7 +6,7 @@ module Language.Sapphire.Token
 data Token
 
     -- Language
-    = TkNewLine | TkEnd | TkReturn | TkSemicolon | TkComma
+    = TkNewLine | TkMain | TkEnd | TkReturn | TkSemicolon | TkComma
 
     -- -- Brackets
     | TkLParen | TkRParen | TkLBrackets | TkRBrackets
@@ -64,6 +64,7 @@ data Token
 instance Show Token where
     show = \case
         TkNewLine       -> "'newline'"
+        TkMain          -> "'main'"
         TkEnd           -> "'end'"
         TkReturn        -> "'return'"
         TkSemicolon     -> "';'"
@@ -72,8 +73,8 @@ instance Show Token where
         TkRParen        -> "')'"
         TkLBrackets     -> "'['"
         TkRBrackets     -> "']'"
-        TkRecordType    -> "type 'record'"
-        TkUnionType     -> "type 'union'"
+        TkRecordType    -> "'record'"
+        TkUnionType     -> "'union'"
         TkAssign        -> "'='"
         TkDef           -> "'def'"
         TkAs            -> "'as'"
