@@ -70,7 +70,7 @@ initialState = TypeState
     , stack        = topStack
     , scopeId      = topScope
     , ast          = Program empty
-    , funcStack    = singletonStack ("sapphire", Void, topScope)
+    , funcStack    = emptyStack
     }
 
 --------------------------------------------------------------------------------
@@ -172,14 +172,12 @@ typeCheckStatement (Lex st posn) = case st of
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
     StReturn mayExpL -> flip (>>) (return True) . runMaybeT $ do
-        (idn, retDt, funcScopeId) <- lift currentFunction
+        (idn, retDt, _) <- lift currentFunction
         if isJust mayExpL
             then do
                 expDt <- lift . typeCheckExpression $ fromJust mayExpL
 
-                unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScope
-                    then tellSError posn (ReturnInProcedure expDt idn)
-                    else tellSError posn ReturnInTopScope
+                unlessGuard (not $ isVoid retDt) $ tellSError posn (ReturnInProcedure expDt idn)
 
                 -- Checking for TypeError
                 guard (isValid expDt)
