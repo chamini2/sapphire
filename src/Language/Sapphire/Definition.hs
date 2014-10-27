@@ -80,9 +80,11 @@ buildDefinition w program@(Program block) = do
 
     (_, defW) <- listen (return ())
 
+    (tab, stk) <- gets (table &&& stack)
     -- First we define every DataType in the program,
-    -- Then we get said DataTypes for the variables/parameters
-    when (null defW) $ gets (toSeq . table) >>= fixDataTypes
+    -- Then we use said DataTypes for the variables/parameters/fields
+    when (null defW) . fixDataTypes $ toSeq tab
+    unless (member mainName stk tab) $ tellSError defaultPosn (StaticError "no 'main' function")
 
 ----------------------------------------
 

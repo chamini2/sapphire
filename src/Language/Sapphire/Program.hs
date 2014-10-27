@@ -2,6 +2,8 @@
 module Language.Sapphire.Program
     ( Program(..)
 
+    , mainName
+
     , module Language.Sapphire.DataType
     , module Language.Sapphire.Declaration
     , module Language.Sapphire.Expression
@@ -25,6 +27,11 @@ import           Data.Foldable                 (concat, forM_, mapM_)
 import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (Seq, singleton)
 import           Prelude                       hiding (concat, exp, mapM_)
+
+--------------------------------------------------------------------------------
+
+mainName :: Identifier
+mainName = "main"
 
 --------------------------------------------------------------------------------
 
