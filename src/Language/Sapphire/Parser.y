@@ -215,7 +215,8 @@ Statement :: { Lexeme Statement }
 
     -- Functions
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
-    | "return" Expression                                               { StReturn $2 <$ $1 }
+    | "return" Expression                                               { StReturn (Just $2) <$ $1 }
+    | "return"                                                          { StReturn Nothing   <$ $1 }
 
     -- Conditionals
     | "if"     Expression MaybeNL "then" StatementList ElIfList "end"               { StIf $2          $5 $6    <$ $1 }
@@ -266,24 +267,17 @@ Statement :: { Lexeme Statement }
                                         return const
                                     }
 
-    -- -- Functions
-    | "return"                                                          {% do
-                                                                            let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $1) EmptyReturn
-                                                                            return const
-                                                                        }
-
     -- -- Conditionals
-   | "case" Expression MaybeNL          "end"                                      {% do
-                                                                                       let const = StNoop <$ $1
-                                                                                       tellPError (lexPosn $4) NoWhensInCase
-                                                                                       return const
-                                                                                   }
-   | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
-                                                                                       let const = StNoop <$ $1
-                                                                                       tellPError (lexPosn $4) NoWhensInCase
-                                                                                       return const
-                                                                                   }
+    | "case" Expression MaybeNL          "end"                                      {% do
+                                                                                        let const = StNoop <$ $1
+                                                                                        tellPError (lexPosn $4) NoWhensInCase
+                                                                                        return const
+                                                                                    }
+    | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
+                                                                                        let const = StNoop <$ $1
+                                                                                        tellPError (lexPosn $4) NoWhensInCase
+                                                                                        return const
+                                                                                    }
 
 ---------------------------------------
 -- Structures

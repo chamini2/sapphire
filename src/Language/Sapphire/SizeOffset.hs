@@ -98,7 +98,7 @@ currentOffset :: SizeOffset Offset
 currentOffset = gets (top . offStack)
 
 addOffset :: Offset -> SizeOffset ()
-addOffset off = modify $ \s -> s { offStack = modifyStack (+off) (offStack s) }
+addOffset off = modify $ \s -> s { offStack = touch (+off) (offStack s) }
 
 resetOffset :: SizeOffset ()
 resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }

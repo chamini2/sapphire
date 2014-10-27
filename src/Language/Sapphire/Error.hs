@@ -80,7 +80,7 @@ data ParseError
     | NoFieldsInType
     -- -- Functions
     | FunctionDefinitionIdentifier
-    | EmptyReturn
+--     | EmptyReturn
     -- -- Conditional
     | NoWhensInCase
 
@@ -109,7 +109,7 @@ instance Show ParseError where
         NoFieldsInType                    -> "type must have at least one field"
         -- -- Functions
         FunctionDefinitionIdentifier -> "missing identifier for function definition"
-        EmptyReturn                  -> "return statement must have an expression"
+        -- EmptyReturn                  -> "return statement must have an expression"
         -- -- Conditional
         NoWhensInCase -> "case statement must have at least one 'when'"
 
@@ -148,6 +148,7 @@ data StaticError
     | ContinueOutsideLoop
     | ReturnInTopScope
     | ReturnInProcedure          DataType Identifier
+    | ReturnVoidInFunction       DataType Identifier
     | ReturnType        DataType DataType Identifier
     -- Operators
     | BinaryTypes Binary (DataType, DataType)

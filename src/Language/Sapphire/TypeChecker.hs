@@ -28,7 +28,7 @@ import           Data.Maybe                    (fromJust, fromMaybe, isJust)
 import           Data.Sequence                 (Seq, empty, length, zipWith)
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (all, and, exp, length,
-                                                lookup, mapM, or, zipWith)
+                                                lookup, mapM, null, or, zipWith)
 
 --------------------------------------------------------------------------------
 
@@ -171,17 +171,20 @@ typeCheckStatement (Lex st posn) = case st of
         guard (isValid expDt)
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
-    StReturn expL -> flip (>>) (return True) . runMaybeT $ do
-        expDt                     <- lift $ typeCheckExpression expL
+    StReturn mayExpL -> flip (>>) (return True) . runMaybeT $ do
         (idn, retDt, funcScopeId) <- lift currentFunction
+        if isJust mayExpL
+            then do
+                expDt <- lift . typeCheckExpression $ fromJust mayExpL
 
-        unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScope
-            then tellSError posn (ReturnInProcedure expDt idn)
-            else tellSError posn ReturnInTopScope
+                unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScope
+                    then tellSError posn (ReturnInProcedure expDt idn)
+                    else tellSError posn ReturnInTopScope
 
-        -- Checking for TypeError
-        guard (isValid expDt)
-        unlessGuard (retDt == expDt) $ tellSError posn (ReturnType retDt expDt idn)
+                -- Checking for TypeError
+                guard (isValid expDt)
+                unlessGuard (retDt == expDt) $ tellSError posn (ReturnType retDt expDt idn)
+            else unlessGuard (retDt == Void) $ tellSError posn (ReturnVoidInFunction retDt idn)
 
     StFunctionDef (Lex idn _) _ block -> do
         dt <- liftM (lexInfo . fromJust) $ getsSymbol idn returnType
