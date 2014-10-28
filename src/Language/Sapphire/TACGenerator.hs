@@ -19,13 +19,14 @@ import           Language.Sapphire.TypeChecker (processAccessChecker,
                                                 processExpressionChecker)
 
 import           Control.Arrow                 ((&&&))
-import           Control.Monad                 (liftM, unless, void)
-import           Control.Monad.RWS             (RWS, execRWS)
+import           Control.Monad                 (guard, liftM, unless, void)
+import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
+import           Control.Monad.Trans.Maybe     (runMaybeT)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (forM_, mapM_)
 import           Data.Functor                  ((<$>))
-import           Data.Maybe                    (fromJust)
+import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (Seq, empty, length, null,
                                                 reverse, singleton, zip)
 import           Data.Traversable              (forM, mapM)
@@ -181,7 +182,9 @@ linearizeStatement nextLabel (Lex st posn) = do
                 expAddr <- linearizeExpression expL
                 generate $ Assign accAddr expAddr
 
-        StReturn expL -> linearizeExpression expL >>= generate . Return
+        StReturn mayExpL -> (=<<) (generate . Return) . runMaybeT $ do
+            guard (isJust mayExpL)
+            lift . linearizeExpression $ fromJust mayExpL
 
         StFunctionDef idnL _ block -> do
             blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
@@ -209,6 +212,7 @@ linearizeStatement nextLabel (Lex st posn) = do
                 Float -> ReadFloat
                 Bool  -> ReadBool
                 Char  -> ReadChar
+                _     -> error "TACGenerator.linearizeStatement.StRead: unreadble DataType"
 
         StPrint expL -> do
             state <- get
@@ -224,6 +228,7 @@ linearizeStatement nextLabel (Lex st posn) = do
                     Float -> PrintFloat
                     Bool  -> PrintBool
                     Char  -> PrintChar
+                    _     -> error "TACGenerator.linearizeStatement.StPrint: unprintable DataType"
 
         StIf expL trueBlock falseBlock -> do
             trueLabel  <- newLabel
@@ -372,7 +377,7 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
 
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
-linearizeExpression :: Lexeme Expression -> TACGenerator (Address)
+linearizeExpression :: Lexeme Expression -> TACGenerator Address
 linearizeExpression (Lex exp _) = case exp of
 
     LitInt    v -> do
@@ -473,6 +478,8 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
             generate $ AssignBin resTemp ADD offAddr fldTemp
 
             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
+
+        _ -> error "TACGenerator.calculateAccessOffset: unrecognized Access"
 
     Nothing -> return offAddr
 

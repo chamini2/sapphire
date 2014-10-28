@@ -1,10 +1,10 @@
 {-|
     MIPS code generation module
 -}
-module MIPS (
+module Language.Sapphire.MIPS (
       MIPSGenerator
     , generateMIPS
-) 
+)
 where
 
 import           Data.Sequence             as DS (Seq, empty, length)
@@ -22,7 +22,7 @@ type Label = String
 {-|
     MIPS 32 registers
  -}
-data Register = 
+data Register =
     | Zero                                  -- Constant register
 --  | AT                                    -- Reserved for assembler
     | A0 | A1 | A2 | A3                     -- Used to pass first four arguments to function call
@@ -39,7 +39,7 @@ data Register =
 {-|
     MIPS 32 floating-point registers
 -}
-data FlPRegister = 
+data FlPRegister =
     | Zero                                  -- Constant register
     | AT                                    -- Reserved for assembler
     | A0 | A1 | A2 | A3                     -- Used to pass first four arguments to function call
@@ -59,7 +59,7 @@ data MIPSInstruction =
       Add  Register Register Operand
     | Addi Register Register Constant
     | Sub  Register Register Register
-    | Mul  Register Register Register 
+    | Mul  Register Register Register
     | Div  Register Register Register
     | Rem  Register Register Register
     -- Load instructions
@@ -69,10 +69,10 @@ data MIPSInstruction =
     -- Store instructions
     | Seq Register Register Register
     | Sne Register Register Register
-    | Slt Register Register Register 
-    | Sgt Register Register Register 
-    | Sle Register Register Register 
-    | Sge Register Register Register 
+    | Slt Register Register Register
+    | Sgt Register Register Register
+    | Sle Register Register Register
+    | Sge Register Register Register
     | Sa
     | Sw
     -- Branch instructions
@@ -93,8 +93,8 @@ data MIPSInstruction =
 
 type MIPSGenerator = RWST MIPSState MIPSReader MIPSWriter IO
 
-MIPSGeneratorState = MIPSGeneratorState 
-    { 
+MIPSGeneratorState = MIPSGeneratorState
+    {
     }
 
 initialState :: MIPSGeneratorState

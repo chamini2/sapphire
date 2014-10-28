@@ -104,6 +104,9 @@ import           Data.Sequence             (Seq, empty, fromList, index,
     ">="            { Lex TkGreatEq     _ }
     "@"             { Lex TkBelongs     _ }
 
+    -- -- String
+    "++"            { Lex TkConcat      _ }
+
     -- -- Identifiers
     ident           { Lex (TkIden   _)  _ }
     typeid          { Lex (TkTypeId _)  _ }
@@ -111,13 +114,13 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 --------------------------------------------------------------------------------
 
 -- Precedence
--- -- String
--- %right    "++"
-
 -- -- Bool
 %left     "or"
 %left     "and"
 %right    "not"
+
+-- -- String
+%right    "++"
 
 -- -- -- Compare
 %nonassoc "@"
@@ -163,7 +166,8 @@ Statement :: { Lexeme Statement }
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
-    | "return" Expression                                               { StReturn $2 <$ $1 }
+    | "return" Expression                                               { StReturn (Just $2) <$ $1 }
+    | "return"                                                          { StReturn Nothing   <$ $1 }
 
     -- Conditionals
     | "if"     Expression MaybeNL "then" StatementList ElIfList "end"               { StIf $2          $5 $6    <$ $1 }
@@ -234,11 +238,6 @@ Statement :: { Lexeme Statement }
     | "def"            ":" Signature Separator StatementList "end"      {% do
                                                                             let const = StNoop <$ $1
                                                                             tellPError (lexPosn $2) FunctionDefinitionIdentifier
-                                                                            return const
-                                                                        }
-    | "return"                                                          {% do
-                                                                            let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $1) EmptyReturn
                                                                             return const
                                                                         }
 
@@ -456,6 +455,10 @@ Expression :: { Lexeme Expression }
     | Expression ">"   Expression   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
     | Expression ">="  Expression   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
     | Expression "@"   Expression   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
+    | Expression "++"  Expression   {% do
+                                        tellLError (lexPosn $2) (LexerError "String concat is not supported yet")
+                                        return $1
+                                    }
     | "-"   Expression              { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" Expression              { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
     | "(" ExpressionNL ")"          { lexInfo $2 <$ $1 }
@@ -488,6 +491,10 @@ ExpressionNL :: { Lexeme Expression }
     | ExpressionNL ">"   ExpressionNL   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
     | ExpressionNL ">="  ExpressionNL   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
     | ExpressionNL "@"   ExpressionNL   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
+    | ExpressionNL "++"  ExpressionNL   {% do
+                                            tellLError (lexPosn $2) (LexerError "String concat is not supported yet")
+                                            return $1
+                                        }
     | "-"   ExpressionNL                { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" ExpressionNL                { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
     | "(" ExpressionNL ")"              { lexInfo $2 <$ $1 }
@@ -531,6 +538,7 @@ notExp :: Lexeme Expression -> Lexeme Expression
 notExp exp = (ExpUnary (OpNot <$ exp) exp) <$ exp
 
 --------------------------------------------------------------------------------
+-- Parser
 
 lexWrap :: (Lexeme Token -> Alex a) -> Alex a
 lexWrap cont = do

@@ -150,6 +150,7 @@ data StaticError
     | ContinueOutsideLoop
     | ReturnInTopScope
     | ReturnInProcedure          DataType Identifier
+    | ReturnVoidInFunction       DataType Identifier
     | ReturnType        DataType DataType Identifier
     -- Operators
     | BinaryTypes Binary (DataType, DataType)

@@ -42,7 +42,7 @@ $alpha = [$small $large]
 
 $idchar = [$alpha $digit]
 
--- Alex won't work if we write it directly in the @inside_string
+-- Alex complains if is written directly in the `@inside_string`
 $backslash = ["\\abfnrtv]
 
 @inside_string          = ($printable # ["\\] | \\$backslash)
@@ -158,7 +158,7 @@ tokens :-
         "@"                     { tok' TkBelongs        }
 
         -- -- String
-        --"++"                    { tok' TkConcat         }
+        "++"                    { tok' TkConcat         }
 
         -- -- Identifiers
         @ident                  { tok TkIden            }

@@ -86,7 +86,7 @@ data Instruction
     | EndFunction
     | PushParameter Address
 --    | PopParameters Int
-    | Return Address
+    | Return (Maybe Address)
     | PCall         Label Int
     | FCall Address Label Int
     -- Print
@@ -118,7 +118,7 @@ instance Show Instruction where
             EndFunction           -> "end_function"
             PushParameter a       -> "param " ++ show a
             -- PopParameters n       -> "unparam " ++ show n
-            Return a              -> "return " ++ show a
+            Return mayA           -> "return" ++ maybe "" ((" " ++) . show) mayA
             PCall la i            -> "call " ++ la ++ ", " ++ show i
             FCall d la i          -> show d ++ " := " ++ "call " ++ la ++ ", " ++ show i
             PrintInt    a         -> "print_int "    ++ show a
@@ -134,6 +134,7 @@ instance Show Instruction where
             IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
             IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la
             IfFalseGoto a la      -> "ifnot " ++ show a ++ " goto " ++ la
+            _  -> error "TAC.Show Instruction: unrecognized instruction"
 
 data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW

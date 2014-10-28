@@ -30,7 +30,7 @@ data Statement
     | StDeclarationList     (Seq (Lexeme Declaration))              -- Only used in Parser
     | StStructDefinition    (Lexeme DataType) (Seq Field)
     -- Functions
-    | StReturn        (Lexeme Expression)
+    | StReturn        (Maybe (Lexeme Expression))
     | StFunctionDef   (Lexeme Identifier) Signature StBlock
     | StProcedureCall (Lexeme Identifier) (Seq (Lexeme Expression))
     -- I/O
@@ -52,7 +52,7 @@ instance Show Statement where
         StAssign accL expL         -> show (lexInfo accL) ++ " = " ++ show (lexInfo expL)
         StVariableDeclaration dclL -> show (lexInfo dclL)
         StStructDefinition dtL _   -> show (lexInfo dtL)
-        StReturn expL              -> "return " ++ show (lexInfo expL)
+        StReturn mayExpL           -> "return" ++ maybe "" ((" " ++) . show . lexInfo) mayExpL
         StFunctionDef idnL _ _     -> "def " ++ lexInfo idnL
         StProcedureCall idnL expLs -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
         StRead accL                -> "read " ++ show (lexInfo accL)

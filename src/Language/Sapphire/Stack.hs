@@ -3,7 +3,7 @@ module Language.Sapphire.Stack
     , top
     , pop
     , push
-    , modifyStack
+    , touch
 
     , topStack
     , globalStack
@@ -53,9 +53,9 @@ pop (Stack (_ : s)) = Stack s
 {- |
     Modifies the top element in the stack.
 -}
-modifyStack :: (a -> a) -> Stack a -> Stack a
-modifyStack _ (Stack [])       = Stack []
-modifyStack f (Stack (x : xs)) = Stack (f x : xs)
+touch :: (a -> a) -> Stack a -> Stack a
+touch _ (Stack [])       = Stack []
+touch f (Stack (x : xs)) = Stack (f x : xs)
 
 ----------------------------------------
 
