@@ -212,10 +212,10 @@ InnerStatement :: { Lexeme Statement }
     | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
 
     -- Loops
-    |                                      "while" Expression "do" StatementList "end"      { StLoop empty $2 $4    <$ $1 }
+    |                                       "while" Expression "do" StatementList "end"     { StLoop empty $2 $4    <$ $1 }
     | "repeat" StatementList "this" MaybeNL "while" Expression                              { StLoop $2    $6 empty <$ $1 }
     | "repeat" StatementList "this" MaybeNL "while" Expression "do" StatementList "end"     { StLoop $2    $6 $8    <$ $1 }
-    |                                      "until" Expression "do" StatementList "end"      { StLoop empty (notExp $2) $4    <$ $1 }
+    |                                       "until" Expression "do" StatementList "end"     { StLoop empty (notExp $2) $4    <$ $1 }
     | "repeat" StatementList "this" MaybeNL "until" Expression                              { StLoop $2    (notExp $6) empty <$ $1 }
     | "repeat" StatementList "this" MaybeNL "until" Expression "do" StatementList "end"     { StLoop $2    (notExp $6) $8    <$ $1 }
 

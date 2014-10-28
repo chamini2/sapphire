@@ -271,7 +271,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
         -- Variables and Parameters
         CatInfo -> void $ runMaybeT $ do
             (dtL', wdt) <- getUpdatedDataTypeWidth (scopeStack sym) (defPosn sym) (dataType sym)
-            modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { dataType = dtL', width = wdt })
+            modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { dataType = dtL', width = wdt }
 
         CatType -> do
             let symDtL  = dataType   sym
@@ -307,9 +307,9 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                 let (symTab'', typeWidth) = case lexInfo symDtL of
                         Record _ -> foldRecordTable $ fmap fromJust symTab'
                         Union  _ -> widthUnionTable $ fmap fromJust symTab'
-                        _        -> error "Definition.fixDataTypes: CatType has non-struct DataType"
+                        _        -> error "Definition.fixDataTypes: user-defined type has a non-struct DataType"
                 when (all isJust symTab') $
-                    modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
+                    modifySymbolWithScope idn symStk $ \sym' -> sym' { fields = Just symTab'', width = typeWidth }
                 where
                     widthUnionTable :: Seq (Identifier, Symbol) -> (SymbolTable, Width)
                     widthUnionTable syms' = (fromSeq syms', maximum $ fmap (width . snd) syms')
@@ -332,7 +332,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     paramDtLs = fmap fromJust mayParamDtLs
                     -- Procedures are auotmatically 'returned'
                     symRet    = isVoid $ lexInfo retDtL
-                modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs, returned = symRet })
+                modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs, returned = symRet }
 
 ----------------------------------------
 

@@ -117,7 +117,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         let idn = lexInfo . dclIdentifier $ lexInfo dclL
         (symStk, symWdt) <- liftM fromJust $ getsSymbol idn (scopeStack &&& width)
         off              <- currentOffset
-        modifySymbolWithScope idn symStk (\sym -> sym { offset = off })
+        modifySymbolWithScope idn symStk $ \sym -> sym { offset = off }
         addOffset symWdt
 
     StFunctionDef (Lex idn _) (Sign prms _) block ->  do
@@ -131,7 +131,7 @@ sizeOffsetStatement stL = case lexInfo stL of
             let prmIdn = lexInfo $ dclIdentifier dcl
             (prmstk, prmWdt) <- liftM fromJust $ getsSymbol prmIdn (scopeStack &&& width)
             off              <- currentOffset
-            modifySymbolWithScope prmIdn prmstk (\sym' -> sym' { offset = negate off })     -- (-1) For the execution stack
+            modifySymbolWithScope prmIdn prmstk $ \sym' -> sym' { offset = negate off }     -- (-1) For the execution stack
             addOffset prmWdt
 
         -- Restarts the offset in 0 for the statements block
@@ -142,7 +142,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         exitScope
 
         blockWdt <- exitFunction
-        modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt })
+        modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt }
 
     StPrint expL -> addStrings expL
 
@@ -178,7 +178,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         enterScope
         (symStk, symWdt) <- liftM fromJust $ getsSymbol idn (scopeStack &&& width)
         off              <- currentOffset
-        modifySymbolWithScope idn symStk (\sym -> sym { offset = off })
+        modifySymbolWithScope idn symStk $ \sym -> sym { offset = off }
         addOffset symWdt
 
         sizeOffsetStatements block
