@@ -3,13 +3,12 @@
     Three-address code (TAC) generation module
 -}
 module Language.Sapphire.TAC
-    (
-      Label
-    , Temporary
-    , Serial
-
-    , Address(..)
+    ( Reference(..)
     , Value(..)
+
+    , Label
+    , Serial
+    , Global
 
     , Instruction(..)
     , BinOperator(..)
@@ -24,27 +23,27 @@ module Language.Sapphire.TAC
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 
-import           Data.Char                 (toLower)
-import           Prelude                   hiding (Ordering (..))
+import           Data.Char                     (toLower)
+import           Prelude                       hiding (Ordering (..))
 
 {-|
     Three-address code representation
 -}
 
-type Label     = String
-type Temporary = String
-type Serial    = Int
+type Label  = String
+type Serial = Int
+type Global = Bool
 
-data Address
-    = Name      Identifier Address
+data Reference
+    = Address   Identifier Reference Global
     | Constant  Value
-    | Temporary Temporary
+    | Temporary Serial
 
-instance Show Address where
+instance Show Reference where
     show = \case
-        Name idn a  -> idn ++ "(" ++ show a ++ ")"
-        Constant v  -> "\\" ++ show v
-        Temporary t -> t
+        Address idn a g -> idn ++ "(" ++ show a ++ "|" ++ (if g then "G" else "FP") ++ ")"
+        Constant v      -> "\\" ++ show v
+        Temporary s     -> "$T" ++ show s
 
 data Value
     = ValInt    Int
@@ -65,81 +64,81 @@ data Instruction
     = Comment String
     | PutLabel Label String
     | AssignBin
-        { result :: Address
+        { result :: Reference
         , binop  :: BinOperator
-        , left   :: Address
-        , right  :: Address
+        , left   :: Reference
+        , right  :: Reference
         }
     | AssignUn
-        { result  :: Address
+        { result  :: Reference
         , unop    :: UnOperator
-        , operand :: Address
+        , operand :: Reference
         }
     | Assign
-        { dst :: Address
-        , src :: Address
+        { dst :: Reference
+        , src :: Reference
         }
 --    | AssignArrR
 --    | AssignArrL
     -- Function related instructions
     | BeginFunction Width
     | EndFunction
-    | PushParameter Address
+    | PushParameter Reference
 --    | PopParameters Int
-    | Return (Maybe Address)
-    | PCall         Label Int
-    | FCall Address Label Int
+    | Return (Maybe Reference)
+    | PCall           Label Int
+    | FCall Reference Label Int
     -- Print
-    | PrintInt    Address
-    | PrintFloat  Address
-    | PrintChar   Address
-    | PrintBool   Address
-    | PrintString Offset  Width
+    | PrintInt    Reference
+    | PrintFloat  Reference
+    | PrintChar   Reference
+    | PrintBool   Reference
+    | PrintString Offset    Width
     -- Read
-    | ReadInt    Address
-    | ReadFloat  Address
-    | ReadChar   Address
-    | ReadBool   Address
+    | ReadInt   Reference
+    | ReadFloat Reference
+    | ReadChar  Reference
+    | ReadBool  Reference
     -- Goto
     | Goto Label
-    | IfGoto      Relation Address Address Label
-    | IfTrueGoto  Address Label
-    | IfFalseGoto Address Label
+    | IfGoto      Relation Reference Reference Label
+    | IfTrueGoto  Reference                    Label
+    | IfFalseGoto Reference                    Label
 
 instance Show Instruction where
     show = \case
         Comment str     -> "# " ++ str
-        PutLabel la str -> la ++ ":" ++ replicate (10 - div (length la + 1) 4) '\t' ++ "# " ++ str
+        PutLabel lab str -> lab ++ ":" ++ replicate (10 - div (length lab + 1) 4) '\t' ++ "# " ++ str
         ins -> "\t" ++ case ins of
             AssignBin res o le ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
             AssignUn  res o n     -> show res ++ " := " ++ show o  ++ " " ++ show n
-            Assign d s            -> show d ++ " := " ++ show s
+            Assign ds sr          -> show ds ++ " := " ++ show sr
             BeginFunction by      -> "begin_function " ++ show by
             EndFunction           -> "end_function"
-            PushParameter a       -> "param " ++ show a
+            PushParameter ref     -> "param " ++ show ref
             -- PopParameters n       -> "unparam " ++ show n
             Return mayA           -> "return" ++ maybe "" ((" " ++) . show) mayA
-            PCall la i            -> "call " ++ la ++ ", " ++ show i
-            FCall d la i          -> show d ++ " := " ++ "call " ++ la ++ ", " ++ show i
-            PrintInt    a         -> "print_int "    ++ show a
-            PrintFloat  a         -> "print_float "  ++ show a
-            PrintChar   a         -> "print_char "   ++ show a
-            PrintBool   a         -> "print_bool "   ++ show a
-            PrintString o w       -> "print_string " ++ show o ++ " " ++ show w
-            ReadInt    a          -> "read_int "   ++ show a
-            ReadFloat  a          -> "read_float " ++ show a
-            ReadChar   a          -> "read_char "  ++ show a
-            ReadBool   a          -> "read_bool "  ++ show a
-            Goto la               -> "goto " ++ la
-            IfGoto r le ri la     -> "if " ++ show le ++ " " ++ show r ++ " " ++ show ri ++ " goto " ++ la
-            IfTrueGoto  a la      -> "if "    ++ show a ++ " goto " ++ la
-            IfFalseGoto a la      -> "ifnot " ++ show a ++ " goto " ++ la
+            PCall lab n            -> "call " ++ lab ++ ", " ++ show n
+            FCall ref lab n       -> show ref ++ " := " ++ "call " ++ lab ++ ", " ++ show n
+            PrintInt    ref       -> "print_int "    ++ show ref
+            PrintFloat  ref       -> "print_float "  ++ show ref
+            PrintChar   ref       -> "print_char "   ++ show ref
+            PrintBool   ref       -> "print_bool "   ++ show ref
+            PrintString off wdt   -> "print_string " ++ show off ++ " " ++ show wdt
+            ReadInt   ref         -> "read_int "   ++ show ref
+            ReadFloat ref         -> "read_float " ++ show ref
+            ReadChar  ref         -> "read_char "  ++ show ref
+            ReadBool  ref         -> "read_bool "  ++ show ref
+            Goto lab              -> "goto " ++ lab
+            IfGoto rel le ri lab  -> "if " ++ show le ++ " " ++ show rel ++ " " ++ show ri ++ " goto " ++ lab
+            IfTrueGoto  ref  lab  -> "if "    ++ show ref ++ " goto " ++ lab
+            IfFalseGoto ref  lab  -> "ifnot " ++ show ref ++ " goto " ++ lab
             _  -> error "TAC.Show Instruction: unrecognized instruction"
 
 data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW
     | OR   | AND
-    | ArrR | ArrL
+--    | ArrR | ArrL
     | Rel Relation
     deriving (Eq)
 
@@ -154,10 +153,10 @@ instance Show BinOperator where
         DIV   -> "/"
         MOD   -> "%"
         POW   -> "^"
-        OR    -> "||"
-        AND   -> "&&"
-        ArrR  -> "=[]"
-        ArrL  -> "[]="
+        OR    -> "|"
+        AND   -> "&"
+        -- ArrR  -> "=[]"
+        -- ArrL  -> "[]="
         Rel r -> show r
 
 instance Show UnOperator where

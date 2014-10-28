@@ -3,7 +3,7 @@
  - TAC Generator Monad
  -
  - This monad needs to generate the necessary intermediate representation (IR)
- - in this case the three-address code; store it temporarily as a structure for
+ - in this case the three-reference code; store it temporarily as a structure for
  - further processing and send it to a temporary file for debugging purposes.
  -}
 module Language.Sapphire.TACGenerator
@@ -134,11 +134,11 @@ currentLoop = gets (top . loopStack)
 
 ----------------------------------------
 
-newTemporary :: TACGenerator Address
+newTemporary :: TACGenerator Reference
 newTemporary = do
     current <- liftM succ $ gets tempSerial
     modify $ \s -> s { tempSerial = current }
-    return . Temporary $ "$T" ++ show current
+    return $ Temporary current
 
 newLabel :: TACGenerator Label
 newLabel = do
@@ -163,7 +163,7 @@ linearizeStatement nextLabel (Lex st posn) = do
         StAssign accL expL ->  do
             state <- get
             let expDt = processExpressionChecker state expL
-            accAddr <- getAccessAddress accL
+            accAddr <- getAccessReference accL
 
             -- When assigning a Boolean expression, use jumping code
             if expDt == Bool then do
@@ -207,7 +207,7 @@ linearizeStatement nextLabel (Lex st posn) = do
         StRead accL -> do
             state <- get
             let accDt = processAccessChecker state accL
-            getAccessAddress accL >>= generate . case accDt of
+            getAccessReference accL >>= generate . case accDt of
                 Int   -> ReadInt
                 Float -> ReadFloat
                 Bool  -> ReadBool
@@ -312,7 +312,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             off <- liftM fromJust $ getsSymbol (lexInfo idnL) offset
 
             generate $ Assign offTemp (Constant $ ValInt off)
-            let idnAddr = Name (lexInfo idnL) offTemp
+            let idnAddr = Address (lexInfo idnL) offTemp False
 
             let ExpBinary _ fromExpL toExpL = lexInfo expL
             fromAddr <- linearizeExpression fromExpL
@@ -371,13 +371,14 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
         _     -> void $ linearizeExpression expL
 
     Variable accL -> do
-        accAddr <- getAccessAddress accL
+        accAddr <- getAccessReference accL
+
         generate $ IfTrueGoto accAddr trueLabel
         generate $ Goto falseLabel
 
     _ -> error "TACGenerator.jumpingCode: should not get jumping code for non-boolean expressions"
 
-linearizeExpression :: Lexeme Expression -> TACGenerator Address
+linearizeExpression :: Lexeme Expression -> TACGenerator Reference
 linearizeExpression (Lex exp _) = case exp of
 
     LitInt    v -> do
@@ -403,7 +404,7 @@ linearizeExpression (Lex exp _) = case exp of
     LitString _ -> error "TACGenerator.linearizeExpression: should not get address for a String"
 
     Variable accL -> do
-        accAddr <- getAccessAddress accL
+        accAddr <- getAccessReference accL
 
         resTemp <- newTemporary
         generate $ Assign resTemp accAddr
@@ -432,22 +433,23 @@ linearizeExpression (Lex exp _) = case exp of
 
 --------------------------------------------------------------------------------
 
-getAccessAddress :: Lexeme Access -> TACGenerator Address
-getAccessAddress accL = do
+getAccessReference :: Lexeme Access -> TACGenerator Reference
+getAccessReference accL = do
     let deepZpp                 = deepAccess $ focusAccess accL
         VariableAccess deepIdnL = lexInfo $ defocusAccess deepZpp
         deepIdn                 = lexInfo deepIdnL
-    (deepOff, deepDtL) <- liftM fromJust $ getsSymbol deepIdn (offset &&& dataType)
+    (deepScp, deepOff, deepDtL) <- liftM fromJust $ getsSymbol deepIdn (\sym -> (top $ scopeStack sym, offset sym, dataType sym))
 
     offTemp <- newTemporary
     generate $ Assign offTemp (Constant $ ValInt deepOff)
 
     offAddr <- calculateAccessOffset deepZpp offTemp (lexInfo deepDtL)
-    return $ Name deepIdn offAddr
+    -- Checking if it is a global variable
+    return $ Address deepIdn offAddr (deepScp == globalScope)
 
 ----------------------------------------
 
-calculateAccessOffset :: AccessZipper -> Address -> DataType -> TACGenerator Address
+calculateAccessOffset :: AccessZipper -> Reference -> DataType -> TACGenerator Reference
 calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ of
 
     Just accL -> case lexInfo accL of
