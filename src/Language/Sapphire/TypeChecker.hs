@@ -196,7 +196,7 @@ typeCheckStatement (Lex st posn) = case st of
         unless (isVoid dt || ret) $ tellSError posn (NoReturn idn)
         return False
 
-    StProcedureCall idnL expLs -> flip (>>) (return False) . runMaybeT $ checkArguments idnL expLs False
+    StProcedureCall idnL expLs -> flip (>>) (return False) $ checkArguments idnL expLs False
 
     StRead accL -> flip (>>) (return False) . runMaybeT $ do
         (accIdn, accDt) <- accessDataType accL
@@ -299,7 +299,7 @@ typeCheckExpression (Lex exp posn) = case exp of
         markUsed accIdn
         return accDt
 
-    FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ runMaybeT $ checkArguments idnL expLs True
+    FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ checkArguments idnL expLs True
 
     ExpBinary (Lex op _) lExpL rExpL -> liftM (fromMaybe TypeError) $ runMaybeT $ do
         lDt <- lift $ typeCheckExpression lExpL
@@ -327,8 +327,8 @@ typeCheckExpression (Lex exp posn) = case exp of
 
 --------------------------------------------------------------------------------
 
-checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> MaybeT TypeChecker DataType
-checkArguments (Lex idn posn) args func = do
+checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> TypeChecker (Maybe DataType)
+checkArguments (Lex idn posn) args func = runMaybeT $ do
     maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, returnType sym, paramTypes sym))
     let (cat, Lex dt _, prms) = fromJust maySymI
 
