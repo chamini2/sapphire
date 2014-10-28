@@ -27,12 +27,12 @@ type SizeOffset = RWS SappReader SappWriter SizeState
 -- State
 
 data SizeState = SizeState
-    { table    :: SymbolTable
-    , stack    :: Stack Scope
-    , scopeId  :: Scope
-    , ast      :: Program
-    , offStack :: Stack Offset
-    , stringOffset :: Offset
+    { table        :: SymbolTable
+    , stack        :: Stack Scope
+    , scopeId      :: Scope
+    , ast          :: Program
+    , offStack     :: Stack Offset
+    , globalOffset :: Offset
     }
 
 ----------------------------------------
@@ -60,8 +60,8 @@ initialState = SizeState
     , stack        = globalStack
     , scopeId      = globalScope
     , ast          = Program empty
-    , offStack     = singletonStack 0
-    , stringOffset = 0
+    , offStack     = emptyStack
+    , globalOffset = 0
     }
 
 --------------------------------------------------------------------------------
@@ -95,10 +95,18 @@ exitFunction = do
     return $ top offStk
 
 currentOffset :: SizeOffset Offset
-currentOffset = gets (top . offStack)
+currentOffset = do
+    scp <- currentScope
+    if scp == globalScope
+        then gets globalOffset
+        else gets (top . offStack)
 
 addOffset :: Offset -> SizeOffset ()
-addOffset off = modify $ \s -> s { offStack = touch (+off) (offStack s) }
+addOffset off = do
+    scp <- currentScope
+    if scp == globalScope
+        then modify $ \s -> s { globalOffset = off + globalOffset s }
+        else modify $ \s -> s { offStack = touch (off+) (offStack s) }
 
 resetOffset :: SizeOffset ()
 resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }
@@ -108,7 +116,6 @@ resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }
 
 sizeOffsetStatements :: StBlock -> SizeOffset ()
 sizeOffsetStatements = mapM_ sizeOffsetStatement
-
 
 sizeOffsetStatement :: Lexeme Statement -> SizeOffset ()
 sizeOffsetStatement stL = case lexInfo stL of
@@ -200,7 +207,7 @@ addStrings :: Lexeme Expression -> SizeOffset ()
 addStrings (Lex exp _) = case exp of
 
     LitString strL -> do
-        strOff <- gets stringOffset
+        strOff <- gets globalOffset
         let strWdt = length $ lexInfo strL
             info = emptySymInfo
                 { dataType   = pure String
@@ -215,7 +222,7 @@ addStrings (Lex exp _) = case exp of
         maySymbol <- getSymbol idn
         unless (isJust maySymbol) $ do
             -- Set the new global offset
-            modify $ \s -> s { stringOffset = strOff + strWdt}
+            modify $ \s -> s { globalOffset = strOff + strWdt}
             addSymbol idn info
 
     _ -> return ()
