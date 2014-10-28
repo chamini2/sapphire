@@ -78,8 +78,8 @@ instance Show TACState where
 initialState :: TACState
 initialState = TACState
     { table       = emptyTable
-    , stack       = topStack
-    , scopeId     = topScope
+    , stack       = globalStack
+    , scopeId     = globalScope
     , ast         = Program empty
     , tempSerial  = 0
     , labelSerial = 0

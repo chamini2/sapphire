@@ -57,8 +57,8 @@ instance Show SizeState where
 initialState :: SizeState
 initialState = SizeState
     { table        = emptyTable
-    , stack        = topStack
-    , scopeId      = topScope
+    , stack        = globalStack
+    , scopeId      = globalScope
     , ast          = Program empty
     , offStack     = singletonStack 0
     , stringOffset = 0
@@ -90,9 +90,9 @@ enterFunction = modify $ \s -> s { offStack = push 0 (offStack s) }
 
 exitFunction :: SizeOffset Offset
 exitFunction = do
-    off <- gets (top . offStack)
-    modify $ \s -> s { offStack = pop $ offStack s }
-    return off
+    offStk <- gets offStack
+    modify $ \s -> s { offStack = pop offStk }
+    return $ top offStk
 
 currentOffset :: SizeOffset Offset
 currentOffset = gets (top . offStack)

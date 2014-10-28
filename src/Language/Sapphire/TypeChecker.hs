@@ -67,8 +67,8 @@ instance Show TypeState where
 initialState :: TypeState
 initialState = TypeState
     { table        = emptyTable
-    , stack        = topStack
-    , scopeId      = topScope
+    , stack        = globalStack
+    , scopeId      = globalScope
     , ast          = Program empty
     , funcStack    = emptyStack
     }

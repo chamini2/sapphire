@@ -62,8 +62,8 @@ instance Show DefState where
 initialState :: DefState
 initialState = DefState
     { table     = emptyTable
-    , stack     = topStack
-    , scopeId   = topScope
+    , stack     = globalStack
+    , scopeId   = globalScope
     , ast       = Program empty
     , loopLvl   = 0
     }
@@ -158,8 +158,8 @@ definitionStatement (Lex st posn) = case st of
 
         current <- currentScope
 
-        -- Can only define structures in the top scope
-        unlessGuard (current == topScope) $ tellSError posn TypeInInnerScope
+        -- Can only define structures in the global scope
+        unlessGuard (current == globalScope) $ tellSError posn TypeInInnerScope
 
         -- Fields SymbolTable
         fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
