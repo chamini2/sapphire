@@ -73,6 +73,7 @@ import           Data.Sequence             (Seq, empty, fromList, index,
     "while"         { Lex TkWhile       _ }
     "until"         { Lex TkUntil       _ }
     "repeat"        { Lex TkRepeat      _ }
+    "this"          { Lex TkThis        _ }
     "break"         { Lex TkBreak       _ }
     "continue"      { Lex TkContinue    _ }
 
@@ -212,11 +213,11 @@ InnerStatement :: { Lexeme Statement }
 
     -- Loops
     |                                      "while" Expression "do" StatementList "end"      { StLoop empty $2 $4    <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "while" Expression                               { StLoop $2    $6 empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"      { StLoop $2    $6 $8    <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "while" Expression                              { StLoop $2    $6 empty <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "while" Expression "do" StatementList "end"     { StLoop $2    $6 $8    <$ $1 }
     |                                      "until" Expression "do" StatementList "end"      { StLoop empty (notExp $2) $4    <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "until" Expression                               { StLoop $2    (notExp $6) empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"      { StLoop $2    (notExp $6) $8    <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "until" Expression                              { StLoop $2    (notExp $6) empty <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "until" Expression "do" StatementList "end"     { StLoop $2    (notExp $6) $8    <$ $1 }
 
     | "for" VariableId "in" Expression "do" StatementList "end"                             { StFor $2 $4 $6 <$ $1 }
     | "break"           { StBreak    <$ $1 }
@@ -412,7 +413,7 @@ Expression :: { Lexeme Expression }
     | Expression ">"   Expression   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
     | Expression ">="  Expression   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
     | Expression "@"   Expression   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
-    | Expression "++"  Expression   {% tellLError (lexPosn $2) (LexerError "String concat is not supported yet") >> return $1 }
+    | Expression "++"  Expression   {% tellLError (lexPosn $2) (TokenNotSupported TkConcat) >> return $1 }
     | "-"   Expression              { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" Expression              { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
     | "(" ExpressionNL ")"          { lexInfo $2 <$ $1 }
@@ -445,7 +446,7 @@ ExpressionNL :: { Lexeme Expression }
     | ExpressionNL ">"   ExpressionNL   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
     | ExpressionNL ">="  ExpressionNL   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
     | ExpressionNL "@"   ExpressionNL   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
-    | ExpressionNL "++"  ExpressionNL   {% tellLError (lexPosn $2) (LexerError "String concat is not supported yet") >> return $1 }
+    | ExpressionNL "++"  ExpressionNL   {% tellLError (lexPosn $2) (TokenNotSupported TkConcat) >> return $1 }
     | "-"   ExpressionNL                { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" ExpressionNL                { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
     | "(" ExpressionNL ")"              { lexInfo $2 <$ $1 }

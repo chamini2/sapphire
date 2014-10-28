@@ -84,7 +84,11 @@ buildDefinition w program@(Program block) = do
     -- First we define every DataType in the program,
     -- Then we use said DataTypes for the variables/parameters/fields
     when (null defW) . fixDataTypes $ toSeq tab
-    unless (member mainName stk tab) $ tellSError defaultPosn (StaticError "no 'main'")
+
+    -- Check for the main procedure, and mark it as used
+    if member mainName stk tab
+        then markUsed mainName
+        else tellSError defaultPosn NoMainProcedure
 
 ----------------------------------------
 

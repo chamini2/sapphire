@@ -11,6 +11,7 @@ module Language.Sapphire.Error
 
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
+import           Language.Sapphire.Token
 
 import           Data.Function                 (on)
 import           Data.Sequence                 (Seq)
@@ -47,12 +48,15 @@ data LexerError
     = LexerError     String
     | UnexpectedChar Char
     | StringError    String
+    -- Support
+    | TokenNotSupported Token
 
 instance Show LexerError where
     show = \case
-        LexerError msg   -> msg
-        UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
-        StringError str  -> "missing matching quotation mark for string " ++ show str
+        LexerError msg       -> msg
+        UnexpectedChar c     -> "unexpected character '" ++ [c] ++ "'"
+        StringError str      -> "missing matching quotation mark for string " ++ show str
+        TokenNotSupported tk -> show tk ++ " is not supported yet"
 
 --------------------------------------------------------------------------------
 
@@ -158,6 +162,7 @@ data StaticError
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
+    | NoMainProcedure
     | WrongCategory   Identifier SymbolCategory SymbolCategory
     | NotDefined      Identifier
     | AlreadyDeclared Identifier Position

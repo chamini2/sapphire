@@ -59,7 +59,7 @@ instance Show Statement where
         StPrint expL               -> "print " ++ show (lexInfo expL)
         StIf expL _ _              -> "if " ++ show (lexInfo expL)
         StCase expL _ _            -> "case " ++ show (lexInfo expL)
-        StLoop _ expL _            -> "repeat .. while " ++ show (lexInfo expL) ++ "do .. end"
+        StLoop _ expL _            -> "repeat .. while " ++ show (lexInfo expL) ++ " do .. end"
         StFor idnL expL _          -> "for " ++ lexInfo idnL ++ " in " ++ show (lexInfo expL) ++ " do "
         StBreak                    -> "break"
         StContinue                 -> "continue"

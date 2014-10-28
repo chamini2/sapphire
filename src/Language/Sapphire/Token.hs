@@ -28,7 +28,7 @@ data Token
 
     -- -- Loops
     | TkFor | TkIn | TkFromTo | TkDo
-    | TkWhile | TkUntil | TkRepeat
+    | TkWhile | TkUntil | TkRepeat | TkThis
     | TkBreak | TkContinue
 
     -- Expressions/Operators
@@ -98,6 +98,7 @@ instance Show Token where
         TkWhile         -> "'while'"
         TkUntil         -> "'until'"
         TkRepeat        -> "'repeat'"
+        TkThis          -> "'this'"
         TkBreak         -> "'break'"
         TkContinue      -> "'continue'"
         TkInt _         -> "literal 'int'"
