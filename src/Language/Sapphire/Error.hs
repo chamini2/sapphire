@@ -68,6 +68,8 @@ data ParseError
     | FieldListComma
     | ParameterListComma
     -- Statements
+    | InnerStatementAsTopStatement
+    | TopStatementAsInnerStatement
     -- -- Assignment
     | AssignmentMissingExpression
     | AssignmentMissingAccess
@@ -97,6 +99,8 @@ instance Show ParseError where
         FieldListComma     -> "fields must be separated with commas"
         ParameterListComma -> "parameters must be separated with commas"
         -- Statements
+        InnerStatementAsTopStatement -> "cannot use this statement in the global scope"
+        TopStatementAsInnerStatement -> "cannot use this statement in the inner scopes"
         -- -- Assignment
         AssignmentMissingExpression -> "assignment missing expression"
         AssignmentMissingAccess     -> "assignment missing variable"
