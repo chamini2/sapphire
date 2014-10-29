@@ -88,7 +88,7 @@ buildDefinition w program@(Program block) = do
     -- Check for the main procedure, and mark it as used
     if member mainName stk tab
         then markUsed mainName
-        else tellSError defaultPosn NoMainProcedure
+        else tellSError defaultPosn NoMainFunction
 
 ----------------------------------------
 

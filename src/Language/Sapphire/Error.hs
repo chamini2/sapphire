@@ -164,7 +164,7 @@ data StaticError
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
-    | NoMainProcedure
+    | NoMainFunction
     | WrongCategory   Identifier SymbolCategory SymbolCategory
     | NotDefined      Identifier
     | AlreadyDeclared Identifier Position
@@ -210,6 +210,7 @@ instance Show StaticError where
         BinaryTypes op (dl,dr)  -> "operator '" ++ show op ++ "' does not work with operands (" ++ show dl ++ ", " ++ show dr ++ ")"
         UnaryTypes  op dt       -> "operator '" ++ show op ++ "' does not work with operand (" ++ show dt ++ ")"
         -- General
+        NoMainFunction         -> "program does not have a main function defined"
         WrongCategory iden e g -> "using '" ++ iden ++ "' as if it were a " ++ show e ++ ", but it is a " ++ show g
         NotDefined  iden       -> "identifier '" ++ iden ++ "' has not been defined"
         AlreadyDeclared var p  -> "identifier '" ++ var ++ "' has already been declared " ++ show p
