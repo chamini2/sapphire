@@ -261,10 +261,10 @@ typeCheckStatement (Lex st posn) = case st of
         exitScope
 
         enterScope
-        aftRet <- typeCheckStatements aftBlock
+        void $ typeCheckStatements aftBlock
         exitScope
 
-        return $ befRet && aftRet
+        return befRet
 
     StFor _ expL block -> do
         expDt <- typeCheckExpression expL
@@ -329,8 +329,8 @@ typeCheckExpression (Lex exp posn) = case exp of
 
 checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> TypeChecker (Maybe DataType)
 checkArguments (Lex idn posn) args func = runMaybeT $ do
-    maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, returnType sym, paramTypes sym))
-    let (cat, Lex dt _, prms) = fromJust maySymI
+    maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, lexInfo $ returnType sym, paramTypes sym))
+    let (cat, dt, prms) = fromJust maySymI
 
     unlessGuard (isJust maySymI) $ tellSError posn (FunctionNotDefined idn)
 
