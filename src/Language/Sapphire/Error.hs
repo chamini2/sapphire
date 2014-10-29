@@ -197,15 +197,16 @@ instance Show StaticError where
         FunctionAlreadyDefined fname p   -> "function '" ++ fname ++ "' has already been defined " ++ show p
         NoReturn               fname     -> "function '" ++ fname ++ "' does not have a return statement"
         -- Statements
-        ConditionDataType dt      -> "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
-        PrintNonPrintable dt      -> "printing of " ++ show dt ++ " is not supported"
-        CaseWhenDataType e g      -> "case has expression of type '" ++ show e ++ "' but when has expression of type '" ++ show g ++ "'"
-        ForInDataType    dt       -> "for statement must iterate over expressions of type 'Range', but it is of type '" ++ show dt ++ "'"
-        BreakOutsideLoop          -> "break statement not inside a loop"
-        ContinueOutsideLoop       -> "continue statement not inside a loop"
-        ReturnInTopScope          -> "cannot return in the outermost scope"
-        ReturnInProcedure g fname -> "cannot return '" ++ show g ++ "' in procedure '" ++ fname ++ "'"
-        ReturnType    e g fname   -> "expected return type '" ++ show e ++ "' for function '" ++ fname ++ "', but got type '" ++ show g ++ "'"
+        ConditionDataType dt          -> "condition must be of type 'Bool', but it is of type '" ++ show dt ++ "'"
+        PrintNonPrintable dt          -> "printing of " ++ show dt ++ " is not supported"
+        CaseWhenDataType e g          -> "case has expression of type '" ++ show e ++ "' but when has expression of type '" ++ show g ++ "'"
+        ForInDataType    dt           -> "for statement must iterate over expressions of type 'Range', but it is of type '" ++ show dt ++ "'"
+        BreakOutsideLoop              -> "break statement not inside a loop"
+        ContinueOutsideLoop           -> "continue statement not inside a loop"
+        ReturnInTopScope              -> "cannot return in the outermost scope"
+        ReturnInProcedure g fname     -> "cannot return '" ++ show g ++ "' in procedure '" ++ fname ++ "'"
+        ReturnVoidInFunction dt fname -> "return statement inside function " ++ fname ++ " must have an expression of type " ++ show dt
+        ReturnType    e g fname       -> "expected return type '" ++ show e ++ "' for function '" ++ fname ++ "', but got type '" ++ show g ++ "'"
         -- Operators
         BinaryTypes op (dl,dr)  -> "operator '" ++ show op ++ "' does not work with operands (" ++ show dl ++ ", " ++ show dr ++ ")"
         UnaryTypes  op dt       -> "operator '" ++ show op ++ "' does not work with operand (" ++ show dt ++ ")"
