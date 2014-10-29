@@ -62,8 +62,8 @@ instance Show DefState where
 initialState :: DefState
 initialState = DefState
     { table     = emptyTable
-    , stack     = topStack
-    , scopeId   = topScope
+    , stack     = globalStack
+    , scopeId   = globalScope
     , ast       = Program empty
     , loopLvl   = 0
     }
@@ -80,9 +80,15 @@ buildDefinition w program@(Program block) = do
 
     (_, defW) <- listen (return ())
 
+    (tab, stk) <- gets (table &&& stack)
     -- First we define every DataType in the program,
-    -- Then we get said DataTypes for the variables/parameters
-    when (null defW) $ gets (toSeq . table) >>= fixDataTypes
+    -- Then we use said DataTypes for the variables/parameters/fields
+    when (null defW) . fixDataTypes $ toSeq tab
+
+    -- Check for the main procedure, and mark it as used
+    if member mainName stk tab
+        then markUsed mainName
+        else tellSError defaultPosn NoMainProcedure
 
 ----------------------------------------
 
@@ -152,8 +158,8 @@ definitionStatement (Lex st posn) = case st of
 
         current <- currentScope
 
-        -- Can only define structures in the top scope
-        unlessGuard (current == topScope) $ tellSError posn TypeInInnerScope
+        -- Can only define structures in the global scope
+        unlessGuard (current == globalScope) $ tellSError posn TypeInInnerScope
 
         -- Fields SymbolTable
         fldsTab <- flip (flip foldlM emptyTable) flds $ \fldsTab (Lex fldIdn fldP, fldDtL) -> do
@@ -254,7 +260,6 @@ definitionStatement (Lex st posn) = case st of
     --StRead
     --StPrint
 
-
 --------------------------------------------------------------------------------
 -- DataType processing
 
@@ -266,7 +271,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
         -- Variables and Parameters
         CatInfo -> void $ runMaybeT $ do
             (dtL', wdt) <- getUpdatedDataTypeWidth (scopeStack sym) (defPosn sym) (dataType sym)
-            modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { dataType = dtL', width = wdt })
+            modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { dataType = dtL', width = wdt }
 
         CatType -> do
             let symDtL  = dataType   sym
@@ -302,9 +307,9 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                 let (symTab'', typeWidth) = case lexInfo symDtL of
                         Record _ -> foldRecordTable $ fmap fromJust symTab'
                         Union  _ -> widthUnionTable $ fmap fromJust symTab'
-                        _        -> error "Definition.fixDataTypes: CatType has non-struct DataType"
+                        _        -> error "Definition.fixDataTypes: user-defined type has a non-struct DataType"
                 when (all isJust symTab') $
-                    modifySymbolWithScope idn symStk (\sym' -> sym' { fields = Just symTab'', width = typeWidth })
+                    modifySymbolWithScope idn symStk $ \sym' -> sym' { fields = Just symTab'', width = typeWidth }
                 where
                     widthUnionTable :: Seq (Identifier, Symbol) -> (SymbolTable, Width)
                     widthUnionTable syms' = (fromSeq syms', maximum $ fmap (width . snd) syms')
@@ -327,7 +332,7 @@ fixDataTypes syms = forM_ syms $ \(idn, sym) -> do
                     paramDtLs = fmap fromJust mayParamDtLs
                     -- Procedures are auotmatically 'returned'
                     symRet    = isVoid $ lexInfo retDtL
-                modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs, returned = symRet })
+                modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { returnType = retDtL, paramTypes = paramDtLs, returned = symRet }
 
 ----------------------------------------
 

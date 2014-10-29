@@ -27,12 +27,12 @@ type SizeOffset = RWS SappReader SappWriter SizeState
 -- State
 
 data SizeState = SizeState
-    { table    :: SymbolTable
-    , stack    :: Stack Scope
-    , scopeId  :: Scope
-    , ast      :: Program
-    , offStack :: Stack Offset
-    , stringOffset :: Offset
+    { table        :: SymbolTable
+    , stack        :: Stack Scope
+    , scopeId      :: Scope
+    , ast          :: Program
+    , offStack     :: Stack Offset
+    , globalOffset :: Offset
     }
 
 ----------------------------------------
@@ -57,11 +57,11 @@ instance Show SizeState where
 initialState :: SizeState
 initialState = SizeState
     { table        = emptyTable
-    , stack        = topStack
-    , scopeId      = topScope
+    , stack        = globalStack
+    , scopeId      = globalScope
     , ast          = Program empty
-    , offStack     = singletonStack 0
-    , stringOffset = 0
+    , offStack     = emptyStack
+    , globalOffset = 0
     }
 
 --------------------------------------------------------------------------------
@@ -90,15 +90,23 @@ enterFunction = modify $ \s -> s { offStack = push 0 (offStack s) }
 
 exitFunction :: SizeOffset Offset
 exitFunction = do
-    off <- gets (top . offStack)
-    modify $ \s -> s { offStack = pop $ offStack s }
-    return off
+    offStk <- gets offStack
+    modify $ \s -> s { offStack = pop offStk }
+    return $ top offStk
 
 currentOffset :: SizeOffset Offset
-currentOffset = gets (top . offStack)
+currentOffset = do
+    scp <- currentScope
+    if scp == globalScope
+        then gets globalOffset
+        else gets (top . offStack)
 
 addOffset :: Offset -> SizeOffset ()
-addOffset off = modify $ \s -> s { offStack = touch (+off) (offStack s) }
+addOffset off = do
+    scp <- currentScope
+    if scp == globalScope
+        then modify $ \s -> s { globalOffset = off + globalOffset s }
+        else modify $ \s -> s { offStack = touch (off+) (offStack s) }
 
 resetOffset :: SizeOffset ()
 resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }
@@ -109,7 +117,6 @@ resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }
 sizeOffsetStatements :: StBlock -> SizeOffset ()
 sizeOffsetStatements = mapM_ sizeOffsetStatement
 
-
 sizeOffsetStatement :: Lexeme Statement -> SizeOffset ()
 sizeOffsetStatement stL = case lexInfo stL of
 
@@ -117,7 +124,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         let idn = lexInfo . dclIdentifier $ lexInfo dclL
         (symStk, symWdt) <- liftM fromJust $ getsSymbol idn (scopeStack &&& width)
         off              <- currentOffset
-        modifySymbolWithScope idn symStk (\sym -> sym { offset = off })
+        modifySymbolWithScope idn symStk $ \sym -> sym { offset = off }
         addOffset symWdt
 
     StFunctionDef (Lex idn _) (Sign prms _) block ->  do
@@ -131,7 +138,7 @@ sizeOffsetStatement stL = case lexInfo stL of
             let prmIdn = lexInfo $ dclIdentifier dcl
             (prmstk, prmWdt) <- liftM fromJust $ getsSymbol prmIdn (scopeStack &&& width)
             off              <- currentOffset
-            modifySymbolWithScope prmIdn prmstk (\sym' -> sym' { offset = negate off })     -- (-1) For the execution stack
+            modifySymbolWithScope prmIdn prmstk $ \sym' -> sym' { offset = negate off }     -- (-1) For the execution stack
             addOffset prmWdt
 
         -- Restarts the offset in 0 for the statements block
@@ -142,7 +149,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         exitScope
 
         blockWdt <- exitFunction
-        modifySymbolWithScope idn (scopeStack sym) (\sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt })
+        modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt }
 
     StPrint expL -> addStrings expL
 
@@ -178,7 +185,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         enterScope
         (symStk, symWdt) <- liftM fromJust $ getsSymbol idn (scopeStack &&& width)
         off              <- currentOffset
-        modifySymbolWithScope idn symStk (\sym -> sym { offset = off })
+        modifySymbolWithScope idn symStk $ \sym -> sym { offset = off }
         addOffset symWdt
 
         sizeOffsetStatements block
@@ -200,7 +207,7 @@ addStrings :: Lexeme Expression -> SizeOffset ()
 addStrings (Lex exp _) = case exp of
 
     LitString strL -> do
-        strOff <- gets stringOffset
+        strOff <- gets globalOffset
         let strWdt = length $ lexInfo strL
             info = emptySymInfo
                 { dataType   = pure String
@@ -215,7 +222,7 @@ addStrings (Lex exp _) = case exp of
         maySymbol <- getSymbol idn
         unless (isJust maySymbol) $ do
             -- Set the new global offset
-            modify $ \s -> s { stringOffset = strOff + strWdt}
+            modify $ \s -> s { globalOffset = strOff + strWdt}
             addSymbol idn info
 
     _ -> return ()

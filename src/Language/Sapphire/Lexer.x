@@ -70,6 +70,7 @@ tokens :-
 
         -- Language
         @skip                   { tok' TkNewLine        }
+        "main"                  { tok' TkMain           }
         "end"                   { tok' TkEnd            }
         "return"                { tok' TkReturn         }
         ";"                     { tok' TkSemicolon      }
@@ -119,6 +120,7 @@ tokens :-
         "while"                 { tok' TkWhile          }
         "until"                 { tok' TkUntil          }
         "repeat"                { tok' TkRepeat         }
+        "this"                  { tok' TkThis           }
 
         "break"                 { tok' TkBreak          }
         "continue"              { tok' TkContinue       }

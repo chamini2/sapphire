@@ -26,6 +26,7 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 
     -- Language
     newline         { Lex TkNewLine     _ }
+    "main"          { Lex TkMain        _ }
     "end"           { Lex TkEnd         _ }
     "return"        { Lex TkReturn      _ }
     ";"             { Lex TkSemicolon   _ }
@@ -72,6 +73,7 @@ import           Data.Sequence             (Seq, empty, fromList, index,
     "while"         { Lex TkWhile       _ }
     "until"         { Lex TkUntil       _ }
     "repeat"        { Lex TkRepeat      _ }
+    "this"          { Lex TkThis        _ }
     "break"         { Lex TkBreak       _ }
     "continue"      { Lex TkContinue    _ }
 
@@ -140,11 +142,7 @@ import           Data.Sequence             (Seq, empty, fromList, index,
 -- Grammar
 
 Program :: { Program }
-    : StatementList         { Program $1 }
-
-StatementList :: { StBlock }
-    : Statement                             { expandStatement $1       }
-    | StatementList Separator Statement     { $1 >< expandStatement $3 }
+    : TopStatementList      { Program $1 }
 
 Separator :: { () }
     : ";"           { }
@@ -154,17 +152,46 @@ MaybeNL :: { () }
     : {- λ -}               { }
     | MaybeNL newline       { }
 
-Statement :: { Lexeme Statement }
-    : {- λ, no-op -}            { pure StNoop }
-    -- Assignment
-    | Access "=" Expression     { StAssign $1 $3 <$ $1 }
+TopStatementList :: { StBlock }
+    : TopStatement                                  { expandStatement $1       }
+    | BothStatement                                 { expandStatement $1       }
+    | TopStatementList Separator TopStatement       { $1 >< expandStatement $3 }
+    | TopStatementList Separator BothStatement      { $1 >< expandStatement $3 }
 
+TopStatement :: { Lexeme Statement }
     -- Definitions
-    | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
-    | Structure TypeId "as" FieldList "end"     { StStructDefinition ($1 <*> pure $2) $4 <$ $1 }
+    : Structure TypeId "as" FieldList "end"     { StStructDefinition ($1 <*> pure $2) $4 <$ $1 }
 
     -- Functions
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
+
+    -- Main
+    | "main" StatementList "end"    { StFunctionDef (mainName <$ $1) (Sign empty (pure $ DataType $ pure "Int")) $2 <$ $1 }
+
+    -- Errors
+    -- -- Definitions
+    | Structure        "as" FieldList "end"     {% tellPError (lexPosn $2) TypeDefinitionIdentifier >> return (pure StNoop) }
+    | Structure TypeId "as"           "end"     {% tellPError (lexPosn $2) NoFieldsInType           >> return (pure StNoop) }
+    | Structure        "as"           "end"     {% tellPError (lexPosn $2) TypeDefinitionIdentifier >>
+                                                   tellPError (lexPosn $2) NoFieldsInType           >> return (pure StNoop) }
+    -- -- Functions
+    | "def"            ":" Signature Separator StatementList "end"      {% tellPError (lexPosn $2) FunctionDefinitionIdentifier >> return (pure StNoop) }
+    -- -- Inner statements
+    | InnerStatement        {% tellPError (lexPosn $1) InnerStatementAsTopStatement >> return (pure StNoop) }
+
+----------------------------------------
+
+StatementList :: { StBlock }
+    : InnerStatement                            { expandStatement $1       }
+    | BothStatement                             { expandStatement $1       }
+    | StatementList Separator InnerStatement    { $1 >< expandStatement $3 }
+    | StatementList Separator BothStatement     { $1 >< expandStatement $3 }
+
+InnerStatement :: { Lexeme Statement }
+    -- Assignment
+    : Access "=" Expression     { StAssign $1 $3 <$ $1 }
+
+    -- Functions
     | VariableId "(" MaybeExpressionListNL ")"                          { StProcedureCall $1 $3 <$ $1 }
     | "return" Expression                                               { StReturn (Just $2) <$ $1 }
     | "return"                                                          { StReturn Nothing   <$ $1 }
@@ -185,73 +212,35 @@ Statement :: { Lexeme Statement }
     | "print" "[" ExpressionListNL "]"      { StPrintList $3 <$ $1 }
 
     -- Loops
-    |                                      "while" Expression "do" StatementList "end"      { StLoop empty $2 $4    <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "while" Expression                               { StLoop $2    $6 empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "while" Expression "do" StatementList "end"      { StLoop $2    $6 $8    <$ $1 }
-    |                                      "until" Expression "do" StatementList "end"      { StLoop empty (notExp $2) $4    <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "until" Expression                               { StLoop $2    (notExp $6) empty <$ $1 }
-    | "repeat" StatementList "end" MaybeNL "until" Expression "do" StatementList "end"      { StLoop $2    (notExp $6) $8    <$ $1 }
+    |                                       "while" Expression "do" StatementList "end"     { StLoop empty $2 $4    <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "while" Expression                              { StLoop $2    $6 empty <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "while" Expression "do" StatementList "end"     { StLoop $2    $6 $8    <$ $1 }
+    |                                       "until" Expression "do" StatementList "end"     { StLoop empty (notExp $2) $4    <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "until" Expression                              { StLoop $2    (notExp $6) empty <$ $1 }
+    | "repeat" StatementList "this" MaybeNL "until" Expression "do" StatementList "end"     { StLoop $2    (notExp $6) $8    <$ $1 }
 
     | "for" VariableId "in" Expression "do" StatementList "end"                             { StFor $2 $4 $6 <$ $1 }
     | "break"           { StBreak    <$ $1 }
     | "continue"        { StContinue <$ $1 }
 
-----------------------------------------
-
     -- Errors
     -- -- Assignment
-    | Access "="                {% do
-                                    let const = StNoop <$ $1
-                                    tellPError (lexPosn $2) AssignmentMissingExpression
-                                    return const
-                                }
-    |        "=" Expression     {% do
-                                    let const = StNoop <$ $1
-                                    tellPError (lexPosn $1) AssignmentMissingAccess
-                                    return const
-                                }
-
-    -- -- Definitions
-    | VariableList ":"              {% do
-                                        let const = StNoop <$ index $1 0
-                                        tellPError (lexPosn $2) VariableDefinitionWithoutDataType
-                                        return const
-                                    }
-    | Structure        "as" FieldList "end"     {% do
-                                                    let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
-                                                    return const
-                                                }
-    | Structure TypeId "as"           "end"     {% do
-                                                    let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) NoFieldsInType
-                                                    return const
-                                                }
-    | Structure        "as"           "end"     {% do
-                                                    let const = StNoop <$ $1
-                                                    tellPError (lexPosn $2) TypeDefinitionIdentifier
-                                                    tellPError (lexPosn $2) NoFieldsInType
-                                                    return const
-                                                }
-
-    -- -- Functions
-    | "def"            ":" Signature Separator StatementList "end"      {% do
-                                                                            let const = StNoop <$ $1
-                                                                            tellPError (lexPosn $2) FunctionDefinitionIdentifier
-                                                                            return const
-                                                                        }
+    | Access "="                {% tellPError (lexPosn $2) AssignmentMissingExpression >> return (pure StNoop) }
+    |        "=" Expression     {% tellPError (lexPosn $1) AssignmentMissingAccess     >> return (pure StNoop) }
 
     -- -- Conditionals
-   | "case" Expression MaybeNL          "end"                                      {% do
-                                                                                       let const = StNoop <$ $1
-                                                                                       tellPError (lexPosn $4) NoWhensInCase
-                                                                                       return const
-                                                                                   }
-   | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% do
-                                                                                       let const = StNoop <$ $1
-                                                                                       tellPError (lexPosn $4) NoWhensInCase
-                                                                                       return const
-                                                                                   }
+    | "case" Expression MaybeNL          "end"                                      {% tellPError (lexPosn $4) NoWhensInCase >> return (pure StNoop) }
+    | "case" Expression MaybeNL          "otherwise" StatementList "end"            {% tellPError (lexPosn $4) NoWhensInCase >> return (pure StNoop) }
+
+---------------------------------------
+-- Statements in TopStatement and InnerStatement
+
+BothStatement :: { Lexeme Statement }
+    : {- λ, no-op -}                { pure StNoop }
+    -- Definitions
+    | VariableList ":" DataType     { (StDeclarationList $ fmap (\idn -> Declaration idn $3 CatVariable <$ idn) $1) <$ index $1 0 }
+    -- Errors
+    | VariableList ":"              {% tellPError (lexPosn $2) VariableDefinitionWithoutDataType >> return (pure StNoop) }
 
 ---------------------------------------
 -- Structures
@@ -309,41 +298,19 @@ VariableList :: { Seq (Lexeme Identifier) }
     : VariableId                    { singleton $1 }
     | VariableList "," VariableId   { $1     |> $3 }
     -- Errors
-    | VariableList     VariableId   {% do
-                                        let const = $1 |> $2
-                                        tellPError (lexPosn $2) VariableListComma
-                                        return const
-                                    }
+    | VariableList     VariableId   {% tellPError (lexPosn $2) VariableListComma >> return ($1 |> $2) }
 
 ---------------------------------------
 -- Definitions
 
 DataType :: { Lexeme DataType }
     : TypeId                    { DataType $1 <$ $1 }
-    | "[" Int "]" DataType      {% do
-                                    unless (lexInfo $2 > 0) $ tellPError (lexPosn $2) ArraySize
-                                    return $ Array $4 $2 <$ $1
-                                }
+    | "[" Int "]" DataType      {% unless (lexInfo $2 > 0) (tellPError (lexPosn $2) ArraySize) >> return (Array $4 $2 <$ $1) }
     -- Errors
-    |  "[" "-" Int "]" DataType {% do
-                                    tellPError (lexPosn $2) ArraySize
-                                    return $ Array $5 (negate `fmap` $3) <$ $1
-                                }
-    | "["     "]" DataType      {% do
-                                    let const = Void <$ $1
-                                    tellPError (lexPosn $2) ArrayDataTypeSize
-                                    return const
-                                }
-    |     Int     DataType      {% do
-                                    let const = Void <$ $1
-                                    tellPError (lexPosn $2) ArrayDataTypeSize
-                                    return const
-                                }
-    | "[" Access "]" DataType   {% do
-                                    let const = Void <$ $1
-                                    tellPError (lexPosn $2) ArrayDataTypeSize
-                                    return const
-                                }
+    |  "[" "-" Int "]" DataType {% tellPError (lexPosn $2) ArraySize >> return (Array $5 (negate `fmap` $3) <$ $1) }
+    | "["     "]" DataType      {% tellPError (lexPosn $2) ArrayDataTypeSize >> return $3 }
+    |     Int     DataType      {% tellPError (lexPosn $2) ArrayDataTypeSize >> return (Array $2 $1 <$ $1) }
+    | "[" Access "]" DataType   {% tellPError (lexPosn $2) ArrayDataTypeSize >> return $4 }
 
 ---------------------------------------
 -- Structures
@@ -352,11 +319,7 @@ FieldList :: { Seq Field }
     : MaybeNL Field MaybeNL                 { $2       }
     | FieldList "," MaybeNL Field MaybeNL   { $1 >< $4 }
     -- Errors
-    | FieldList             Field MaybeNL   {% do
-                                                let const = $1 >< $2
-                                                tellPError (lexPosn . snd $ index $2 0) FieldListComma
-                                                return const
-                                            }
+    | FieldList             Field MaybeNL   {% tellPError (lexPosn . snd $ index $2 0) FieldListComma >> return ($1 >< $2) }
 
 Field :: { Seq Field }
     : VariableList ":" DataType     { expandField $3 $1 }
@@ -374,24 +337,19 @@ ReturnType :: { Lexeme DataType }
     | "(" ")"       { Void <$ $1 }
 
 ParameterList :: { Seq (Lexeme Declaration) }
-    : DataType VariableId                       { singleton (Declaration $2 $1 CatParameter <$ $1) }
-    | ParameterList "," DataType VariableId     { $1     |> (Declaration $4 $3 CatParameter <$ $3) }
+    : Parameter                       { singleton $1 }
+    | ParameterList "," Parameter     { $1     |> $3 }
     -- Errors
-    | ParameterList     DataType VariableId     {% do
-                                                    let const = $1 |> (Declaration $3 $2 CatParameter <$ $2)
-                                                    tellPError (lexPosn $2) ParameterListComma
-                                                    return const
-                                                }
+    | ParameterList     Parameter     {% tellPError (lexPosn $2) ParameterListComma >> return ($1 |> $2) }
 
 ParameterListNL :: { Seq (Lexeme Declaration) }
-    : MaybeNL DataType VariableId MaybeNL                       { singleton (Declaration $3 $2 CatParameter <$ $2) }
-    | ParameterListNL "," MaybeNL DataType VariableId MaybeNL   { $1     |> (Declaration $5 $4 CatParameter <$ $4) }
+    : MaybeNL Parameter MaybeNL                       { singleton $2 }
+    | ParameterListNL "," MaybeNL Parameter MaybeNL   { $1     |> $4 }
     -- Errors
-    | ParameterListNL             DataType VariableId MaybeNL   {% do
-                                                                    let const = $1 |> (Declaration $3 $2 CatParameter <$ $2)
-                                                                    tellPError (lexPosn $2) ParameterListComma
-                                                                    return const
-                                                                }
+    | ParameterListNL             Parameter MaybeNL   {% tellPError (lexPosn $2) ParameterListComma >> return ($1 |> $2) }
+
+Parameter :: { Lexeme Declaration }
+    : DataType VariableId   { Declaration $2 $1 CatParameter <$ $1 }
 
 ---------------------------------------
 -- Conditionals
@@ -455,10 +413,7 @@ Expression :: { Lexeme Expression }
     | Expression ">"   Expression   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
     | Expression ">="  Expression   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
     | Expression "@"   Expression   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
-    | Expression "++"  Expression   {% do
-                                        tellLError (lexPosn $2) (LexerError "String concat is not supported yet")
-                                        return $1
-                                    }
+    | Expression "++"  Expression   {% tellLError (lexPosn $2) (TokenNotSupported TkConcat) >> return $1 }
     | "-"   Expression              { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" Expression              { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
     | "(" ExpressionNL ")"          { lexInfo $2 <$ $1 }
@@ -491,10 +446,7 @@ ExpressionNL :: { Lexeme Expression }
     | ExpressionNL ">"   ExpressionNL   { ExpBinary (OpGreat   <$ $2) $1 $3 <$ $1 }
     | ExpressionNL ">="  ExpressionNL   { ExpBinary (OpGreatEq <$ $2) $1 $3 <$ $1 }
     | ExpressionNL "@"   ExpressionNL   { ExpBinary (OpBelongs <$ $2) $1 $3 <$ $1 }
-    | ExpressionNL "++"  ExpressionNL   {% do
-                                            tellLError (lexPosn $2) (LexerError "String concat is not supported yet")
-                                            return $1
-                                        }
+    | ExpressionNL "++"  ExpressionNL   {% tellLError (lexPosn $2) (TokenNotSupported TkConcat) >> return $1 }
     | "-"   ExpressionNL                { ExpUnary  (OpNegate  <$ $1) $2    <$ $1 }
     | "not" ExpressionNL                { ExpUnary  (OpNot     <$ $1) $2    <$ $1 }
     | "(" ExpressionNL ")"              { lexInfo $2 <$ $1 }

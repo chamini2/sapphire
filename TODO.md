@@ -14,12 +14,11 @@
 
 * add embeded functions to symbol table
 * Get file name from command line, put in reader.
-* check Printer.hs
 * Functions have a `width` that **may be wrong**
 * Decorate the AST `Either Expression (Expression, DataType)` -- or something like this
 * Find strings in intermediate code (add it to the symbol table with a unique id or add it to symbol table by its content?) -- DONE (right?)
 * Functions may not return some times -- DONE
-* Fix offsets for scopes
+* Fix offsets for scopes (the smart way)
 * Create missing Error construtors (mostly in Parser.y, there are more) -- DONE
 
 * data SymbolTable = SymTab (Map Identifier (Map ScopeNum Symbol))
@@ -31,7 +30,7 @@
 * pass arrays by reference (width changes between parameter and variable)
 
 * shouldn't be able to return arrays
-* add non-expression return
+* add non-expression return -- DONE
 
 ##Ask
 

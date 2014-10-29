@@ -11,6 +11,7 @@ module Language.Sapphire.Error
 
 import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
+import           Language.Sapphire.Token
 
 import           Data.Foldable                 (toList)
 import           Data.Function                 (on)
@@ -49,12 +50,15 @@ data LexerError
     = LexerError     String
     | UnexpectedChar Char
     | StringError    String
+    -- Support
+    | TokenNotSupported Token
 
 instance Show LexerError where
     show = \case
-        LexerError msg   -> msg
-        UnexpectedChar c -> "unexpected character '" ++ [c] ++ "'"
-        StringError str  -> "missing matching quotation mark for string " ++ show str
+        LexerError msg       -> msg
+        UnexpectedChar c     -> "unexpected character '" ++ [c] ++ "'"
+        StringError str      -> "missing matching quotation mark for string " ++ show str
+        TokenNotSupported tk -> show tk ++ " is not supported yet"
 
 --------------------------------------------------------------------------------
 
@@ -70,6 +74,8 @@ data ParseError
     | FieldListComma
     | ParameterListComma
     -- Statements
+    | InnerStatementAsTopStatement
+    | TopStatementAsInnerStatement
     -- -- Assignment
     | AssignmentMissingExpression
     | AssignmentMissingAccess
@@ -82,7 +88,7 @@ data ParseError
     | NoFieldsInType
     -- -- Functions
     | FunctionDefinitionIdentifier
-    | EmptyReturn
+--     | EmptyReturn
     -- -- Conditional
     | NoWhensInCase
 
@@ -99,6 +105,8 @@ instance Show ParseError where
         FieldListComma     -> "fields must be separated with commas"
         ParameterListComma -> "parameters must be separated with commas"
         -- Statements
+        InnerStatementAsTopStatement -> "cannot use this statement in the global scope"
+        TopStatementAsInnerStatement -> "cannot use this statement in the inner scopes"
         -- -- Assignment
         AssignmentMissingExpression -> "assignment missing expression"
         AssignmentMissingAccess     -> "assignment missing variable"
@@ -111,7 +119,7 @@ instance Show ParseError where
         NoFieldsInType                    -> "type must have at least one field"
         -- -- Functions
         FunctionDefinitionIdentifier -> "missing identifier for function definition"
-        EmptyReturn                  -> "return statement must have an expression"
+        -- EmptyReturn                  -> "return statement must have an expression"
         -- -- Conditional
         NoWhensInCase -> "case statement must have at least one 'when'"
 
@@ -156,6 +164,7 @@ data StaticError
     | BinaryTypes Binary (DataType, DataType)
     | UnaryTypes  Unary  DataType
     -- General
+    | NoMainProcedure
     | WrongCategory   Identifier SymbolCategory SymbolCategory
     | NotDefined      Identifier
     | AlreadyDeclared Identifier Position

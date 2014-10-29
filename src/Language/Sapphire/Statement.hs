@@ -13,9 +13,9 @@ import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
 import           Data.Foldable                 (foldl', concatMap)
-import           Data.Sequence                 (Seq)
+import           Data.Sequence                 (Seq, null)
 import           Data.List                     (intercalate)
-import           Prelude                       hiding (exp, concatMap)
+import           Prelude                       hiding (exp, concatMap, null)
 
 type StBlock    = Seq (Lexeme Statement)
 
@@ -59,7 +59,7 @@ instance Show Statement where
         StPrint expL               -> "print " ++ show (lexInfo expL)
         StIf expL _ _              -> "if " ++ show (lexInfo expL)
         StCase expL _ _            -> "case " ++ show (lexInfo expL)
-        StLoop _ expL _            -> "repeat .. while " ++ show (lexInfo expL) ++ "do .. end"
+        StLoop _ expL _            -> "repeat .. while " ++ show (lexInfo expL) ++ " do .. end"
         StFor idnL expL _          -> "for " ++ lexInfo idnL ++ " in " ++ show (lexInfo expL) ++ " do "
         StBreak                    -> "break"
         StContinue                 -> "continue"
@@ -78,6 +78,6 @@ data Signature = Sign (Seq (Lexeme Declaration)) (Lexeme DataType)
 instance Show Signature where
     show (Sign prmLs retDtL) = showPrms ++ showRetDt
         where
-            showPrms = intercalate ", " $ foldl' func [] prmLs
+            showPrms = if null prmLs then "()" else intercalate ", " $ foldl' func [] prmLs
             showRetDt = " -> " ++ show (lexInfo retDtL)
             func ls (Lex dcl _) = (show (lexInfo $ dclDataType dcl) ++ " " ++ lexInfo (dclIdentifier dcl)) : ls

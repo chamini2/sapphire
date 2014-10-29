@@ -67,10 +67,10 @@ instance Show TypeState where
 initialState :: TypeState
 initialState = TypeState
     { table        = emptyTable
-    , stack        = topStack
-    , scopeId      = topScope
+    , stack        = globalStack
+    , scopeId      = globalScope
     , ast          = Program empty
-    , funcStack    = singletonStack ("sapphire", Void, topScope)
+    , funcStack    = emptyStack
     }
 
 --------------------------------------------------------------------------------
@@ -172,14 +172,12 @@ typeCheckStatement (Lex st posn) = case st of
         unless (accDt == expDt) $ tellSError posn (InvalidAssignType accIdn accDt expDt)
 
     StReturn mayExpL -> flip (>>) (return True) . runMaybeT $ do
-        (idn, retDt, funcScopeId) <- lift currentFunction
+        (idn, retDt, _) <- lift currentFunction
         if isJust mayExpL
             then do
                 expDt <- lift . typeCheckExpression $ fromJust mayExpL
 
-                unlessGuard (not $ isVoid retDt) $ if funcScopeId /= topScope
-                    then tellSError posn (ReturnInProcedure expDt idn)
-                    else tellSError posn ReturnInTopScope
+                unlessGuard (not $ isVoid retDt) $ tellSError posn (ReturnInProcedure expDt idn)
 
                 -- Checking for TypeError
                 guard (isValid expDt)
@@ -198,7 +196,7 @@ typeCheckStatement (Lex st posn) = case st of
         unless (isVoid dt || ret) $ tellSError posn (NoReturn idn)
         return False
 
-    StProcedureCall idnL expLs -> flip (>>) (return False) . runMaybeT $ checkArguments idnL expLs False
+    StProcedureCall idnL expLs -> flip (>>) (return False) $ checkArguments idnL expLs False
 
     StRead accL -> flip (>>) (return False) . runMaybeT $ do
         (accIdn, accDt) <- accessDataType accL
@@ -263,10 +261,10 @@ typeCheckStatement (Lex st posn) = case st of
         exitScope
 
         enterScope
-        aftRet <- typeCheckStatements aftBlock
+        void $ typeCheckStatements aftBlock
         exitScope
 
-        return $ befRet && aftRet
+        return befRet
 
     StFor _ expL block -> do
         expDt <- typeCheckExpression expL
@@ -301,7 +299,7 @@ typeCheckExpression (Lex exp posn) = case exp of
         markUsed accIdn
         return accDt
 
-    FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ runMaybeT $ checkArguments idnL expLs True
+    FunctionCall idnL expLs -> liftM (fromMaybe TypeError) $ checkArguments idnL expLs True
 
     ExpBinary (Lex op _) lExpL rExpL -> liftM (fromMaybe TypeError) $ runMaybeT $ do
         lDt <- lift $ typeCheckExpression lExpL
@@ -329,10 +327,10 @@ typeCheckExpression (Lex exp posn) = case exp of
 
 --------------------------------------------------------------------------------
 
-checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> MaybeT TypeChecker DataType
-checkArguments (Lex idn posn) args func = do
-    maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, returnType sym, paramTypes sym))
-    let (cat, Lex dt _, prms) = fromJust maySymI
+checkArguments :: Lexeme Identifier -> Seq (Lexeme Expression) -> Bool -> TypeChecker (Maybe DataType)
+checkArguments (Lex idn posn) args func = runMaybeT $ do
+    maySymI <- getsSymbol idn (\sym -> (symbolCategory sym, lexInfo $ returnType sym, paramTypes sym))
+    let (cat, dt, prms) = fromJust maySymI
 
     unlessGuard (isJust maySymI) $ tellSError posn (FunctionNotDefined idn)
 
