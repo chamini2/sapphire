@@ -12,7 +12,7 @@ union Number as
   float : Float
 end
 
-Number n
+n : Number
 
 main
   n.int = 1

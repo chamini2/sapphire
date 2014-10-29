@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Main where
 
 import           Language.Sapphire.Definition
@@ -23,7 +24,6 @@ import           System.Environment            (getArgs)
 main :: IO ()
 main = void $ runMaybeT $ do
     (flgs, args) <- liftIO arguments
-    let reader = initialReader { flags = flgs }
 
     when (Version `elem` flgs) . liftIO $ putStrLn version
     when (Help    `elem` flgs) . liftIO $ putStrLn help
@@ -31,9 +31,11 @@ main = void $ runMaybeT $ do
     -- Only continue if there were no 'help' or 'version' flags
     guard . not $ (Help `elem` flgs) || (Version `elem` flgs)
 
-    input <- if P.null args
-        then liftIO getContents
-        else liftIO . readFile $ head args
+    (input, file') <- if P.null args
+        then liftIO getContents            >>= return . (, "<stdin>")
+        else liftIO (readFile $ head args) >>= return . (, head args)
+
+    let reader = initialReader { file = file', flags = flgs }
 
     let (prog, plErrs) = parseProgram input
     unlessGuard (null $ errors plErrs) $ mapM_ (liftIO . print) plErrs
@@ -67,13 +69,13 @@ main = void $ runMaybeT $ do
 
 options :: [OptDescr Flag]
 options =
-    [ Option "h"  ["help"]         (NoArg  Help)              "shows this help message"
-    , Option "v"  ["version"]      (NoArg  Version)           "shows version number"
-    , Option "W"  ["all-warnings"] (NoArg  AllWarnings)       "show all warnings"
-    , Option "w"  ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
-    , Option "o"  ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
-    , Option "st" ["symbol-table"] (NoArg ShowSymbolTable)    "shows the symbol table"
-    , Option "a" ["ast"]          (NoArg ShowAST)            "shows the AST"
+    [ Option ['h']     ["help"]         (NoArg  Help)              "shows this help message"
+    , Option ['v']     ["version"]      (NoArg  Version)           "shows version number"
+    , Option ['W']     ["all-warnings"] (NoArg  AllWarnings)       "show all warnings"
+    , Option ['w']     ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
+    , Option ['o']     ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
+    , Option ['s','t'] ["symbol-table"] (NoArg  ShowSymbolTable)   "shows the symbol table"
+    , Option ['a']     ["ast"]          (NoArg  ShowAST)           "shows the AST"
     ]
 
 help :: String

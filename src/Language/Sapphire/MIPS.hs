@@ -39,7 +39,7 @@ data Register =
 {-|
     MIPS 32 floating-point registers
 -}
-data FlPRegister =
+data FloatRegister =
     | Zero                                  -- Constant register
     | AT                                    -- Reserved for assembler
     | A0 | A1 | A2 | A3                     -- Used to pass first four arguments to function call

@@ -26,7 +26,8 @@ unlessGuard cond actn = unless cond actn >> guard cond
 -- Reader
 
 data SappReader = SappReader
-    { flags :: [Flag]
+    { file  :: FilePath
+    , flags :: [Flag]
     , arch  :: Architecture
     }
 
@@ -67,8 +68,9 @@ instance Eq Architecture where
 
 initialReader :: SappReader
 initialReader = SappReader
-    { flags  = []
-    , arch   = defaultArchitecture
+    { file  = ""
+    , flags = []
+    , arch  = defaultArchitecture
     }
 
 defaultArchitecture :: Architecture
@@ -76,7 +78,7 @@ defaultArchitecture = Arch
     { archName = "mips"
     , types = Map.fromList
         [ (Int     , 4)
-        , (Float   , 4)
+        , (Float   , 8)
         , (Char    , 1)
         , (Bool    , 1)
         --, (Pointer , 4)
