@@ -42,8 +42,9 @@ data Flag = Help                    -- -h      | --help
     deriving (Show)
 
 data Architecture = Arch
-    { archName :: String
-    , types    :: Map.Map DataType Width
+    { arch  :: String
+    , types :: Map.Map DataType Width
+    , frame :: Width
     } deriving (Show)
 
 ----------------------------------------
@@ -61,7 +62,7 @@ instance Eq Flag where
         (_               , _               ) -> False
 
 instance Eq Architecture where
-    (==) = (==) `on` archName
+    (==) = (==) `on` arch
 
 ----------------------------------------
 -- Initial
@@ -75,14 +76,15 @@ initialReader = SappReader
 
 defaultArchitecture :: Architecture
 defaultArchitecture = Arch
-    { archName = "mips"
+    { arch  = "mips"
     , types = Map.fromList
         [ (Int     , 4)
-        , (Float   , 8)
+        , (Float   , 4)
         , (Char    , 1)
         , (Bool    , 1)
         --, (Pointer , 4)
         ]
+    , frame = 8
     }
 
 --------------------------------------------------------------------------------
