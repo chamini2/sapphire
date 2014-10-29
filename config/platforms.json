@@ -1,16 +1,24 @@
-{
-  "mips" : {
-    "int":     4,
-    "float":   4,
-    "char":    1,
-    "bool":    1,
-    "pointer": 4
+[
+  {
+    "arch": "mips",
+    "types": [
+        { "Int"     : 4 },
+        { "Float"   : 4 },
+        { "Char"    : 1 },
+        { "Bool"    : 1 },
+        { "Pointer" : 4 }
+      ],
+    "frame": 8
   },
-  "llvm" : {
-    "int":     4,
-    "float":   8,
-    "char":    1,
-    "bool":    1,
-    "pointer": 4
+  {
+    "arch": "llvm",
+    "types": [
+        { "Int"     : 4 },
+        { "Float"   : 4 },
+        { "Char"    : 1 },
+        { "Bool"    : 1 },
+        { "Pointer" : 4 }
+      ],
+    "frame": 12
   }
-}
+]
