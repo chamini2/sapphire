@@ -24,8 +24,8 @@ On the repository's root run the following commands:
 1. cabal install
 2. using the compiler:
     * `sapphire`: write a program directly on the command line, until `ctrl-D` is pressed.
-    * `sapphire examples/tac/<file>.sp`: compiles a program written in the given file.
+    * `sapphire examples/<file>.sp`: compiles a program written in the given file.
     * `sapphire --help`: displays a help menu.
 
 Tips:   
-* Use *cabal sandboxes* for better isolation of the execution environment.
+* Use *cabal sandbox* for better isolation of the execution environment.
