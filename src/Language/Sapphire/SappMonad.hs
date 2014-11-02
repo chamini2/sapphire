@@ -39,10 +39,11 @@ data Flag = Help                    -- -h      | --help
           -- For compiler use
           | ShowSymbolTable         -- -st     | --symbol-table
           | ShowAST                 -- -a      | --ast
+          | ShowTAC                 -- -c      | --tac
     deriving (Show)
 
 data Architecture = Arch
-    { arch  :: String
+    { name  :: String
     , types :: Map.Map DataType Width
     , frame :: Width
     } deriving (Show)
@@ -59,10 +60,11 @@ instance Eq Flag where
         (OutputFile _    , OutputFile _    ) -> True
         (ShowSymbolTable , ShowSymbolTable ) -> True
         (ShowAST         , ShowAST         ) -> True
+        (ShowTAC         , ShowTAC         ) -> True
         (_               , _               ) -> False
 
 instance Eq Architecture where
-    (==) = (==) `on` arch
+    (==) = (==) `on` name
 
 ----------------------------------------
 -- Initial
@@ -76,7 +78,7 @@ initialReader = SappReader
 
 defaultArchitecture :: Architecture
 defaultArchitecture = Arch
-    { arch  = "mips"
+    { name  = "mips"
     , types = Map.fromList
         [ (Int     , 4)
         , (Float   , 4)

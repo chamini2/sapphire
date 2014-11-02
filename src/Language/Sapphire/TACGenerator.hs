@@ -89,7 +89,7 @@ initialState = TACState
 --------------------------------------------------------------------------------
 -- Writer
 
-type TACWriter = Seq Instruction
+type TACWriter = TAC
 
 ----------------------------------------
 -- Initial
@@ -114,11 +114,12 @@ buildTACGenerator tab program@(Program block) = do
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processTACGenerator :: TACReader -> SymbolTable -> Program -> TACWriter
+processTACGenerator :: TACReader -> SymbolTable -> Program -> (TACState, TACWriter)
 processTACGenerator r s = generateTAC r . buildTACGenerator s
 
-generateTAC :: TACReader -> TACGenerator a -> TACWriter
-generateTAC r = snd . flip (flip execRWS r) initialState
+generateTAC :: TACReader -> TACGenerator a -> (TACState, TACWriter)
+generateTAC r = flip (flip execRWS r) initialState
+{-generateTAC r = snd . flip (flip execRWS r) initialState-}
 
 --------------------------------------------------------------------------------
 -- Monad handling

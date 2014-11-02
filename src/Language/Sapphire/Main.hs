@@ -2,6 +2,7 @@
 module Main where
 
 import           Language.Sapphire.Definition
+import           Language.Sapphire.MIPSGenerator
 import           Language.Sapphire.Parser
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SizeOffset
@@ -58,9 +59,13 @@ main = void $ runMaybeT $ do
     when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
     when (ShowAST         `elem` flgs) . liftIO $ print prog
 
-    let tacW = processTACGenerator () (getTable sizS) prog
+    let (tacS, tac) = processTACGenerator () (getTable sizS) prog
 
-    mapM_ (liftIO . print) tacW
+    when (ShowTAC `elem` flgs) . liftIO $ (mapM_ print tac)
+
+    let mipsCode = processMIPSGenerator () (getTable tacS) tac
+
+    mapM_ (liftIO . print) mipsCode
 
     liftIO $ putStrLn "done."
 
@@ -76,6 +81,7 @@ options =
     , Option ['o']     ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
     , Option ['s','t'] ["symbol-table"] (NoArg  ShowSymbolTable)   "shows the symbol table"
     , Option ['a']     ["ast"]          (NoArg  ShowAST)           "shows the AST"
+    , Option ['c']     ["tac"]          (NoArg  ShowTAC)           "shows the three-address code generated"
     ]
 
 help :: String
@@ -111,3 +117,4 @@ arguments = do
             OutputFile _     -> flg : flgs
             ShowSymbolTable  -> flg : flgs
             ShowAST          -> flg : flgs
+            ShowTAC          -> flg : flgs

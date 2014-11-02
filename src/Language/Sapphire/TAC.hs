@@ -6,6 +6,7 @@ module Language.Sapphire.TAC
     ( Reference(..)
     , Value(..)
 
+    , TAC
     , Label
     , Serial
     , Global
@@ -24,11 +25,14 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 
 import           Data.Char                     (toLower)
+import           Data.Sequence                 (Seq)
 import           Prelude                       hiding (Ordering (..))
 
 {-|
     Three-address code representation
 -}
+
+type TAC = Seq Instruction
 
 type Label  = String
 type Serial = Int
