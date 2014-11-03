@@ -7,16 +7,18 @@ module Language.Sapphire.MIPSGenerator
     , processMIPSGenerator
     ) where
 
-import           Language.Sapphire.MIPS                  
+import           Language.Sapphire.MIPS        as MIPS             
 import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.TAC         hiding (generate, Instruction(..), Label)
+import           Language.Sapphire.TAC as TAC  hiding (generate(..), Label)
 
 import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Writer          (tell)
+import           Data.Foldable                 (mapM_)
 import           Data.Sequence                 (Seq, empty, singleton)
+import           Prelude                       hiding (mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -67,7 +69,7 @@ initialState = MIPSState
 --------------------------------------------------------------------------------
 -- Writer
 
-type MIPSWriter = Seq Instruction
+type MIPSWriter = Seq MIPS.Instruction
 
 ----------------------------------------
 -- Initial
@@ -77,7 +79,7 @@ initialWriter = empty
 
 ----------------------------------------
 
-generate :: Instruction -> MIPSGenerator ()
+generate :: MIPS.Instruction -> MIPSGenerator ()
 generate = tell . singleton
 
 --------------------------------------------------------------------------------
@@ -87,7 +89,7 @@ buildMIPSGenerator :: SymbolTable -> TAC -> MIPSGenerator ()
 buildMIPSGenerator tab tac = do
     modify $ \s -> s { table = tab }
     tell initialWriter
-    tac2Mips tac
+    mapM_ tac2Mips tac
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -100,48 +102,36 @@ generateMIPS r = snd . flip (flip execRWS r) initialState
 
 ----------------------------------------
 
-tac2Mips :: TAC -> MIPSGenerator ()
-tac2Mips tac = generate $ Comment "PROBANDO"    --case ins of
-      {-Comment String = -}
-    {-| PutLabel Label StGring-}
-    {-| AssignBin-}
-        {-{ result :: Reference-}
-        {-, binop  :: BinOperator-}
-        {-, left   :: Reference-}
-        {-, right  :: Reference-}
-        {-}-}
-    {-| AssignUn-}
-        {-{ result  :: Reference-}
-        {-, unop    :: UnOperator-}
-        {-, operand :: Reference-}
-        {-}-}
-    {-| Assign-}
-        {-{ dst :: Reference-}
-        {-, src :: Reference-}
-        {-}-}
-{---    | AssignArrR-}
-{---    | AssignArrL-}
-    {--- Function related instructions-}
-    {-| BeginFunction Width-}
-    {-| EndFunction-}
-    {-| PushParameter Reference-}
-{---    | PopParameters Int-}
-    {-| Return (Maybe Reference)-}
-    {-| PCall           Label Int-}
-    {-| FCall Reference Label Int-}
-    {--- Print-}
-    {-| PrintInt    Reference-}
-    {-| PrintFloat  Reference-}
-    {-| PrintChar   Reference-}
-    {-| PrintBool   Reference-}
-    {-| PrintString Offset    Width-}
-    {--- Read-}
-    {-| ReadInt   Reference-}
-    {-| ReadFloat Reference-}
-    {-| ReadChar  Reference-}
-    {-| ReadBool  Reference-}
-    {--- Goto-}
-    {-| Goto Label-}
-    {-| IfGoto      Relation Reference Reference Label-}
-    {-| IfTrueGoto  Reference                    Label-}
-    {-| IfFalseGoto Reference                    Label-}
+tac2Mips :: TAC.Instruction -> MIPSGenerator ()
+tac2Mips tac = case tac of 
+      {-Comment str          -> generate $ MIPS.Comment str-}
+      {-PutLabel l b str     -> undefined-}
+      AssignBin res op l r -> undefined
+      AssignUn res unop op -> undefined
+      Assign dst src       -> undefined
+--    | AssignArrR
+--    | AssignArrL
+    -- Function related instructions
+      BeginFunction w   -> undefined
+      EndFunction       -> undefined
+      PushParameter ref -> undefined
+--    | PopParameters Int
+      Return mayA     -> undefined
+      PCall lab nInt  -> undefined
+      FCall ref lab n -> undefined
+    -- Print
+      PrintInt    ref     -> undefined
+      PrintFloat  ref     -> undefined
+      PrintChar   ref     -> undefined
+      PrintBool   ref     -> undefined
+      PrintString off wdt -> undefined
+    -- Read
+      ReadInt   ref -> undefined
+      ReadFloat ref -> undefined
+      ReadChar  ref -> undefined
+      ReadBool  ref -> undefined
+    -- Goto
+      Goto lab                  -> undefined
+      IfGoto      rel le ri lab -> undefined
+      IfTrueGoto  ref lab       -> undefined
+      IfFalseGoto ref lab       -> undefined

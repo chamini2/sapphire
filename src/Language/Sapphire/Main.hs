@@ -67,7 +67,7 @@ main = void $ runMaybeT $ do
 
     mapM_ (liftIO . print) mipsCode
 
-    liftIO $ putStrLn "done."
+    {-liftIO $ putStrLn "done."-}
 
 --------------------------------------------------------------------------------
 -- Flags handling
