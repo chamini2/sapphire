@@ -42,7 +42,7 @@ data Flag = Help                    -- -h      | --help
     deriving (Show)
 
 data Architecture = Arch
-    { arch  :: String
+    { name  :: String
     , types :: Map.Map DataType Width
     , frame :: Width
     } deriving (Show)
@@ -62,7 +62,7 @@ instance Eq Flag where
         (_               , _               ) -> False
 
 instance Eq Architecture where
-    (==) = (==) `on` arch
+    (==) = (==) `on` name
 
 ----------------------------------------
 -- Initial
@@ -76,7 +76,7 @@ initialReader = SappReader
 
 defaultArchitecture :: Architecture
 defaultArchitecture = Arch
-    { arch  = "mips"
+    { name  = "mips"
     , types = Map.fromList
         [ (Int     , 4)
         , (Float   , 4)
