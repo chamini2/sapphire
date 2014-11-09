@@ -27,7 +27,7 @@ import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (forM_, mapM_)
 import           Data.Functor                  ((<$>))
 import           Data.Maybe                    (fromJust, isJust)
-import           Data.Sequence                 (Seq, empty, length, null,
+import           Data.Sequence                 (empty, length, null,
                                                 reverse, singleton, zip)
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (Ordering (..), exp,
@@ -190,7 +190,6 @@ linearizeStatement nextLabel (Lex st posn) = do
         StFunctionDef idnL _ block -> do
             blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
 
-            -- I don't know if we actually need this
             generate $ PutLabel ("FUN_" ++ lexInfo idnL) $ "function name label"
 
             generate $ BeginFunction blockWdt
@@ -203,7 +202,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             prmAddrs <- mapM linearizeExpression (reverse prmLs)
             mapM_ (generate . PushParameter) prmAddrs
             generate $ PCall (lexInfo idnL) (length prmAddrs)
-            -- generate . PopParameters $ length prmAddrs
+            generate $ PopParameters $ length prmAddrs
 
         StRead accL -> do
             state <- get

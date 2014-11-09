@@ -88,7 +88,7 @@ data Instruction
     | BeginFunction Width
     | EndFunction
     | PushParameter Reference
---    | PopParameters Int
+    | PopParameters Int
     | Return (Maybe Reference)
     | PCall           Label Int
     | FCall Reference Label Int
@@ -120,9 +120,9 @@ instance Show Instruction where
             BeginFunction by      -> "begin_function " ++ show by
             EndFunction           -> "end_function"
             PushParameter ref     -> "param " ++ show ref
-            -- PopParameters n       -> "unparam " ++ show n
+            PopParameters n       -> "popparams " ++ show n
             Return mayA           -> "return" ++ maybe "" ((" " ++) . show) mayA
-            PCall lab n            -> "call " ++ lab ++ ", " ++ show n
+            PCall lab n           -> "call " ++ lab ++ ", " ++ show n
             FCall ref lab n       -> show ref ++ " := " ++ "call " ++ lab ++ ", " ++ show n
             PrintInt    ref       -> "print_int "    ++ show ref
             PrintFloat  ref       -> "print_float "  ++ show ref

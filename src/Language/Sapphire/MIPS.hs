@@ -8,13 +8,12 @@ module Language.Sapphire.MIPS
     , Register(..)
     , Value
     {-, FloatRegister-}
-    {-, Operand-}
+    , Operand(..)
     , Instruction(..)
     ) where
 
 import           Data.Char            (toLower)
 import           Data.Data
-import           Data.Typeable
 
 {-|
     MIPS related information and data types
@@ -62,23 +61,29 @@ instance Show Register where
 
 data Operand 
     = Register         Register
-    | Constant         Value 
-    | Indexed          Value Register
-    | IndirectRegister Register
-    | IndirectIndexed  Value Register
+    | Const            Int 
+    | Indexed          Int Register
+    {-| IndirectRegister Register-}
+    {-| IndirectIndexed  Value Register-}
+
+instance Show Operand where
+    show = \case
+        Register reg    -> show reg
+        Const int       -> show int
+        Indexed int reg -> show int ++ "(" ++ show reg ++ ")"
 
 data Value
     = ValInt    Int
-    | ValFloat  Float
-    | ValBool   Bool
+    {-| ValFloat  Float-}
+    {-| ValBool   Bool-}
     | ValChar   Char
     | ValString String
 
 instance Show Value where
     show = \case
         ValInt    v -> show v
-        ValFloat  v -> show v
-        ValBool   v -> map toLower (show v)
+        {-ValFloat  v -> show v-}
+        {-ValBool   v -> map toLower (show v)-}
         ValChar   v -> [v]
         ValString v -> v
 
@@ -86,27 +91,36 @@ data Instruction
     = Comment String
     | PutLabel Label String 
     -- Arithmetic
-    | Add  Register Register Register
-    | Addi Register Register Value
-    | Sub  Register Register Register
-    | Mul  Register Register Register
-    | Div  Register Register
-    {-| Rem  Register Register Register-}
+    | Add   Register Register Register
+    | Addi  Register Register Operand
+    | Addiu Register Register Operand
+    | Sub   Register Register Register
+    | Subu  Register Register Operand
+    | Mul   Register Register Register
+    | Mult  Register Register 
+    | Div   Register Register
+    -- Boolean operations
+    | Or  Register Register Register
+    | And Register Register Register
+    -- Move
+    | Move Register Register
     -- Load instructions
-    | La Register Label
-    | Li Register Value
-    | Lw Register Label Register 
+    | La Register Label     -- Load address
+    | Li Register Operand   -- Load immediate
+    | Lw Register Operand   -- Load word
+    | Ld Register Operand   -- Load double word
     | Mflo Register
     | Mfhi Register
     | Mtlo Register
     | Mthi Register
     -- Store instructions
-    | Sw  Register Label Register 
-    | Slt Register Register Register
+    | Sw  Register Operand  
+    | Slt Register Register Register        --  Set Rd to 1 if Rs < Rt, 0 otherwise
+    | Seq Register Register Register        --  Set Rd to 1 if Rs == Rt, 0 otherwise
     -- Branch instructions
-    | B    Label
-    | Beq  Register Register Label
-    | Beqz Register Label
+    | B    Label                            --  Unconditional branch
+    | Beq  Register Register Label          --  Branch if registers hold the same value
+    | Beqz Register Label                   --  Branch to Label if Register equals zero
     | Bgez Register Label
     | Bgtz Register Label
     | Blez Register Label
@@ -114,42 +128,64 @@ data Instruction
     | Bne  Register Register Label
     | Bnez Register Label
     -- Jump instructions
-    | J   Label    -- Jump to label
-    | Jal Label    -- Jump to label
-    | Jr  Register -- Return from function, resume at address $ra
+    | J    Label    -- Jump to label
+    | Jal  Label    -- Jump to label (save $ra)
+    | Jalr Register -- Jump to label at register (save $ra)
+    | Jr   Register -- Return from function, resume at address $ra
+    -- Other instructions
+    | Nop
+    | Break
+    | Syscall
 
 instance Show Instruction where
     show = \case
-        Comment str     -> "# " ++ str
+        Comment str      -> "# " ++ str
         PutLabel lab str -> lab ++ ":" ++ replicate (10 - div (length lab + 1) 4) '\t' ++ "# " ++ str
         ins -> "\t" ++ case ins of
-            Add  rd rs rt -> "add\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Addi rd rs rt -> "addi\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Sub  rd rs rt -> "sub\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Mul  rd rs rt -> "mul\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Div  rs rt    -> "div\t\t"  ++ show rs ++ ", " ++ show rt 
-            -- Load instructions
+            --  Arithmetic
+            Add   rd rs rt  -> "add\t\t"   ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Addi  rd rs imm -> "addi\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
+            Addiu rd rs imm -> "addiu\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
+            Sub   rd rs rt  -> "sub\t\t"   ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Subu  rd rs imm -> "subu\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
+            Mul   rd rs rt  -> "mul\t\t"   ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Mult     rs rt  -> "mult\t\t"  ++ show rs ++ ", " ++ show rt 
+            Div      rs rt  -> "div\t\t"   ++ show rs ++ ", " ++ show rt 
+            --  Boolean 
+            Or  rd rs rt -> "or "  ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            And rd rs rt -> "and " ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            --  Move
+            Move rd rs    -> "move " ++ show rd ++ ", " ++ show rs
+            --  Load instructions
             La rd lab     -> "la\t\t"   ++ show rd ++ ", " ++ lab
+            Li rd imm     -> "li\t\t"   ++ show rd ++ ", " ++ show imm
+            Lw rd ind     -> "lw\t\t"   ++ show rd ++ ", " ++ show ind
+            Ld rd ind     -> "ld\t\t"   ++ show rd ++ ", " ++ show ind
             Mflo rd       -> "mflo\t\t" ++ show rd
             Mfhi rd       -> "mfhi\t\t" ++ show rd
             Mtlo rs       -> "mtlo\t\t" ++ show rs
             Mthi rs       -> "mthi\t\t" ++ show rs
-            -- Store instructions
-            Sw  rs lab rt -> " sw\t\t"  ++ show rs ++ ", " ++ lab ++ "(" ++ show rt ++ ")"
-            _             -> undefined
-            {-Slt Register Register Register-}
-            {--- Branch instructions-}
-            {-B    Label-}
-            {-Beq  Register Register Label-}
-            {-Beqz Register Label-}
-            {-Bgez Register Label-}
-            {-Bgtz Register Label-}
-            {-Blez Register Label-}
-            {-Bltz Register Label-}
-            {-Bne  Register Register Label-}
-            {-Bnez Register Label-}
-            {--- Jump instructions-}
-            {-J   Label    -- Jump to label-}
-            {-Jal Label    -- Jump to label-}
-            {-Jr  Register -- Return from function, resume at address $ra-}
-
+            --  Store instructions
+            Sw  rs ind    -> "sw\t\t"  ++ show rs ++ ", " ++ show ind
+            Slt rd rs  rt -> "slt\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Seq rd rs  rt -> "seq\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            --  Branch instructions
+            B          lab -> "b\t\t"    ++ lab
+            Beq  rs rt lab -> "beq\t\t"  ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
+            Beqz rs    lab -> "beqz\t\t" ++ show rs ++ ", " ++ lab
+            Bgez rs    lab -> "bgez\t\t" ++ show rs ++ ", " ++ lab
+            Bgtz rs    lab -> "bgtz\t\t" ++ show rs ++ ", " ++ lab
+            Blez rs    lab -> "blez\t\t" ++ show rs ++ ", " ++ lab
+            Bltz rs    lab -> "bltz\t\t" ++ show rs ++ ", " ++ lab
+            Bne  rs rt lab -> "bne\t\t"  ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
+            Bnez rs    lab -> "bnez\t\t" ++ show rs ++ ", " ++ lab
+            --  Jump instructions
+            J   lab -> "j\t\t"    ++ lab    
+            Jal lab -> "jal\t\t"  ++ lab    
+            Jalr r  -> "jalr\t\t" ++ show r
+            Jr  rs  -> "jr\t\t"   ++ show rs    
+            --  Other instructions
+            Nop     -> "nop"
+            Break   -> "break"
+            Syscall -> "syscall"
+            _  -> error "MIPS.Show Instruction: unrecognized instruction"
