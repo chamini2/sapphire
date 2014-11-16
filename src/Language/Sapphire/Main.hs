@@ -62,8 +62,8 @@ main = void $ runMaybeT $ do
     let (tacS, tac) = processTACGenerator () (getTable sizS) prog
 
     when (ShowTAC `elem` flgs) . liftIO $ (mapM_ print tac)
-
-    let mipsCode = processMIPSGenerator () (getTable tacS) tac
+    
+    let mipsCode = processMIPSGenerator reader (getTable tacS) tac
 
     mapM_ (liftIO . print) mipsCode
 

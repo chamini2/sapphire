@@ -63,6 +63,7 @@ data Operand
     = Register         Register
     | Const            Int 
     | Indexed          Int Register
+    | Label            Label
     {-| IndirectRegister Register-}
     {-| IndirectIndexed  Value Register-}
 
@@ -90,6 +91,9 @@ instance Show Value where
 data Instruction 
     = Comment String
     | PutLabel Label String 
+    -- Data declarations
+    | Asciiz Label String
+    {-| Word ???-}
     -- Arithmetic
     | Add   Register Register Register
     | Addi  Register Register Operand
@@ -105,7 +109,7 @@ data Instruction
     -- Move
     | Move Register Register
     -- Load instructions
-    | La Register Label     -- Load address
+    | La Register Operand     -- Load address
     | Li Register Operand   -- Load immediate
     | Lw Register Operand   -- Load word
     | Ld Register Operand   -- Load double word
@@ -140,52 +144,55 @@ data Instruction
 instance Show Instruction where
     show = \case
         Comment str      -> "# " ++ str
-        PutLabel lab str -> lab ++ ":" ++ replicate (10 - div (length lab + 1) 4) '\t' ++ "# " ++ str
+        PutLabel lab str -> lab ++ (tabs $ length lab) ++ (if str /= "" then ("# " ++ str) else "")
         ins -> "\t" ++ case ins of
+            --  Data declarations
+            Asciiz lab str  -> lab ++ ": .asciiz " ++ str 
             --  Arithmetic
-            Add   rd rs rt  -> "add\t\t"   ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Addi  rd rs imm -> "addi\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
-            Addiu rd rs imm -> "addiu\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
-            Sub   rd rs rt  -> "sub\t\t"   ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Subu  rd rs imm -> "subu\t\t"  ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
-            Mul   rd rs rt  -> "mul\t\t"   ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Mult     rs rt  -> "mult\t\t"  ++ show rs ++ ", " ++ show rt 
-            Div      rs rt  -> "div\t\t"   ++ show rs ++ ", " ++ show rt 
+            Add   rd rs rt  -> "add"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Addi  rd rs imm -> "addi"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
+            Addiu rd rs imm -> "addiu" ++ (tabs 5) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
+            Sub   rd rs rt  -> "sub"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Subu  rd rs imm -> "subu"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
+            Mul   rd rs rt  -> "mul"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Mult     rs rt  -> "mult"  ++ (tabs 4) ++ show rs ++ ", " ++ show rt 
+            Div      rs rt  -> "div"   ++ (tabs 3) ++ show rs ++ ", " ++ show rt 
             --  Boolean 
-            Or  rd rs rt -> "or "  ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
-            And rd rs rt -> "and " ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Or  rd rs rt -> "or"  ++ (tabs 2) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            And rd rs rt -> "and" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             --  Move
-            Move rd rs    -> "move " ++ show rd ++ ", " ++ show rs
+            Move rd rs    -> "move" ++ (tabs 4) ++ show rd ++ ", " ++ show rs
             --  Load instructions
-            La rd lab     -> "la\t\t"   ++ show rd ++ ", " ++ lab
-            Li rd imm     -> "li\t\t"   ++ show rd ++ ", " ++ show imm
-            Lw rd ind     -> "lw\t\t"   ++ show rd ++ ", " ++ show ind
-            Ld rd ind     -> "ld\t\t"   ++ show rd ++ ", " ++ show ind
-            Mflo rd       -> "mflo\t\t" ++ show rd
-            Mfhi rd       -> "mfhi\t\t" ++ show rd
-            Mtlo rs       -> "mtlo\t\t" ++ show rs
-            Mthi rs       -> "mthi\t\t" ++ show rs
+            La rd ind     -> "la"   ++ (tabs 2) ++ show rd ++ ", " ++ show ind
+            Li rd imm     -> "li"   ++ (tabs 2) ++ show rd ++ ", " ++ show imm
+            Lw rd ind     -> "lw"   ++ (tabs 2) ++ show rd ++ ", " ++ show ind
+            Ld rd ind     -> "ld"   ++ (tabs 2) ++ show rd ++ ", " ++ show ind
+            Mflo rd       -> "mflo" ++ (tabs 4) ++ show rd
+            Mfhi rd       -> "mfhi" ++ (tabs 4) ++ show rd
+            Mtlo rs       -> "mtlo" ++ (tabs 4) ++ show rs
+            Mthi rs       -> "mthi" ++ (tabs 4) ++ show rs
             --  Store instructions
-            Sw  rs ind    -> "sw\t\t"  ++ show rs ++ ", " ++ show ind
-            Slt rd rs  rt -> "slt\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Seq rd rs  rt -> "seq\t\t" ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Sw  rs ind    -> "sw"  ++ (tabs 2) ++ show rs ++ ", " ++ show ind
+            Slt rd rs  rt -> "slt" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Seq rd rs  rt -> "seq" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
             --  Branch instructions
-            B          lab -> "b\t\t"    ++ lab
-            Beq  rs rt lab -> "beq\t\t"  ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
-            Beqz rs    lab -> "beqz\t\t" ++ show rs ++ ", " ++ lab
-            Bgez rs    lab -> "bgez\t\t" ++ show rs ++ ", " ++ lab
-            Bgtz rs    lab -> "bgtz\t\t" ++ show rs ++ ", " ++ lab
-            Blez rs    lab -> "blez\t\t" ++ show rs ++ ", " ++ lab
-            Bltz rs    lab -> "bltz\t\t" ++ show rs ++ ", " ++ lab
-            Bne  rs rt lab -> "bne\t\t"  ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
-            Bnez rs    lab -> "bnez\t\t" ++ show rs ++ ", " ++ lab
+            B          lab -> "b"    ++ (tabs 1) ++ lab
+            Beq  rs rt lab -> "beq"  ++ (tabs 3) ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
+            Beqz rs    lab -> "beqz" ++ (tabs 4) ++ show rs ++ ", " ++ lab
+            Bgez rs    lab -> "bgez" ++ (tabs 4) ++ show rs ++ ", " ++ lab
+            Bgtz rs    lab -> "bgtz" ++ (tabs 4) ++ show rs ++ ", " ++ lab
+            Blez rs    lab -> "blez" ++ (tabs 4) ++ show rs ++ ", " ++ lab
+            Bltz rs    lab -> "bltz" ++ (tabs 4) ++ show rs ++ ", " ++ lab
+            Bne  rs rt lab -> "bne"  ++ (tabs 3) ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
+            Bnez rs    lab -> "bnez" ++ (tabs 4) ++ show rs ++ ", " ++ lab
             --  Jump instructions
-            J   lab -> "j\t\t"    ++ lab    
-            Jal lab -> "jal\t\t"  ++ lab    
-            Jalr r  -> "jalr\t\t" ++ show r
-            Jr  rs  -> "jr\t\t"   ++ show rs    
+            J   lab -> "j"    ++ (tabs 1) ++ lab    
+            Jal lab -> "jal"  ++ (tabs 3) ++ lab    
+            Jalr r  -> "jalr" ++ (tabs 4) ++ show r
+            Jr  rs  -> "jr"   ++ (tabs 2) ++ show rs    
             --  Other instructions
             Nop     -> "nop"
             Break   -> "break"
             Syscall -> "syscall"
             _  -> error "MIPS.Show Instruction: unrecognized instruction"
+        where tabs l = replicate (5 - div (l + 1) 4) '\t'

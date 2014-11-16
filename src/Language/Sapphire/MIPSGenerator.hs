@@ -13,21 +13,18 @@ import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC as TAC  hiding (generate(..), Label)
 
+import           Control.Monad                 (liftM, unless)
 import           Control.Monad.RWS             (RWS, execRWS, lift)
+import           Control.Monad.Reader          (asks)
 import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Writer          (tell)
-import           Data.Foldable                 (mapM_)
+import           Data.Foldable                 (mapM_, forM_)
 import           Data.Sequence                 (Seq, empty, singleton)
 import           Prelude                       hiding (mapM_, EQ, LT, GT)
 
 --------------------------------------------------------------------------------
 
-type MIPSGenerator = RWS MIPSReader MIPSWriter MIPSState
-
---------------------------------------------------------------------------------
--- Reader
-
-type MIPSReader = ()
+type MIPSGenerator = RWS SappReader MIPSWriter MIPSState
 
 --------------------------------------------------------------------------------
 -- State
@@ -95,45 +92,99 @@ buildMIPSGenerator tab tac = do
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processMIPSGenerator :: MIPSReader -> SymbolTable -> TAC -> MIPSWriter
+processMIPSGenerator :: SappReader -> SymbolTable -> TAC -> MIPSWriter
 processMIPSGenerator r s = generateMIPS r . buildMIPSGenerator s
 
-generateMIPS :: MIPSReader -> MIPSGenerator a -> MIPSWriter
+generateMIPS :: SappReader -> MIPSGenerator a -> MIPSWriter
 generateMIPS r = snd . flip (flip execRWS r) initialState
 
 emitPreamble :: MIPSGenerator ()
 emitPreamble = do
-    {-generate $ PutLabel fileName ""-}
+    file <- asks file
+    generate $ MIPS.Comment $ file ++ " - Sapphire compiler generated MIPS code"
+
+    --  Generate .data section
+    generateGlobals
+
     generate $ MIPS.PutLabel ".text"       ""
     generate $ MIPS.PutLabel ".align 2"    ""
     generate $ MIPS.PutLabel ".globl main" ""
 
-    generatePrint "_PrintInt"    1
-    generatePrint "_PrintString" 4
-    {-generatePrint "_PrintChar"   11-}
-
-generatePrint :: Label -> Int -> MIPSGenerator ()
-generatePrint fname code = do
-    generate $ MIPS.PutLabel fname ("Language defined " ++ fname)
+{-
+ -    Generates MIPS code for printing scalar data types
+ -
+ -    List of codes used by sycall
+ -    1  - Print Integer      $A0  Integer to print
+ -    2  - Print Float        $F12 Float to print
+ -    3  - Print Double       $F12 Double to print
+ -    4  - Print String       $A0  Address of null terminated string to print
+ -    11 - Print Character    
+ -    5  - Read Integer
+ -    6  - Read Float
+ -    7  - Read Double
+ -    8  - Read String 
+ -    12 - Read Character
+ -}
+generatePrint :: Offset -> Int -> MIPSGenerator ()
+generatePrint off code = do
     generate $ Li V0 (Const code)
-    generate $ Lw A0 (Indexed 0 FP)
+    generate $ La A0 (Indexed (32768 + off) GP)
     generate Syscall
 
+generatePrintString :: Offset -> MIPSGenerator ()
+generatePrintString off = generatePrint off 4
+
+generateRead :: Label -> Int -> MIPSGenerator ()
+generateRead fname code = return ()
+
+generateGlobals :: MIPSGenerator ()
+generateGlobals = do
+    generate $ MIPS.PutLabel ".data" ""
+    syms <- liftM toSeq $ gets getTable
+    forM_ syms $ \(idn, sym) -> do
+        case sym of
+            SymInfo dt _ _ _ _ _ _ -> unless (lexInfo dt /= String) $ generateStringDeclaration idn 1
+            otherwise              -> return ()
+     {-mapM_ (\(c, n) generateString) -}
+
+generateStringDeclaration :: String -> Int -> MIPSGenerator ()
+generateStringDeclaration str serial = generate $ Asciiz ("_string" ++ show serial) str
+
+----------------------------------------
+
+data Reason = Read | Write
+
 getRegister :: Reference -> MIPSGenerator Register
-getRegister ref = return T0
+getRegister ref = findRegisterWithContents ref
+
+findRegisterWithContents :: Reference -> MIPSGenerator Register
+findRegisterWithContents var = return T4
 
 spillRegister :: Register -> MIPSGenerator ()
 spillRegister reg = undefined
+
+spillAllDirtyRegisters :: MIPSGenerator ()
+spillAllDirtyRegisters = return ()
 
 buildOperand :: Reference -> MIPSGenerator Operand
 buildOperand ref = case ref of
     Address   iden ref glob -> do
         return $ Indexed 99 T1
-    Constant  val           -> do
+    Constant  val -> do
         case val of 
             ValInt int -> return $ Const int
             otherwise  -> return $ Const 101
-    Temporary int           -> return $ Const 101
+    Temporary int -> return $ Const 101
+
+{-generateLoadConstant :: Reference -> Int -> MIPSGenerator ()-}
+{-generateLoadConstant dst imm = do-}
+    {-reg <- getRegisterForWrite dst-}
+    {-generate $ Li reg (Const imm)-}
+
+{-generateLoadAddress :: Reference -> MIPS.Label -> MIPSGenerator ()-}
+{-generateLoadAddress dst lab = do-}
+    {-reg <- getRegisterForWrite dst-}
+    {-generate $ La reg lab-}
 
 ----------------------------------------
 
@@ -142,12 +193,15 @@ tac2Mips tac = case tac of
       TAC.Comment str      -> generate $ MIPS.Comment str
 
       TAC.PutLabel lab str -> do
-        case head lab of 
-            'L'       -> return ()
-            otherwise -> generate $ MIPS.PutLabel lab str
+        {-spillAllDirtyRegisters  -}
+        if (lab == "FUN_main")
+            then generate $ MIPS.PutLabel "main:" str 
+            else case head lab of 
+                'L'       -> return ()
+                otherwise -> generate $ MIPS.PutLabel lab str
 
       AssignBin res op l r -> do
-        regRes <- getRegister res
+        rDst   <- getRegister res
         lef    <- getRegister l
         opl    <- buildOperand l
         generate $ Ld lef opl
@@ -155,18 +209,18 @@ tac2Mips tac = case tac of
         opr    <- buildOperand l
         generate $ Ld rig opr
         case op of 
-            ADD   -> generate $ Add regRes lef rig
-            SUB   -> generate $ Sub regRes lef rig
-            MUL   -> generate $ Mul regRes lef rig
+            ADD   -> generate $ Add rDst lef rig
+            SUB   -> generate $ Sub rDst lef rig
+            MUL   -> generate $ Mul rDst lef rig
             DIV   -> do
                 generate $ Div lef rig
-                generate $ Mflo regRes
+                generate $ Mflo rDst
             MOD   -> do
                 generate $ Div lef rig
-                generate $ Mfhi regRes
+                generate $ Mfhi rDst
             {-POW   -> "^"-}
-            OR    -> generate $ Or  regRes lef rig
-            AND   -> generate $ And regRes lef rig
+            OR    -> generate $ Or  rDst lef rig
+            AND   -> generate $ And rDst lef rig
 
       AssignUn res unop op -> do
         case unop of 
@@ -185,11 +239,15 @@ tac2Mips tac = case tac of
 --    | AssignArrL
     -- Function related instructions
       BeginFunction w   -> do
-        generate $ Subu  SP SP (Const 8)    -- Decrement $sp to make space to save $ra, $fp
-        generate $ Sw    FP (Indexed 8 SP)  -- Save fp
-        generate $ Sw    RA (Indexed 4 SP)  -- Save ra
-        generate $ Addiu FP SP (Const 8)    -- Setup new fp
-        generate $ Subu SP SP (Const w)     -- Decrement sp to make space for locals/temps
+        generate $ Subu  SP SP (Const 8)            -- Decrement $sp to make space to save $ra, $fp
+        {-generate $ Subu  SP SP (Const 12)           -- Decrement $sp to make space to save $ra, $fp and return value-}
+        generate $ Sw    FP (Indexed 8 SP)          -- Save fp
+        generate $ Sw    RA (Indexed 4 SP)          -- Save ra
+                                                    -- Save return value
+        generate $ Addiu FP SP (Const 8)            -- Setup new fp
+        if (w == 0) 
+            then generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
+            else return ()     
 
       EndFunction       -> return ()
 
@@ -204,11 +262,12 @@ tac2Mips tac = case tac of
       Return mayA     -> do 
         case mayA of
             Just ref -> do
-                {-Register reg <- buildOperand ref-}
-                {-generate $ Move V0 reg-}
+                {-Register reg <- getRegister ref-}
+                generate $ Move V0 T5
                 return ()
             Nothing  -> return ()
-        generate $ Move SP FP               -- Pop calee frame off stack
+        generate $ Move SP FP               -- Pop callee frame off stack
+        {-generate $ Lw FP (Indexed (-8)  FP)    -- Restore saved return value-}
         generate $ Lw RA (Indexed (-4) FP)  -- Restore saved ra
         generate $ Lw FP (Indexed 0  FP)    -- Restore saved fp
         generate $ Jr RA                    -- Return from function
@@ -221,14 +280,12 @@ tac2Mips tac = case tac of
         -- get return value TO DO
         
       -- Print
-      PrintInt    ref     -> do
-        {-tac2Mips $ PushParameter ref-}
-        tac2Mips $ PCall "_PrintInt" 1
+      PrintInt    ref   -> return () --generatePrintInt ref
+      PrintFloat  ref   -> return ()
+      PrintChar   ref   -> return ()
+      PrintBool   ref   -> return ()
+      PrintString off _ -> generatePrintString off
 
-      PrintFloat  ref     -> return ()
-      PrintChar   ref     -> return ()
-      PrintBool   ref     -> return ()
-      PrintString off wdt -> return ()
       -- Read
       ReadInt   ref -> return ()
       ReadFloat ref -> return ()
@@ -236,6 +293,7 @@ tac2Mips tac = case tac of
       ReadBool  ref -> return ()
       -- Goto
       Goto lab                  -> do
+        spillAllDirtyRegisters 
         generate $ B lab        --  Unconditional branch
       IfGoto      rel le ri lab -> do
         regLe <- getRegister le 
