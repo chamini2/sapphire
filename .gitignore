@@ -1,8 +1,8 @@
 dist
 .cabal-sandbox
 cabal.sandbox.config
-*.o
-*.s
+*.o     # Object files
+*.s     # MIPS files
 *.hi
 *.chi
 *.chs.h
