@@ -166,7 +166,7 @@ TopStatement :: { Lexeme Statement }
     | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
 
     -- Main
-    | "main" StatementList "end"    { StFunctionDef (mainName <$ $1) (Sign empty (pure $ DataType $ pure "Int")) $2 <$ $1 }
+    | "main" StatementList "end"    { StFunctionDef (mainName <$ $1) (Sign empty (pure $ DataType $ pure "Int")) (addReturn $2) <$ $1 }
 
     -- Errors
     -- -- Definitions
@@ -467,6 +467,9 @@ MaybeExpressionListNL :: { Seq (Lexeme Expression) }
 
 --------------------------------------------------------------------------------
 -- Functions
+
+addReturn :: StBlock -> StBlock
+addReturn = flip (|>) (pure . StReturn . Just . pure . LitInt $ pure 0)
 
 expandStatement :: Lexeme Statement -> StBlock
 expandStatement stL = case lexInfo stL of
