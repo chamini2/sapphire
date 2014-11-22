@@ -31,17 +31,17 @@ data SappReader = SappReader
     , arch  :: Architecture
     }
 
-data Flag = Help                    -- -h      | --help
-          | Version                 -- -v      | --version
-          | AllWarnings             -- -W      | --all-warnings
-          | SuppressWarnings        -- -w      | --no-warnings
-          | OutputFile FilePath     -- -o FILE | --output FILE
+data Flag = Help                    -- -h | --help
+          | Version                 -- -v | --version
+          | AllWarnings             -- -W | --all-warnings
+          | SuppressWarnings        -- -w | --no-warnings
+          | Execute                 -- -e | --execute
           -- For compiler use
-          | ShowSymbolTable         -- -s      | --symbol-table
-          | ShowAST                 -- -a      | --ast
-          | ShowTAC                 -- -t      | --tac
-          | ShowMIPS                -- -m      | --mips
-    deriving (Show)
+          | ShowSymbolTable         -- -s | --symbol-table
+          | ShowAST                 -- -a | --ast
+          | ShowTAC                 -- -t | --tac
+          | ShowMIPS                -- -m | --mips
+    deriving (Show, Eq)
 
 data Architecture = Arch
     { name  :: String
@@ -51,18 +51,6 @@ data Architecture = Arch
 
 ----------------------------------------
 -- Instances
-
-instance Eq Flag where
-    a == b = case (a, b) of
-        (Help            , Help            ) -> True
-        (Version         , Version         ) -> True
-        (AllWarnings     , AllWarnings     ) -> True
-        (SuppressWarnings, SuppressWarnings) -> True
-        (OutputFile _    , OutputFile _    ) -> True
-        (ShowSymbolTable , ShowSymbolTable ) -> True
-        (ShowAST         , ShowAST         ) -> True
-        (ShowTAC         , ShowTAC         ) -> True
-        (_               , _               ) -> False
 
 instance Eq Architecture where
     (==) = (==) `on` name

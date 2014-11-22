@@ -12,16 +12,17 @@ import           Language.Sapphire.TypeChecker
 import           Control.Monad                   (guard, void, when)
 import           Control.Monad.Trans             (liftIO)
 import           Control.Monad.Trans.Maybe       (runMaybeT)
-import           Data.Foldable                   (concatMap, mapM_)
+import           Data.Foldable                   (mapM_, toList)
 import           Data.List                       (nub)
 import           Data.Sequence                   (null)
-import           Prelude                         hiding (concatMap, mapM_, null)
+import           Prelude                         hiding (mapM_, null)
 import qualified Prelude                         as P (null)
 import           System.Process                  (rawSystem)
 import           System.Console.GetOpt           (ArgDescr (..), ArgOrder (..),
                                                   OptDescr (..), getOpt,
                                                   usageInfo)
 import           System.Environment              (getArgs)
+import           System.Directory                (removeFile)
 import           System.FilePath                 (replaceExtension)
 
 main :: IO ()
@@ -29,12 +30,13 @@ main = void $ runMaybeT $ do
     (flgs, args) <- liftIO arguments
 
     when (Version `elem` flgs) . liftIO $ putStrLn version
-    when (Help    `elem` flgs) . liftIO $ putStrLn help
+    when (Help    `elem` flgs) . liftIO $ putStr help
 
     -- Only continue if there were no 'help' or 'version' flags
     guard . not $ (Help `elem` flgs) || (Version `elem` flgs)
 
-    (input, filepath) <- if P.null args
+    let fromStdin = P.null args
+    (input, filepath) <- if fromStdin
         then liftIO getContents            >>= return . (, "<stdin>")
         else liftIO (readFile $ head args) >>= return . (, head args)
 
@@ -65,30 +67,32 @@ main = void $ runMaybeT $ do
 
     when (ShowTAC `elem` flgs) . liftIO $ mapM_ print tac
 
-    let mipsc = concatMap ((++"\n") . show) $ processMIPSGenerator reader (getTable tacS) tac
+    let mipsc = processMIPSGenerator reader (getTable tacS) tac
         mipsf = replaceExtension filepath "s"
 
-    when (ShowMIPS `elem` flgs) . liftIO $ putStrLn mipsc
+    when (ShowMIPS `elem` flgs) . liftIO $ mapM_ print mipsc
 
-    liftIO $ writeFile mipsf mipsc
+    liftIO . writeFile mipsf . unlines . map show $ toList mipsc
 
     -- Run the MIPS file
-    liftIO $ rawSystem "spim" ["-f", mipsf]
+    when (Execute `elem` flgs || fromStdin) . void . liftIO $ rawSystem "spim" ["-f", mipsf]
+
+    when fromStdin . liftIO $ removeFile mipsf
 
 --------------------------------------------------------------------------------
 -- Flags handling
 
 options :: [OptDescr Flag]
 options =
-    [ Option ['h'] ["help"]         (NoArg  Help)              "shows this help message"
-    , Option ['v'] ["version"]      (NoArg  Version)           "shows version number"
-    , Option ['W'] ["all-warnings"] (NoArg  AllWarnings)       "show all warnings"
-    , Option ['w'] ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
-    , Option ['o'] ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
-    , Option ['s'] ["symbol-table"] (NoArg  ShowSymbolTable)   "shows the symbol table"
-    , Option ['a'] ["ast"]          (NoArg  ShowAST)           "shows the AST"
-    , Option ['t'] ["tac"]          (NoArg  ShowTAC)           "shows the three-address code generated"
-    , Option ['m'] ["mips"]         (NoArg  ShowMIPS)          "shows the MIPS code generated"
+    [ Option ['h'] ["help"]         (NoArg Help)              "shows this help message"
+    , Option ['v'] ["version"]      (NoArg Version)           "shows version number"
+    , Option ['W'] ["all-warnings"] (NoArg AllWarnings)       "show all warnings"
+    , Option ['w'] ["no-warnings"]  (NoArg SuppressWarnings)  "suppress all warnings"
+    , Option ['s'] ["symbol-table"] (NoArg ShowSymbolTable)   "shows the symbol table"
+    , Option ['a'] ["ast"]          (NoArg ShowAST)           "shows the AST"
+    , Option ['t'] ["tac"]          (NoArg ShowTAC)           "shows the three-address code generated"
+    , Option ['m'] ["mips"]         (NoArg ShowMIPS)          "shows the MIPS code generated"
+    , Option ['e'] ["execute"]      (NoArg Execute)           "execute the MIPS code directly with the 'spim' command"
     ]
 
 help :: String
@@ -96,7 +100,7 @@ help = usageInfo message options
     where
         message = "usage: sapphire [OPTION]... [FILE]\n" ++
                   "\twhen running sapphire without arguments, the compiler " ++
-                  "consumes data it receives from the standard input until " ++
+                  "consumes data it\n\treceives from the standard input until " ++
                   "it receives an EOF ('^D') character"
 
 version :: String

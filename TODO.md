@@ -12,7 +12,8 @@
 
 ##General
 
-* add embeded functions to symbol table
+* warn about <stdin>
+* add embedded functions to symbol table
 * Get file name from command line, put in reader.
 * Functions have a `width` that **may be wrong**
 * Decorate the AST `Either Expression (Expression, DataType)` -- or something like this
