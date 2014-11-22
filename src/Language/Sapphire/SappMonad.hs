@@ -37,9 +37,10 @@ data Flag = Help                    -- -h      | --help
           | SuppressWarnings        -- -w      | --no-warnings
           | OutputFile FilePath     -- -o FILE | --output FILE
           -- For compiler use
-          | ShowSymbolTable         -- -st     | --symbol-table
+          | ShowSymbolTable         -- -s      | --symbol-table
           | ShowAST                 -- -a      | --ast
-          | ShowTAC                 -- -c      | --tac
+          | ShowTAC                 -- -t      | --tac
+          | ShowMIPS                -- -m      | --mips
     deriving (Show)
 
 data Architecture = Arch

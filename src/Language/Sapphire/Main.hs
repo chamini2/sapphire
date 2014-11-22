@@ -9,18 +9,20 @@ import           Language.Sapphire.SizeOffset
 import           Language.Sapphire.TACGenerator
 import           Language.Sapphire.TypeChecker
 
-import           Control.Monad                 (guard, void, when)
-import           Control.Monad.Trans           (liftIO)
-import           Control.Monad.Trans.Maybe     (runMaybeT)
-import           Data.Foldable                 (mapM_)
-import           Data.List                     (nub)
-import           Data.Sequence                 (null)
-import           Prelude                       hiding (mapM_, null)
-import qualified Prelude                       as P (null)
-import           System.Console.GetOpt         (ArgDescr (..), ArgOrder (..),
-                                                OptDescr (..), getOpt,
-                                                usageInfo)
-import           System.Environment            (getArgs)
+import           Control.Monad                   (guard, void, when)
+import           Control.Monad.Trans             (liftIO)
+import           Control.Monad.Trans.Maybe       (runMaybeT)
+import           Data.Foldable                   (concatMap, mapM_)
+import           Data.List                       (nub)
+import           Data.Sequence                   (null)
+import           Prelude                         hiding (concatMap, mapM_, null)
+import qualified Prelude                         as P (null)
+import           System.Process                  (rawSystem)
+import           System.Console.GetOpt           (ArgDescr (..), ArgOrder (..),
+                                                  OptDescr (..), getOpt,
+                                                  usageInfo)
+import           System.Environment              (getArgs)
+import           System.FilePath                 (replaceExtension)
 
 main :: IO ()
 main = void $ runMaybeT $ do
@@ -32,11 +34,11 @@ main = void $ runMaybeT $ do
     -- Only continue if there were no 'help' or 'version' flags
     guard . not $ (Help `elem` flgs) || (Version `elem` flgs)
 
-    (input, file') <- if P.null args
+    (input, filepath) <- if P.null args
         then liftIO getContents            >>= return . (, "<stdin>")
         else liftIO (readFile $ head args) >>= return . (, head args)
 
-    let reader = initialReader { file = file', flags = flgs }
+    let reader = initialReader { file = filepath, flags = flgs }
 
     let (prog, plErrs) = parseProgram input
     unlessGuard (null $ errors plErrs) $ mapM_ (liftIO . print) plErrs
@@ -61,13 +63,17 @@ main = void $ runMaybeT $ do
 
     let (tacS, tac) = processTACGenerator () (getTable sizS) prog
 
-    when (ShowTAC `elem` flgs) . liftIO $ (mapM_ print tac)
-    
-    let mipsCode = processMIPSGenerator reader (getTable tacS) tac
+    when (ShowTAC `elem` flgs) . liftIO $ mapM_ print tac
 
-    mapM_ (liftIO . print) mipsCode
+    let mipsc = concatMap ((++"\n") . show) $ processMIPSGenerator reader (getTable tacS) tac
+        mipsf = replaceExtension filepath "s"
 
-    {-liftIO $ putStrLn "done."-}
+    when (ShowMIPS `elem` flgs) . liftIO $ putStrLn mipsc
+
+    liftIO $ writeFile mipsf mipsc
+
+    -- Run the MIPS file
+    liftIO $ rawSystem "spim" ["-f", mipsf]
 
 --------------------------------------------------------------------------------
 -- Flags handling
@@ -82,6 +88,7 @@ options =
     , Option ['s'] ["symbol-table"] (NoArg  ShowSymbolTable)   "shows the symbol table"
     , Option ['a'] ["ast"]          (NoArg  ShowAST)           "shows the AST"
     , Option ['t'] ["tac"]          (NoArg  ShowTAC)           "shows the three-address code generated"
+    , Option ['m'] ["mips"]         (NoArg  ShowMIPS)          "shows the MIPS code generated"
     ]
 
 help :: String
@@ -104,8 +111,6 @@ arguments = do
     where
         coherent = foldr func []
         func flg flgs = case flg of
-            Help             -> flg : flgs
-            Version          -> flg : flgs
             AllWarnings      ->
                 if SuppressWarnings `elem` flgs
                     then flgs
@@ -114,7 +119,4 @@ arguments = do
                 if AllWarnings `elem` flgs
                     then flgs
                     else flg : flgs
-            OutputFile _     -> flg : flgs
-            ShowSymbolTable  -> flg : flgs
-            ShowAST          -> flg : flgs
-            ShowTAC          -> flg : flgs
+            _ -> flg : flgs
