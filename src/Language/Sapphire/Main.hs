@@ -23,7 +23,7 @@ import           System.Console.GetOpt           (ArgDescr (..), ArgOrder (..),
                                                   usageInfo)
 import           System.Environment              (getArgs)
 import           System.Directory                (removeFile)
-import           System.FilePath                 (replaceExtension)
+import           System.FilePath                 (replaceExtension, takeFileName)
 
 main :: IO ()
 main = void $ runMaybeT $ do
@@ -68,7 +68,7 @@ main = void $ runMaybeT $ do
     when (ShowTAC `elem` flgs) . liftIO $ mapM_ print tac
 
     let mipsc = processMIPSGenerator reader (getTable tacS) tac
-        mipsf = replaceExtension filepath "s"
+        mipsf = flip replaceExtension "s" $ takeFileName filepath
 
     when (ShowMIPS `elem` flgs) . liftIO $ mapM_ print mipsc
 
