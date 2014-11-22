@@ -72,6 +72,7 @@ instance Show Operand where
         Register reg    -> show reg
         Const int       -> show int
         Indexed int reg -> show int ++ "(" ++ show reg ++ ")"
+        Label lab       -> lab
 
 data Value
     = ValInt    Int
@@ -109,7 +110,7 @@ data Instruction
     -- Move
     | Move Register Register
     -- Load instructions
-    | La Register Operand     -- Load address
+    | La Register Operand   -- Load address
     | Li Register Operand   -- Load immediate
     | Lw Register Operand   -- Load word
     | Ld Register Operand   -- Load double word

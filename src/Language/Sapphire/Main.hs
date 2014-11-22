@@ -74,14 +74,14 @@ main = void $ runMaybeT $ do
 
 options :: [OptDescr Flag]
 options =
-    [ Option ['h']     ["help"]         (NoArg  Help)              "shows this help message"
-    , Option ['v']     ["version"]      (NoArg  Version)           "shows version number"
-    , Option ['W']     ["all-warnings"] (NoArg  AllWarnings)       "show all warnings"
-    , Option ['w']     ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
-    , Option ['o']     ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
-    , Option ['s','t'] ["symbol-table"] (NoArg  ShowSymbolTable)   "shows the symbol table"
-    , Option ['a']     ["ast"]          (NoArg  ShowAST)           "shows the AST"
-    , Option ['c']     ["tac"]          (NoArg  ShowTAC)           "shows the three-address code generated"
+    [ Option ['h'] ["help"]         (NoArg  Help)              "shows this help message"
+    , Option ['v'] ["version"]      (NoArg  Version)           "shows version number"
+    , Option ['W'] ["all-warnings"] (NoArg  AllWarnings)       "show all warnings"
+    , Option ['w'] ["no-warnings"]  (NoArg  SuppressWarnings)  "suppress all warnings"
+    , Option ['o'] ["output"]       (ReqArg OutputFile "FILE") "specify a FILE for output of the program"
+    , Option ['s'] ["symbol-table"] (NoArg  ShowSymbolTable)   "shows the symbol table"
+    , Option ['a'] ["ast"]          (NoArg  ShowAST)           "shows the AST"
+    , Option ['t'] ["tac"]          (NoArg  ShowTAC)           "shows the three-address code generated"
     ]
 
 help :: String

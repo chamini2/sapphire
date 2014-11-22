@@ -1,11 +1,4 @@
-def f : Int a, Int b -> Int
-    c : Int 
-    c = a + b
-    return c
-end
-
-
-def g : Int a, Int b -> Int
+def binky : Int a, Int b -> Int
     c : Int 
     c = a + b
     return c
@@ -13,6 +6,7 @@ end
 
 main
     num : Int
-    num = f(4, 10)
+    num = binky(4, 10)
+    print num
     return 0
 end

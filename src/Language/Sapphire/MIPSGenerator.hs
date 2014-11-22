@@ -1,7 +1,6 @@
 {-|
     MIPS code generation module
  -}
-
 module Language.Sapphire.MIPSGenerator 
     ( MIPSGenerator
     , processMIPSGenerator
@@ -100,8 +99,8 @@ generateMIPS r = snd . flip (flip execRWS r) initialState
 
 emitPreamble :: MIPSGenerator ()
 emitPreamble = do
-    file <- asks file
-    generate $ MIPS.Comment $ file ++ " - Sapphire compiler generated MIPS code"
+    filePath <- asks file
+    generate $ MIPS.Comment $ filePath ++ " - Sapphire compiler generated MIPS code"
 
     --  Generate .data section
     generateGlobals
@@ -113,7 +112,7 @@ emitPreamble = do
 {-
  -    Generates MIPS code for printing scalar data types
  -
- -    List of codes used by sycall
+ -    List of codes used by syscall
  -    1  - Print Integer      $A0  Integer to print
  -    2  - Print Float        $F12 Float to print
  -    3  - Print Double       $F12 Double to print
@@ -124,15 +123,16 @@ emitPreamble = do
  -    7  - Read Double
  -    8  - Read String 
  -    12 - Read Character
+ -
  -}
-generatePrint :: Offset -> Int -> MIPSGenerator ()
-generatePrint off code = do
+generatePrint :: MIPS.Label -> Int -> MIPSGenerator ()
+generatePrint lab code = do
     generate $ Li V0 (Const code)
-    generate $ La A0 (Indexed (32768 + off) GP)
+    generate $ La A0 (Label lab)
     generate Syscall
 
 generatePrintString :: Offset -> MIPSGenerator ()
-generatePrintString off = generatePrint off 4
+generatePrintString off = generatePrint ("_string" ++ show off) 4
 
 generateRead :: Label -> Int -> MIPSGenerator ()
 generateRead fname code = return ()
@@ -143,12 +143,9 @@ generateGlobals = do
     syms <- liftM toSeq $ gets getTable
     forM_ syms $ \(idn, sym) -> do
         case sym of
-            SymInfo dt _ _ _ _ _ _ -> unless (lexInfo dt /= String) $ generateStringDeclaration idn 1
-            otherwise              -> return ()
+            SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_string" ++ show off) idn
+            otherwise                -> return ()
      {-mapM_ (\(c, n) generateString) -}
-
-generateStringDeclaration :: String -> Int -> MIPSGenerator ()
-generateStringDeclaration str serial = generate $ Asciiz ("_string" ++ show serial) str
 
 ----------------------------------------
 
@@ -157,11 +154,14 @@ data Reason = Read | Write
 getRegister :: Reference -> MIPSGenerator Register
 getRegister ref = findRegisterWithContents ref
 
+getRegisterForWrite :: Reference -> MIPSGenerator Register
+getRegisterForWrite _ = return Zero
+
 findRegisterWithContents :: Reference -> MIPSGenerator Register
-findRegisterWithContents var = return T4
+findRegisterWithContents var = return Zero
 
 spillRegister :: Register -> MIPSGenerator ()
-spillRegister reg = undefined
+spillRegister reg = return ()
 
 spillAllDirtyRegisters :: MIPSGenerator ()
 spillAllDirtyRegisters = return ()
@@ -194,7 +194,7 @@ tac2Mips tac = case tac of
 
       TAC.PutLabel lab str -> do
         {-spillAllDirtyRegisters  -}
-        if (lab == "FUN_main")
+        if (lab == "_main")
             then generate $ MIPS.PutLabel "main:" str 
             else case head lab of 
                 'L'       -> return ()
@@ -202,12 +202,15 @@ tac2Mips tac = case tac of
 
       AssignBin res op l r -> do
         rDst   <- getRegister res
+
         lef    <- getRegister l
         opl    <- buildOperand l
         generate $ Ld lef opl
+
         rig    <- getRegister r
         opr    <- buildOperand l
         generate $ Ld rig opr
+
         case op of 
             ADD   -> generate $ Add rDst lef rig
             SUB   -> generate $ Sub rDst lef rig
@@ -249,7 +252,9 @@ tac2Mips tac = case tac of
             then generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
             else return ()     
 
-      EndFunction       -> return ()
+      EndFunction       -> do
+        return ()
+        -- We could have an implicit return value here, but in our case return statements are mandatory
 
       PushParameter ref -> do
         generate $ Subu SP SP (Const 4)     -- Decrement sp to make space for param
@@ -273,11 +278,13 @@ tac2Mips tac = case tac of
         generate $ Jr RA                    -- Return from function
 
       PCall lab nInt  -> do
-        generate $ Jal ("FUN_" ++ lab) 
+        generate $ Jal ("_" ++ lab) 
 
       FCall ref lab n -> do
-        generate $ Jal ("FUN_" ++ lab) 
+        generate $ Jal ("_" ++ lab) 
         -- get return value TO DO
+        ret <- getRegisterForWrite ref
+        generate $ Move ret V0 -- Copy return value from $v0 - MIPS Convention
         
       -- Print
       PrintInt    ref   -> return () --generatePrintInt ref

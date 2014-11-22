@@ -190,7 +190,7 @@ linearizeStatement nextLabel (Lex st posn) = do
         StFunctionDef idnL _ block -> do
             blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
 
-            generate $ PutLabel ("FUN_" ++ lexInfo idnL) $ "function name label"
+            generate $ PutLabel ("_" ++ lexInfo idnL) $ "function name label"
 
             generate $ BeginFunction blockWdt
             enterScope
