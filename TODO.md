@@ -4,17 +4,19 @@
 
 * In any expression we should be using only temporals
 
-* Arrays (not working for multiple dimensions)
+* Arrays (not working for multiple dimensions) -- DONE (right?)
 * Structures (Records/Unions)
 * Initialize Variables
+
+* Array bounds
 
 * Static Chain
 
 ##General
 
 * warn about <stdin>
+
 * add embedded functions to symbol table
-* Get file name from command line, put in reader.
 * Functions have a `width` that **may be wrong**
 * Decorate the AST `Either Expression (Expression, DataType)` -- or something like this
 * Find strings in intermediate code (add it to the symbol table with a unique id or add it to symbol table by its content?) -- DONE (right?)
@@ -22,7 +24,7 @@
 * Fix offsets for scopes (the smart way)
 * Create missing Error construtors (mostly in Parser.y, there are more) -- DONE
 
-* data SymbolTable = SymTab (Map Identifier (Map ScopeNum Symbol))
+* data SymbolTable = SymTab (Map Identifier (Map ScopeNum Symbol)) -- DONE
 * add applicative code for Lexeme
 * change name `Lexeme`
 
