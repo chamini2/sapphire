@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 {-|
  - TAC Generator Monad
  -
@@ -23,16 +24,22 @@ import           Control.Monad                 (guard, liftM, unless, void)
 import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Trans.Maybe     (runMaybeT)
-import           Control.Monad.Writer          (tell)
-import           Data.Foldable                 (forM_, mapM_)
-import           Data.Functor                  ((<$>))
+import           Control.Monad.Writer          (tell, listen)
+import           Data.Foldable                 (forM_, mapM_, foldl, concatMap,
+                                                foldr, toList)
+import           Data.Functor                  ((<$>), fmap)
+{-import           Data.Graph.Inductive                    -}
 import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (empty, length, null,
-                                                reverse, singleton, zip)
+                                                reverse, singleton, zip,
+                                                (|>), (<|), Seq, adjust)
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (Ordering (..), exp,
                                                 length, lookup, mapM, mapM_,
-                                                null, reverse, zip)
+                                                null, reverse, zip, foldl, 
+                                                concatMap, foldr)
+
+import Debug.Trace (trace)
 
 --------------------------------------------------------------------------------
 
@@ -100,7 +107,7 @@ initialWriter = empty
 ----------------------------------------
 
 generate :: Instruction -> TACGenerator ()
-generate = tell . singleton
+generate = tell . singleton 
 
 --------------------------------------------------------------------------------
 -- Building the Monad
@@ -108,8 +115,19 @@ generate = tell . singleton
 buildTACGenerator :: SymbolTable -> Program -> TACGenerator ()
 buildTACGenerator tab program@(Program block) = do
     modify $ \s -> s { table = tab, ast = program }
-    tell initialWriter
-    linearizeStatements block
+    {-tell initialWriter-}
+    ((), tac) <- listen $ linearizeStatements block
+
+    --  We turn the sequence of TAC code into a TAC Graph of basic blocks
+    let blocks = makeBasicBlocks tac
+    {-trace ("Printing BLOCKS:\n" ++ (unlines . toList) (fmap show (makeBasicBlocks tac)) ++ line) $ return ()-}
+    trace ("Printing basic blocks:\n" ++ printBlocks blocks ++ line) $ return ()
+        where 
+            printBlocks :: Seq (Seq Instruction) -> String
+            printBlocks = snd . foldl printBlock (0, "")
+            printBlock :: (Int, String) -> Seq Instruction -> (Int, String) 
+            printBlock (blockNum, str) block = (succ blockNum, str ++ "\nBlock num: " ++ show blockNum ++ "\n" ++ (unlines . toList $ fmap show block))
+            line = "\n-------------------------------------------------------------\n"
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -119,7 +137,6 @@ processTACGenerator r s = generateTAC r . buildTACGenerator s
 
 generateTAC :: TACReader -> TACGenerator a -> (TACState, TACWriter)
 generateTAC r = flip (flip execRWS r) initialState
-{-generateTAC r = snd . flip (flip execRWS r) initialState-}
 
 --------------------------------------------------------------------------------
 -- Monad handling
@@ -144,7 +161,7 @@ newTemporary = do
 newLabel :: TACGenerator Label
 newLabel = do
     current <- liftM succ $ gets labelSerial
-    modify $ \s -> s { labelSerial = current}
+    modify $ \s -> s { labelSerial = current }
     return $ "L" ++ show current
 
 --------------------------------------------------------------------------------
@@ -494,3 +511,40 @@ dataTypeWidth dt = if isArray dt
         inDtWdt <- dataTypeWidth $ lexInfo inDtL
         return $ inDtWdt * lexInfo sizL
     else liftM fromJust $ getsSymbol (toIdentifier dt) width
+
+----------------------------------------
+
+type Leader = Bool
+
+type Str = (Seq (Leader, Instruction), [Label], Bool)
+
+makeBasicBlocks :: TAC -> Seq TAC
+makeBasicBlocks = fst . foldl buildBlock (empty, -1) . leaderInstructionPairs 
+    where 
+        buildBlock :: (Seq (Seq Instruction), Int) -> (Leader, Instruction) -> (Seq (Seq Instruction), Int)
+        buildBlock (blocks, blockNum) (True,  ins) = (blocks |> singleton ins, succ blockNum)
+        buildBlock (blocks, blockNum) (False, ins) = (adjust (\cb -> cb |> ins) blockNum blocks, blockNum)
+
+leaderInstructionPairs :: Seq Instruction -> Seq (Leader, Instruction)
+leaderInstructionPairs = markGotoDests . markLeaders 
+    where
+        markLeaders :: Seq Instruction -> Str
+        markLeaders = foldl checkBlockLeader (empty, [], True) 
+
+        markGotoDests :: Str -> Seq (Leader, Instruction)
+        markGotoDests (pairs, labels, _) = fmap (markAsLeader labels) pairs
+
+        checkBlockLeader :: Str -> Instruction -> Str
+        checkBlockLeader str@(insSeq, leaders, markThisOne) ins = case ins of 
+            Goto lab          -> markNextOne markThisOne lab
+            IfGoto _ _ _  lab -> markNextOne markThisOne lab
+            IfTrueGoto  _ lab -> markNextOne markThisOne lab
+            IfFalseGoto _ lab -> markNextOne markThisOne lab
+            _                 -> (insSeq |> (markThisOne, ins), leaders, False) 
+            where 
+                markNextOne thisOne l = (insSeq |> (thisOne, ins), l : leaders, True)
+
+        markAsLeader :: [Label] -> (Leader, Instruction) -> (Leader, Instruction)
+        markAsLeader leaders pair@(isLeader, ins) = case ins of 
+            PutLabel lab _ -> if lab `elem` leaders then (True, ins) else pair
+            _              -> pair

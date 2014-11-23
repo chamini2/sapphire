@@ -33,6 +33,9 @@ data MIPSState = MIPSState
     , stack       :: Stack Scope
     , scopeId     :: Scope
     , ast         :: Program
+
+    , registerDescriptors
+    , variablesDescriptors
     }
 
 ----------------------------------------
@@ -148,17 +151,30 @@ generateGlobals = do
      {-mapM_ (\(c, n) generateString) -}
 
 ----------------------------------------
+--  Register allocation
+
+{-|
+ -  Given a Reference, say r, of a current var or temporary, 
+ -  a reason (to read or to write), this function will assign 
+ -  a register for r according to the following rules:
+ -
+ -  - A register already holding r 
+ -  - An empty register
+ -  - An unmodified register
+ -  - A modified (dirty) register. We have to spill it
+ -
+ -}
+{-getRegister :: Reference -> Reason -> MIPSGenerator Register-}
+getRegister :: Reason -> Reference -> MIPSGenerator Register
+getRegister reason ref = findRegisterWithContents ref
 
 data Reason = Read | Write
 
-getRegister :: Reference -> MIPSGenerator Register
-getRegister ref = findRegisterWithContents ref
-
 getRegisterForWrite :: Reference -> MIPSGenerator Register
-getRegisterForWrite _ = return Zero
+getRegisterForWrite = getRegister Write
 
 findRegisterWithContents :: Reference -> MIPSGenerator Register
-findRegisterWithContents var = return Zero
+findRegisterWithContents ref = return Zero
 
 spillRegister :: Register -> MIPSGenerator ()
 spillRegister reg = return ()
@@ -196,9 +212,7 @@ tac2Mips tac = case tac of
         {-spillAllDirtyRegisters  -}
         if (lab == "_main")
             then generate $ MIPS.PutLabel "main:" str 
-            else case head lab of 
-                'L'       -> return ()
-                otherwise -> generate $ MIPS.PutLabel lab str
+            else generate $ MIPS.PutLabel (lab ++ ":") str
 
       AssignBin res op l r -> do
         rDst   <- getRegister res

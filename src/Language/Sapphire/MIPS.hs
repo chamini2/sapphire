@@ -73,6 +73,7 @@ instance Show Operand where
         Const int       -> show int
         Indexed int reg -> show int ++ "(" ++ show reg ++ ")"
         Label lab       -> lab
+        _               -> error "MIPS: show operand not defined entirely"
 
 data Value
     = ValInt    Int
@@ -195,5 +196,5 @@ instance Show Instruction where
             Nop     -> "nop"
             Break   -> "break"
             Syscall -> "syscall"
-            _  -> error "MIPS.Show Instruction: unrecognized instruction"
+            _       -> error "MIPS.Show Instruction: unrecognized instruction"
         where tabs l = replicate (5 - div (l + 1) 4) '\t'
