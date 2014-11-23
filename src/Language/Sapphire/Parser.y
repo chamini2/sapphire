@@ -163,7 +163,7 @@ TopStatement :: { Lexeme Statement }
     : Structure TypeId "as" FieldList "end"     { StStructDefinition ($1 <*> pure $2) $4 <$ $1 }
 
     -- Functions
-    | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
+    | "def" VariableId ":" Signature StatementList "end"    { StFunctionDef $2 $4 $5 <$ $1 }
 
     -- Main
     | "main" StatementList "end"    { StFunctionDef (mainName <$ $1) (Sign empty (pure $ DataType $ pure "Int")) (addReturn $2) <$ $1 }
@@ -175,7 +175,7 @@ TopStatement :: { Lexeme Statement }
     | Structure        "as"           "end"     {% tellPError (lexPosn $2) TypeDefinitionIdentifier >>
                                                    tellPError (lexPosn $2) NoFieldsInType           >> return (pure StNoop) }
     -- -- Functions
-    | "def"            ":" Signature Separator StatementList "end"      {% tellPError (lexPosn $2) FunctionDefinitionIdentifier >> return (pure StNoop) }
+    | "def"            ":" Signature StatementList "end"    {% tellPError (lexPosn $2) FunctionDefinitionIdentifier >> return (pure StNoop) }
     -- -- Inner statements
     | InnerStatement        {% tellPError (lexPosn $1) InnerStatementAsTopStatement >> return (pure StNoop) }
 
@@ -331,8 +331,8 @@ Field :: { Seq Field }
 -- Function definition
 
 Signature :: { Signature }
-    : ParameterList "->" ReturnType                             { Sign $1    $3 }
-    | "(" ParameterListNL ")" MaybeNL "->" MaybeNL ReturnType   { Sign $2    $7 }
+    -- : ParameterList "->" ReturnType                             { Sign $1    $3 }
+    : "(" ParameterListNL ")" MaybeNL "->" MaybeNL ReturnType   { Sign $2    $7 }
     | ReturnType                                                { Sign empty $1 }
 
 ReturnType :: { Lexeme DataType }
