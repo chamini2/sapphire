@@ -36,7 +36,8 @@ data DataType
     | String
     | Record { structIdentifier :: (Lexeme Identifier) }
     | Union  { structIdentifier :: (Lexeme Identifier) }
-    | Array  (Lexeme DataType)   (Lexeme Int)
+    | Array     (Lexeme DataType) (Lexeme Int)
+    | ArraySign (Lexeme DataType)                   -- For signatures
     | Void | TypeError                              -- For compiler use
     deriving (Ord)
 
@@ -53,6 +54,7 @@ instance Show DataType where
         Record idnL     -> "record " ++ lexInfo idnL
         Union  idnL     -> "union "  ++ lexInfo idnL
         Array  dtL sizL -> "[" ++ show (lexInfo sizL) ++ "]" ++  show (lexInfo dtL)
+        ArraySign  dtL  -> "[]" ++  show (lexInfo dtL)
         Void            -> "()"
         TypeError       -> error "DataType.DataType.show: TypeError should never be shown"
 
@@ -69,6 +71,11 @@ instance Eq DataType where
         (Record idnAL, Record idnBL)         -> comp idnAL idnBL
         (Union  idnAL, Union  idnBL)         -> comp idnAL idnBL
         (Array dtAL sizAL, Array dtBL sizBL) -> (comp dtAL dtBL) && (comp sizAL sizBL)
+
+        (ArraySign dtAL, Array dtBL _  )     -> (comp dtAL dtBL)
+        (Array dtAL _  , ArraySign dtBL)     -> (comp dtAL dtBL)
+        (ArraySign dtAL, ArraySign dtBL)     -> (comp dtAL dtBL)
+
         (Void, Void)                         -> True
         (TypeError, TypeError)               -> True
         _                                    -> False
@@ -86,18 +93,19 @@ type Field = (Lexeme Identifier, Lexeme DataType)
 toIdentifier :: DataType -> Identifier
 toIdentifier = \case
     DataType idnL -> lexInfo idnL
-    Int         -> "Int"
-    Float       -> "Float"
-    Bool        -> "Bool"
-    Char        -> "Char"
-    Range       -> "Range"
-    Type        -> "Type"
-    String      -> "String"
-    Record idnL -> lexInfo idnL
-    Union  idnL -> lexInfo idnL
-    Array dtL _ -> toIdentifier $ lexInfo dtL
-    Void        -> "()"
-    TypeError   -> "Error"
+    Int           -> "Int"
+    Float         -> "Float"
+    Bool          -> "Bool"
+    Char          -> "Char"
+    Range         -> "Range"
+    Type          -> "Type"
+    String        -> "String"
+    Record idnL   -> lexInfo idnL
+    Union  idnL   -> lexInfo idnL
+    Array dtL _   -> toIdentifier $ lexInfo dtL
+    ArraySign dtL -> toIdentifier $ lexInfo dtL
+    Void          -> "()"
+    TypeError     -> "Error"
 
 ----------------------------------------
 

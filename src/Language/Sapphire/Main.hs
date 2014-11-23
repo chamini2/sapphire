@@ -17,13 +17,14 @@ import           Data.List                       (nub)
 import           Data.Sequence                   (null)
 import           Prelude                         hiding (mapM_, null)
 import qualified Prelude                         as P (null)
-import           System.Process                  (rawSystem)
 import           System.Console.GetOpt           (ArgDescr (..), ArgOrder (..),
                                                   OptDescr (..), getOpt,
                                                   usageInfo)
-import           System.Environment              (getArgs)
 import           System.Directory                (removeFile)
-import           System.FilePath                 (replaceExtension, takeFileName)
+import           System.Environment              (getArgs)
+import           System.FilePath                 (replaceExtension,
+                                                  takeFileName)
+import           System.Process                  (rawSystem)
 
 main :: IO ()
 main = void $ runMaybeT $ do

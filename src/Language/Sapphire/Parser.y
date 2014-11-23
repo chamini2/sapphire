@@ -333,7 +333,7 @@ Signature :: { Signature }
     | ReturnType                                                { Sign empty $1 }
 
 ReturnType :: { Lexeme DataType }
-    : DataType      { $1 }
+    : SignType      { $1 }
     | "(" ")"       { Void <$ $1 }
 
 ParameterList :: { Seq (Lexeme Declaration) }
@@ -348,8 +348,12 @@ ParameterListNL :: { Seq (Lexeme Declaration) }
     -- Errors
     | ParameterListNL             Parameter MaybeNL   {% tellPError (lexPosn $2) ParameterListComma >> return ($1 |> $2) }
 
+SignType :: { Lexeme DataType }
+    : TypeId                { DataType  $1 <$ $1 }
+    | "[" "]" SignType      { ArraySign $3 <$ $1 }
+
 Parameter :: { Lexeme Declaration }
-    : DataType VariableId   { Declaration $2 $1 CatParameter <$ $1 }
+    : SignType VariableId   { Declaration $2 $1 CatParameter <$ $1 }
 
 ---------------------------------------
 -- Conditionals
