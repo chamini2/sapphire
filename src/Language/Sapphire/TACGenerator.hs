@@ -254,9 +254,9 @@ linearizeStatement nextLabel (Lex st posn) = do
             expAddr <- linearizeExpression expL
             generate $ Goto testLabel
 
-            whenLabels <- forM whnLs $ \(Lex (When _ whnBlock) _) -> do
+            whenLabels <- forM whnLs $ \(Lex (When _ whnBlock) whnP) -> do
                 whnLabel <- newLabel
-                generate $ PutLabel whnLabel $ "when label for " ++ showStatement
+                generate $ PutLabel whnLabel $ "when " ++ show whnP ++ " label for " ++ showStatement
 
                 enterScope
                 linearizeStatements whnBlock

@@ -109,7 +109,7 @@ addOffset off = do
         else modify $ \s -> s { offStack = touch (off+) (offStack s) }
 
 resetOffset :: SizeOffset ()
-resetOffset = modify $ \s -> s { offStack = push 0 $ pop (offStack s) }
+resetOffset = exitFunction >> enterFunction
 
 --------------------------------------------------------------------------------
 -- Statements

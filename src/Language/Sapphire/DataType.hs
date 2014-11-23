@@ -176,14 +176,14 @@ defocusDataType (dtL, dim, _) = (dtL, dim)
 inDataType :: DataTypeZipper -> Maybe DataTypeZipper
 inDataType (dtL, dim, thrd) = case lexInfo dtL of
     Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataTypeArray sizL <$ dtL) : thrd)
-    ArraySign inDtL  -> Just (inDtL, 1                 , (HistoryDataTypeArraySign  <$ dtL) : thrd)
+    ArraySign inDtL  -> Just (inDtL, 4                 , (HistoryDataTypeArraySign  <$ dtL) : thrd)
     _                -> Nothing
 
 backDataType :: DataTypeZipper -> Maybe DataTypeZipper
 backDataType (dtL, dim, thrd) = case thrd of
     []                                          -> Nothing
     hstL@(Lex (HistoryDataTypeArray sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
-    hstL@(Lex (HistoryDataTypeArraySign ) _) : hstLs -> Just (ArraySign dtL  <$ hstL, 1                     , hstLs)
+    hstL@(Lex (HistoryDataTypeArraySign ) _) : hstLs -> Just (ArraySign dtL  <$ hstL, 4                     , hstLs)
 
 topDataType :: DataTypeZipper -> DataTypeZipper
 topDataType zpp@(_, _, thrd) = if null thrd

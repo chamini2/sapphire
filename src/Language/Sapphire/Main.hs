@@ -61,17 +61,15 @@ main = void $ runMaybeT $ do
 
     mapM_ (liftIO . print) $ warnings szErrs
 
-    when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
-    when (ShowAST         `elem` flgs) . liftIO $ print prog
-
     let (tacS, tac) = processTACGenerator () (getTable sizS) prog
-
-    when (ShowTAC `elem` flgs) . liftIO $ mapM_ print tac
 
     let mipsc = processMIPSGenerator reader (getTable tacS) tac
         mipsf = flip replaceExtension "s" $ takeFileName filepath
 
-    when (ShowMIPS `elem` flgs) . liftIO $ mapM_ print mipsc
+    when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
+    when (ShowAST         `elem` flgs) . liftIO $ print prog
+    when (ShowTAC         `elem` flgs) . liftIO $ mapM_ print tac
+    when (ShowMIPS        `elem` flgs) . liftIO $ mapM_ print mipsc
 
     liftIO . writeFile mipsf . unlines . map show $ toList mipsc
 

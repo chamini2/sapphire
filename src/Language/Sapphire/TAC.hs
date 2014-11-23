@@ -61,7 +61,7 @@ instance Show Value where
         ValInt    v -> show v
         ValFloat  v -> show v
         ValBool   v -> map toLower (show v)
-        ValChar   v -> [v]
+        ValChar   v -> show v
         ValString v -> v
 
 data Instruction
