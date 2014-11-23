@@ -340,9 +340,9 @@ checkArguments (Lex idn posn) args func = runMaybeT $ do
     markUsed idn
 
     if func
-        -- When is a procedure, and should be a function
+        -- When is used as a function, and is a procedure
         then when   (isVoid dt) $ tellSError posn (ProcedureInExpression idn)
-        -- When is a function, and should be a procedure
+        -- When is used as a procedure, and is a function
         else unless (isVoid dt) $ tellSError posn (FunctionAsStatement idn)
 
     -- Typecheck arguments

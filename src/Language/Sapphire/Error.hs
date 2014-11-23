@@ -88,6 +88,7 @@ data ParseError
     | NoFieldsInType
     -- -- Functions
     | FunctionDefinitionIdentifier
+    | ArrayReturn
 --     | EmptyReturn
     -- -- Conditional
     | NoWhensInCase
@@ -119,6 +120,7 @@ instance Show ParseError where
         NoFieldsInType                    -> "type must have at least one field"
         -- -- Functions
         FunctionDefinitionIdentifier -> "missing identifier for function definition"
+        ArrayReturn                  -> "functions cannot use arrays as return type"
         -- EmptyReturn                  -> "return statement must have an expression"
         -- -- Conditional
         NoWhensInCase -> "case statement must have at least one 'when'"

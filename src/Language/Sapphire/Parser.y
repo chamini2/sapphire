@@ -163,7 +163,7 @@ TopStatement :: { Lexeme Statement }
     : Structure TypeId "as" FieldList "end"     { StStructDefinition ($1 <*> pure $2) $4 <$ $1 }
 
     -- Functions
-    | "def" VariableId ":" Signature Separator StatementList "end"      { StFunctionDef $2 $4 $6 <$ $1 }
+    | "def" VariableId ":" Signature StatementList "end"    { StFunctionDef $2 $4 $5 <$ $1 }
 
     -- Main
     | "main" StatementList "end"    { StFunctionDef (mainName <$ $1) (Sign empty (pure $ DataType $ pure "Int")) (addReturn $2) <$ $1 }
@@ -175,7 +175,7 @@ TopStatement :: { Lexeme Statement }
     | Structure        "as"           "end"     {% tellPError (lexPosn $2) TypeDefinitionIdentifier >>
                                                    tellPError (lexPosn $2) NoFieldsInType           >> return (pure StNoop) }
     -- -- Functions
-    | "def"            ":" Signature Separator StatementList "end"      {% tellPError (lexPosn $2) FunctionDefinitionIdentifier >> return (pure StNoop) }
+    | "def"            ":" Signature StatementList "end"    {% tellPError (lexPosn $2) FunctionDefinitionIdentifier >> return (pure StNoop) }
     -- -- Inner statements
     | InnerStatement        {% tellPError (lexPosn $1) InnerStatementAsTopStatement >> return (pure StNoop) }
 
@@ -303,8 +303,11 @@ VariableList :: { Seq (Lexeme Identifier) }
 ---------------------------------------
 -- Definitions
 
+BasicDataType :: { Lexeme DataType }
+    : TypeId    { DataType $1 <$ $1 }
+
 DataType :: { Lexeme DataType }
-    : TypeId                    { DataType $1 <$ $1 }
+    : BasicDataType             { $1 }
     | "[" Int "]" DataType      {% unless (lexInfo $2 > 0) (tellPError (lexPosn $2) ArraySize) >> return (Array $4 $2 <$ $1) }
     -- Errors
     |  "[" "-" Int "]" DataType {% tellPError (lexPosn $2) ArraySize >> return (Array $5 (negate `fmap` $3) <$ $1) }
@@ -328,13 +331,15 @@ Field :: { Seq Field }
 -- Function definition
 
 Signature :: { Signature }
-    : ParameterList "->" ReturnType                             { Sign $1    $3 }
-    | "(" ParameterListNL ")" MaybeNL "->" MaybeNL ReturnType   { Sign $2    $7 }
+    -- : ParameterList "->" ReturnType                             { Sign $1    $3 }
+    : "(" ParameterListNL ")" MaybeNL "->" MaybeNL ReturnType   { Sign $2    $7 }
     | ReturnType                                                { Sign empty $1 }
 
 ReturnType :: { Lexeme DataType }
-    : DataType      { $1 }
-    | "(" ")"       { Void <$ $1 }
+    : BasicDataType         { $1 }
+    | "(" ")"               { Void <$ $1 }
+    -- Errors
+    | "[" "]" SignType      {% tellPError (lexPosn $1) ArrayReturn >> return $3 }
 
 ParameterList :: { Seq (Lexeme Declaration) }
     : Parameter                       { singleton $1 }
@@ -348,8 +353,12 @@ ParameterListNL :: { Seq (Lexeme Declaration) }
     -- Errors
     | ParameterListNL             Parameter MaybeNL   {% tellPError (lexPosn $2) ParameterListComma >> return ($1 |> $2) }
 
+SignType :: { Lexeme DataType }
+    : BasicDataType         { $1 }
+    | "[" "]" SignType      { ArraySign $3 <$ $1 }
+
 Parameter :: { Lexeme Declaration }
-    : DataType VariableId   { Declaration $2 $1 CatParameter <$ $1 }
+    : SignType VariableId   { Declaration $2 $1 CatParameter <$ $1 }
 
 ---------------------------------------
 -- Conditionals
