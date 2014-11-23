@@ -303,8 +303,11 @@ VariableList :: { Seq (Lexeme Identifier) }
 ---------------------------------------
 -- Definitions
 
+BasicDataType :: { Lexeme DataType }
+    : TypeId    { DataType $1 <$ $1 }
+
 DataType :: { Lexeme DataType }
-    : TypeId                    { DataType $1 <$ $1 }
+    : BasicDataType             { $1 }
     | "[" Int "]" DataType      {% unless (lexInfo $2 > 0) (tellPError (lexPosn $2) ArraySize) >> return (Array $4 $2 <$ $1) }
     -- Errors
     |  "[" "-" Int "]" DataType {% tellPError (lexPosn $2) ArraySize >> return (Array $5 (negate `fmap` $3) <$ $1) }
@@ -333,8 +336,10 @@ Signature :: { Signature }
     | ReturnType                                                { Sign empty $1 }
 
 ReturnType :: { Lexeme DataType }
-    : SignType      { $1 }
-    | "(" ")"       { Void <$ $1 }
+    : BasicDataType         { $1 }
+    | "(" ")"               { Void <$ $1 }
+    -- Errors
+    | "[" "]" SignType      {% tellPError (lexPosn $1) ArrayReturn >> return $3 }
 
 ParameterList :: { Seq (Lexeme Declaration) }
     : Parameter                       { singleton $1 }
@@ -349,7 +354,7 @@ ParameterListNL :: { Seq (Lexeme Declaration) }
     | ParameterListNL             Parameter MaybeNL   {% tellPError (lexPosn $2) ParameterListComma >> return ($1 |> $2) }
 
 SignType :: { Lexeme DataType }
-    : TypeId                { DataType  $1 <$ $1 }
+    : BasicDataType         { $1 }
     | "[" "]" SignType      { ArraySign $3 <$ $1 }
 
 Parameter :: { Lexeme Declaration }

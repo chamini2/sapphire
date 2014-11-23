@@ -120,8 +120,9 @@ isValid = (/= TypeError)
 
 isArray :: DataType -> Bool
 isArray = \case
-    Array _ _ -> True
-    _         -> False
+    Array _ _   -> True
+    ArraySign _ -> True
+    _           -> False
 
 isStruct :: DataType -> Bool
 isStruct = \case
@@ -131,8 +132,9 @@ isStruct = \case
 
 arrayInnerDataType :: DataType -> DataType
 arrayInnerDataType = \case
-    Array dtL _ -> lexInfo dtL
-    _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
+    Array dtL _   -> lexInfo dtL
+    ArraySign dtL -> lexInfo dtL
+    _             -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
 
 --------------------------------------------------------------------------------
 
@@ -156,7 +158,8 @@ arrayInnerDataType = \case
  - dt' = C
  -}
 
-data DataTypeHistory = HistoryDataType (Lexeme Int)
+data DataTypeHistory = HistoryDataTypeArray (Lexeme Int)
+                     | HistoryDataTypeArraySign
 
 type Thread = [Lexeme DataTypeHistory]
 
@@ -172,23 +175,25 @@ defocusDataType (dtL, dim, _) = (dtL, dim)
 
 inDataType :: DataTypeZipper -> Maybe DataTypeZipper
 inDataType (dtL, dim, thrd) = case lexInfo dtL of
-    Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataType sizL <$ dtL) : thrd)
+    Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataTypeArray sizL <$ dtL) : thrd)
+    ArraySign inDtL  -> Just (inDtL, 1                 , (HistoryDataTypeArraySign  <$ dtL) : thrd)
     _                -> Nothing
 
 backDataType :: DataTypeZipper -> Maybe DataTypeZipper
 backDataType (dtL, dim, thrd) = case thrd of
     []                                          -> Nothing
-    hstL@(Lex (HistoryDataType sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
+    hstL@(Lex (HistoryDataTypeArray sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
+    hstL@(Lex (HistoryDataTypeArraySign ) _) : hstLs -> Just (ArraySign dtL  <$ hstL, 1                     , hstLs)
 
 topDataType :: DataTypeZipper -> DataTypeZipper
-topDataType zpp@(_, _, thrd) = case thrd of
-    []    -> zpp
-    _ : _ -> topDataType $ fromJust $ backDataType zpp
+topDataType zpp@(_, _, thrd) = if null thrd
+    then zpp
+    else topDataType $ fromJust $ backDataType zpp
 
 deepDataType :: DataTypeZipper -> DataTypeZipper
-deepDataType zpp@(dtL, _, _) = case lexInfo dtL of
-    Array _ _ -> deepDataType $ fromJust $ inDataType zpp
-    _         -> zpp
+deepDataType zpp@(dtL, _, _) = if isArray (lexInfo dtL)
+    then deepDataType $ fromJust $ inDataType zpp
+    else zpp
 
 putDataType :: Lexeme DataType -> DataTypeZipper -> DataTypeZipper
 putDataType dtL (_, dim, thrd) = (dtL, dim, thrd)
