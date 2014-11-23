@@ -42,18 +42,20 @@ $alpha = [$small $large]
 
 $idchar = [$alpha $digit]
 
--- Alex complains if is written directly in the `@inside_string`
-$backslash = ["\\abfnrtv]
+$backslash = [\\abfnrtv]
 
-@inside_string          = ($printable # ["\\] | \\$backslash)
-@inside_multilinestring = (@inside_string | $newline )
+-- Alex has a parser error otherwise
+$double_quotation = "
+
+@inside_string          = ($printable # [\\"] | \\$double_quotation | \\$backslash)
+@inside_multilinestring = (@inside_string | $newline)
 
 @ident  = $small $idchar*
 @typeid = $large $idchar*
 
 @int    = $digit+
 @float  = $digit+(\.$digit+)?
-@char   = \'($printable # ['\\] | \\' | \\$backslash)\'
+@char   = \'($printable # [\\'] | \\' | \\$backslash)\'
 
 @string                 = \"@inside_string*\"
 @string_error           = \"@inside_string*
@@ -132,7 +134,7 @@ tokens :-
         "false"                 { tok' (TkBool False)   }
         @float                  { tok  (TkFloat . read) }
         -- -- -- Filtering newlines and escaped characters
-        @char                   { tok  (TkChar . read . backslash) }
+        @char                   { tok  (TkChar . read) }
         @string                 { tok  (TkString . dropQuotationMarks 1 1 . backslash) }
         @multiline_string       { tok  (TkString . dropQuotationMarks 3 3 . backslash) }
 
@@ -196,7 +198,7 @@ tellPError posn err = modifyUserState $ \st -> st { errors = errors st |> (PErro
 ----------------------------------------
 
 backslash :: String -> String
-backslash str = foldl' (flip replace) str chars
+backslash = flip (foldl' (flip replace)) chars
     where
         replace :: (Char, Char) -> String -> String
         replace (new, old) = intercalate [new] . splitOn ['\\', old]
