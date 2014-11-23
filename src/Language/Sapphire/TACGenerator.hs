@@ -381,26 +381,10 @@ jumpingCode expL@(Lex exp _) trueLabel falseLabel = case exp of
 linearizeExpression :: Lexeme Expression -> TACGenerator Reference
 linearizeExpression (Lex exp _) = case exp of
 
-    LitInt    v -> do
-        resTemp <- newTemporary
-        generate $ Assign resTemp (Constant . ValInt   $ lexInfo v)
-        return resTemp
-
-    LitFloat  v -> do
-        resTemp <- newTemporary
-        generate $ Assign resTemp (Constant . ValFloat $ lexInfo v)
-        return resTemp
-
-    LitBool   v -> do
-        resTemp <- newTemporary
-        generate $ Assign resTemp (Constant . ValBool  $ lexInfo v)
-        return resTemp
-
-    LitChar   v -> do
-        resTemp <- newTemporary
-        generate $ Assign resTemp (Constant . ValChar  $ lexInfo v)
-        return resTemp
-
+    LitInt    v -> return . Constant . ValInt   $ lexInfo v
+    LitFloat  v -> return . Constant . ValFloat $ lexInfo v
+    LitBool   v -> return . Constant . ValBool  $ lexInfo v
+    LitChar   v -> return . Constant . ValChar  $ lexInfo v
     LitString _ -> error "TACGenerator.linearizeExpression: should not get address for a String"
 
     Variable accL -> do
@@ -440,10 +424,10 @@ getAccessReference accL = do
         deepIdn                 = lexInfo deepIdnL
     (deepScp, deepOff, deepDtL) <- liftM fromJust $ getsSymbol deepIdn (\sym -> (top $ scopeStack sym, offset sym, dataType sym))
 
-    offTemp <- newTemporary
-    generate $ Assign offTemp (Constant $ ValInt deepOff)
+    -- offTemp <- newTemporary
+    -- generate $ Assign offTemp (Constant $ ValInt deepOff)
 
-    offAddr <- calculateAccessOffset deepZpp offTemp (lexInfo deepDtL)
+    offAddr <- calculateAccessOffset deepZpp (Constant $ ValInt deepOff) (lexInfo deepDtL)
     -- Checking if it is a global variable
     return $ Address deepIdn offAddr (deepScp == globalScope)
 
@@ -460,13 +444,13 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
             dtWdt   <- dataTypeWidth inDt
             expAddr <- linearizeExpression expL
 
-            wdtTemp <- newTemporary
+            -- wdtTemp <- newTemporary
             indTemp <- newTemporary
             resTemp <- newTemporary
 
-            generate $ Assign wdtTemp (Constant $ ValInt dtWdt)
-            generate $ AssignBin indTemp MUL wdtTemp expAddr
-            generate $ AssignBin resTemp ADD offAddr indTemp
+            -- generate $ Assign wdtTemp (Constant $ ValInt dtWdt)
+            generate $ AssignBin indTemp MUL expAddr (Constant $ ValInt dtWdt)
+            generate $ AssignBin resTemp ADD indTemp offAddr
 
             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (arrayInnerDataType dt)
 
@@ -474,10 +458,11 @@ calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ o
             tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
             let (fldOff, fldDtL) = ((offset &&& dataType) . fromJust) $ lookup (lexInfo fldIdnL) tab
 
-            fldTemp <- newTemporary
+            -- fldTemp <- newTemporary
             resTemp <- newTemporary
-            generate $ Assign fldTemp (Constant $ ValInt fldOff)
-            generate $ AssignBin resTemp ADD offAddr fldTemp
+
+            -- generate $ Assign fldTemp (Constant $ ValInt fldOff)
+            generate $ AssignBin resTemp ADD offAddr (Constant $ ValInt fldOff)
 
             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
 

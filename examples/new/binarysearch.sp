@@ -19,7 +19,7 @@ def binarysearch : []Int array, Int size, Int elem -> Int
     return middle
 end
 
-def binarysearchrec : []Int array, Int first, Int last, Int elem -> Int
+def binarysearchrec : ([]Int array, Int first, Int last, Int elem) -> Int
     middle : Int
 
     middle = (first + last) / 2

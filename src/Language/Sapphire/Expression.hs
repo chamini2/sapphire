@@ -27,11 +27,12 @@ import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
 import           Data.Char                    (toLower)
-import           Data.Foldable                (concatMap, find)
+import           Data.Foldable                (find, toList)
 import           Data.Functor                 ((<$), (<$>))
+import           Data.List                    (intercalate)
 import           Data.Maybe                   (fromJust)
 import           Data.Sequence                (Seq, fromList)
-import           Prelude                      hiding (concatMap)
+import           Prelude                      hiding ()
 
 data Expression
     -- Literals
@@ -58,7 +59,7 @@ instance Show Expression where
         LitChar  vL               -> show (lexInfo vL)
         LitString strL            -> show (lexInfo strL)
         Variable accL             -> show (lexInfo accL)
-        FunctionCall idnL expLs   -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
+        FunctionCall idnL expLs   -> lexInfo idnL ++ "(" ++ (intercalate ", " . map (show . lexInfo) $ toList expLs) ++ ")"
         ExpBinary opL lExpL rExpL -> "(" ++ show (lexInfo lExpL) ++ " " ++ show (lexInfo opL) ++ " " ++ show (lexInfo rExpL) ++ ")"
         ExpUnary  opL expL        -> "(" ++ show (lexInfo opL) ++ " " ++ show (lexInfo expL) ++ ")"
 
