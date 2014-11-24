@@ -1,5 +1,5 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase         #-}
 {-|
     MIPS related data structures
 -}
@@ -12,7 +12,7 @@ module Language.Sapphire.MIPS
     , Instruction(..)
     ) where
 
-import           Data.Char            (toLower)
+import           Data.Char (toLower)
 import           Data.Data
 
 {-|
@@ -24,7 +24,7 @@ type Label = String
 {-|
     MIPS 32 registers
  -}
-data Register 
+data Register
     = Zero                                  -- Constant register
 --  | AT                                    -- Reserved for assembler
     | A0 | A1 | A2 | A3                     -- Used to pass first four arguments to function call
@@ -59,9 +59,9 @@ instance Show Register where
     {-| SP                                    -- Stack pointer-}
     {-| RA                                    -- Record address-}
 
-data Operand 
+data Operand
     = Register         Register
-    | Const            Int 
+    | Const            Int
     | Indexed          Int Register
     | Label            Label
     {-| IndirectRegister Register-}
@@ -87,12 +87,12 @@ instance Show Value where
         ValInt    v -> show v
         {-ValFloat  v -> show v-}
         {-ValBool   v -> map toLower (show v)-}
-        ValChar   v -> [v]
+        ValChar   v -> show v
         ValString v -> v
 
-data Instruction 
+data Instruction
     = Comment String
-    | PutLabel Label String 
+    | PutLabel Label String
     -- Data declarations
     | Asciiz Label String
     {-| Word ???-}
@@ -103,7 +103,7 @@ data Instruction
     | Sub   Register Register Register
     | Subu  Register Register Operand
     | Mul   Register Register Register
-    | Mult  Register Register 
+    | Mult  Register Register
     | Div   Register Register
     -- Boolean operations
     | Or  Register Register Register
@@ -120,7 +120,7 @@ data Instruction
     | Mtlo Register
     | Mthi Register
     -- Store instructions
-    | Sw  Register Operand  
+    | Sw  Register Operand
     | Slt Register Register Register        --  Set Rd to 1 if Rs < Rt, 0 otherwise
     | Seq Register Register Register        --  Set Rd to 1 if Rs == Rt, 0 otherwise
     -- Branch instructions
@@ -146,20 +146,20 @@ data Instruction
 instance Show Instruction where
     show = \case
         Comment str      -> "# " ++ str
-        PutLabel lab str -> lab ++ (tabs $ length lab) ++ (if str /= "" then ("# " ++ str) else "")
+        PutLabel lab str -> lab ++ tabs (length lab) ++ ("# " ++ str)
         ins -> "\t" ++ case ins of
             --  Data declarations
-            Asciiz lab str  -> lab ++ ": .asciiz " ++ str 
+            Asciiz lab str  -> lab ++ ": .asciiz " ++ str
             --  Arithmetic
-            Add   rd rs rt  -> "add"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Addi  rd rs imm -> "addi"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
-            Addiu rd rs imm -> "addiu" ++ (tabs 5) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
-            Sub   rd rs rt  -> "sub"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Subu  rd rs imm -> "subu"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm 
-            Mul   rd rs rt  -> "mul"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Mult     rs rt  -> "mult"  ++ (tabs 4) ++ show rs ++ ", " ++ show rt 
-            Div      rs rt  -> "div"   ++ (tabs 3) ++ show rs ++ ", " ++ show rt 
-            --  Boolean 
+            Add   rd rs rt  -> "add"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Addi  rd rs imm -> "addi"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm
+            Addiu rd rs imm -> "addiu" ++ (tabs 5) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm
+            Sub   rd rs rt  -> "sub"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Subu  rd rs imm -> "subu"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm
+            Mul   rd rs rt  -> "mul"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Mult     rs rt  -> "mult"  ++ (tabs 4) ++ show rs ++ ", " ++ show rt
+            Div      rs rt  -> "div"   ++ (tabs 3) ++ show rs ++ ", " ++ show rt
+            --  Boolean
             Or  rd rs rt -> "or"  ++ (tabs 2) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             And rd rs rt -> "and" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             --  Move
@@ -175,8 +175,8 @@ instance Show Instruction where
             Mthi rs       -> "mthi" ++ (tabs 4) ++ show rs
             --  Store instructions
             Sw  rs ind    -> "sw"  ++ (tabs 2) ++ show rs ++ ", " ++ show ind
-            Slt rd rs  rt -> "slt" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
-            Seq rd rs  rt -> "seq" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt 
+            Slt rd rs  rt -> "slt" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Seq rd rs  rt -> "seq" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             --  Branch instructions
             B          lab -> "b"    ++ (tabs 1) ++ lab
             Beq  rs rt lab -> "beq"  ++ (tabs 3) ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
@@ -188,10 +188,10 @@ instance Show Instruction where
             Bne  rs rt lab -> "bne"  ++ (tabs 3) ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
             Bnez rs    lab -> "bnez" ++ (tabs 4) ++ show rs ++ ", " ++ lab
             --  Jump instructions
-            J   lab -> "j"    ++ (tabs 1) ++ lab    
-            Jal lab -> "jal"  ++ (tabs 3) ++ lab    
+            J   lab -> "j"    ++ (tabs 1) ++ lab
+            Jal lab -> "jal"  ++ (tabs 3) ++ lab
             Jalr r  -> "jalr" ++ (tabs 4) ++ show r
-            Jr  rs  -> "jr"   ++ (tabs 2) ++ show rs    
+            Jr  rs  -> "jr"   ++ (tabs 2) ++ show rs
             --  Other instructions
             Nop     -> "nop"
             Break   -> "break"

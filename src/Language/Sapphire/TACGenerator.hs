@@ -28,9 +28,9 @@ import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (foldl', forM_, mapM_, toList)
 import           Data.Functor                  ((<$>))
 import           Data.Maybe                    (fromJust, isJust)
-import           Data.Sequence                 (Seq, adjust, empty, fromList,
-                                                length, null, reverse,
-                                                singleton, zip, (|>))
+import           Data.Sequence                 (Seq, empty, fromList, length,
+                                                null, reverse, singleton, zip,
+                                                (|>))
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (Ordering (..), exp,
                                                 length, lookup, mapM, mapM_,
@@ -191,7 +191,7 @@ linearizeStatement nextLabel (Lex st posn) = do
         StFunctionDef idnL _ block -> do
             blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
 
-            generate $ PutLabel ("_" ++ lexInfo idnL) $ "function name label"
+            generate $ PutLabel (lexInfo idnL) $ "function name label"
 
             generate $ BeginFunction blockWdt
             enterScope
@@ -484,8 +484,6 @@ dataTypeWidth dt = if isArray dt
 ----------------------------------------
 
 type Leader = Bool
-
-type Str = (Seq (Leader, Instruction), [Label], Bool)
 
 makeBasicBlocks :: TAC -> Seq TAC
 makeBasicBlocks = separateBlocks . markLeaders
