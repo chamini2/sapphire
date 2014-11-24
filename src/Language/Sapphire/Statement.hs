@@ -12,10 +12,10 @@ import           Language.Sapphire.Expression
 import           Language.Sapphire.Identifier
 import           Language.Sapphire.Lexeme
 
-import           Data.Foldable                 (foldl', concatMap)
+import           Data.Foldable                 (foldl', toList)
 import           Data.Sequence                 (Seq, null)
 import           Data.List                     (intercalate)
-import           Prelude                       hiding (exp, concatMap, null)
+import           Prelude                       hiding (exp, null)
 
 type StBlock    = Seq (Lexeme Statement)
 
@@ -54,7 +54,7 @@ instance Show Statement where
         StStructDefinition dtL _   -> show (lexInfo dtL)
         StReturn mayExpL           -> "return" ++ maybe "" ((" " ++) . show . lexInfo) mayExpL
         StFunctionDef idnL _ _     -> "def " ++ lexInfo idnL
-        StProcedureCall idnL expLs -> lexInfo idnL ++ "(" ++ concatMap (show . lexInfo) expLs ++ ")"
+        StProcedureCall idnL expLs -> lexInfo idnL ++ "(" ++ (intercalate ", " . map (show . lexInfo) $ toList expLs) ++ ")"
         StRead accL                -> "read " ++ show (lexInfo accL)
         StPrint expL               -> "print " ++ show (lexInfo expL)
         StIf expL _ _              -> "if " ++ show (lexInfo expL)

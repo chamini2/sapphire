@@ -36,7 +36,8 @@ data DataType
     | String
     | Record { structIdentifier :: (Lexeme Identifier) }
     | Union  { structIdentifier :: (Lexeme Identifier) }
-    | Array  (Lexeme DataType)   (Lexeme Int)
+    | Array     (Lexeme DataType) (Lexeme Int)
+    | ArraySign (Lexeme DataType)                   -- For signatures
     | Void | TypeError                              -- For compiler use
     deriving (Ord)
 
@@ -53,6 +54,7 @@ instance Show DataType where
         Record idnL     -> "record " ++ lexInfo idnL
         Union  idnL     -> "union "  ++ lexInfo idnL
         Array  dtL sizL -> "[" ++ show (lexInfo sizL) ++ "]" ++  show (lexInfo dtL)
+        ArraySign  dtL  -> "[]" ++  show (lexInfo dtL)
         Void            -> "()"
         TypeError       -> error "DataType.DataType.show: TypeError should never be shown"
 
@@ -69,6 +71,11 @@ instance Eq DataType where
         (Record idnAL, Record idnBL)         -> comp idnAL idnBL
         (Union  idnAL, Union  idnBL)         -> comp idnAL idnBL
         (Array dtAL sizAL, Array dtBL sizBL) -> (comp dtAL dtBL) && (comp sizAL sizBL)
+
+        (ArraySign dtAL, Array dtBL _  )     -> (comp dtAL dtBL)
+        (Array dtAL _  , ArraySign dtBL)     -> (comp dtAL dtBL)
+        (ArraySign dtAL, ArraySign dtBL)     -> (comp dtAL dtBL)
+
         (Void, Void)                         -> True
         (TypeError, TypeError)               -> True
         _                                    -> False
@@ -86,18 +93,19 @@ type Field = (Lexeme Identifier, Lexeme DataType)
 toIdentifier :: DataType -> Identifier
 toIdentifier = \case
     DataType idnL -> lexInfo idnL
-    Int         -> "Int"
-    Float       -> "Float"
-    Bool        -> "Bool"
-    Char        -> "Char"
-    Range       -> "Range"
-    Type        -> "Type"
-    String      -> "String"
-    Record idnL -> lexInfo idnL
-    Union  idnL -> lexInfo idnL
-    Array dtL _ -> toIdentifier $ lexInfo dtL
-    Void        -> "()"
-    TypeError   -> "Error"
+    Int           -> "Int"
+    Float         -> "Float"
+    Bool          -> "Bool"
+    Char          -> "Char"
+    Range         -> "Range"
+    Type          -> "Type"
+    String        -> "String"
+    Record idnL   -> lexInfo idnL
+    Union  idnL   -> lexInfo idnL
+    Array dtL _   -> toIdentifier $ lexInfo dtL
+    ArraySign dtL -> toIdentifier $ lexInfo dtL
+    Void          -> "()"
+    TypeError     -> "Error"
 
 ----------------------------------------
 
@@ -112,8 +120,9 @@ isValid = (/= TypeError)
 
 isArray :: DataType -> Bool
 isArray = \case
-    Array _ _ -> True
-    _         -> False
+    Array _ _   -> True
+    ArraySign _ -> True
+    _           -> False
 
 isStruct :: DataType -> Bool
 isStruct = \case
@@ -123,8 +132,9 @@ isStruct = \case
 
 arrayInnerDataType :: DataType -> DataType
 arrayInnerDataType = \case
-    Array dtL _ -> lexInfo dtL
-    _           -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
+    Array dtL _   -> lexInfo dtL
+    ArraySign dtL -> lexInfo dtL
+    _             -> error "DataType.arrayInnerDataType: should not attempt to get inner DataType from a non-array DataType"
 
 --------------------------------------------------------------------------------
 
@@ -148,7 +158,8 @@ arrayInnerDataType = \case
  - dt' = C
  -}
 
-data DataTypeHistory = HistoryDataType (Lexeme Int)
+data DataTypeHistory = HistoryDataTypeArray (Lexeme Int)
+                     | HistoryDataTypeArraySign
 
 type Thread = [Lexeme DataTypeHistory]
 
@@ -164,23 +175,25 @@ defocusDataType (dtL, dim, _) = (dtL, dim)
 
 inDataType :: DataTypeZipper -> Maybe DataTypeZipper
 inDataType (dtL, dim, thrd) = case lexInfo dtL of
-    Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataType sizL <$ dtL) : thrd)
+    Array inDtL sizL -> Just (inDtL, dim * lexInfo sizL, (HistoryDataTypeArray sizL <$ dtL) : thrd)
+    ArraySign inDtL  -> Just (inDtL, 4                 , (HistoryDataTypeArraySign  <$ dtL) : thrd)
     _                -> Nothing
 
 backDataType :: DataTypeZipper -> Maybe DataTypeZipper
 backDataType (dtL, dim, thrd) = case thrd of
     []                                          -> Nothing
-    hstL@(Lex (HistoryDataType sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
+    hstL@(Lex (HistoryDataTypeArray sizL) _) : hstLs -> Just (Array dtL sizL <$ hstL, dim `div` lexInfo sizL, hstLs)
+    hstL@(Lex (HistoryDataTypeArraySign ) _) : hstLs -> Just (ArraySign dtL  <$ hstL, 4                     , hstLs)
 
 topDataType :: DataTypeZipper -> DataTypeZipper
-topDataType zpp@(_, _, thrd) = case thrd of
-    []    -> zpp
-    _ : _ -> topDataType $ fromJust $ backDataType zpp
+topDataType zpp@(_, _, thrd) = if null thrd
+    then zpp
+    else topDataType $ fromJust $ backDataType zpp
 
 deepDataType :: DataTypeZipper -> DataTypeZipper
-deepDataType zpp@(dtL, _, _) = case lexInfo dtL of
-    Array _ _ -> deepDataType $ fromJust $ inDataType zpp
-    _         -> zpp
+deepDataType zpp@(dtL, _, _) = if isArray (lexInfo dtL)
+    then deepDataType $ fromJust $ inDataType zpp
+    else zpp
 
 putDataType :: Lexeme DataType -> DataTypeZipper -> DataTypeZipper
 putDataType dtL (_, dim, thrd) = (dtL, dim, thrd)

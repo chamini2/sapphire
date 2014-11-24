@@ -17,13 +17,14 @@ import           Data.List                       (nub)
 import           Data.Sequence                   (null)
 import           Prelude                         hiding (mapM_, null)
 import qualified Prelude                         as P (null)
-import           System.Process                  (rawSystem)
 import           System.Console.GetOpt           (ArgDescr (..), ArgOrder (..),
                                                   OptDescr (..), getOpt,
                                                   usageInfo)
-import           System.Environment              (getArgs)
 import           System.Directory                (removeFile)
-import           System.FilePath                 (replaceExtension, takeFileName)
+import           System.Environment              (getArgs)
+import           System.FilePath                 (replaceExtension,
+                                                  takeFileName)
+import           System.Process                  (rawSystem)
 
 main :: IO ()
 main = void $ runMaybeT $ do
@@ -60,17 +61,15 @@ main = void $ runMaybeT $ do
 
     mapM_ (liftIO . print) $ warnings szErrs
 
-    when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
-    when (ShowAST         `elem` flgs) . liftIO $ print prog
-
     let (tacS, tac) = processTACGenerator () (getTable sizS) prog
-
-    when (ShowTAC `elem` flgs) . liftIO $ mapM_ print tac
 
     let mipsc = processMIPSGenerator reader (getTable tacS) tac
         mipsf = flip replaceExtension "s" $ takeFileName filepath
 
-    when (ShowMIPS `elem` flgs) . liftIO $ mapM_ print mipsc
+    when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)
+    when (ShowAST         `elem` flgs) . liftIO $ print prog
+    when (ShowTAC         `elem` flgs) . liftIO $ mapM_ print tac
+    when (ShowMIPS        `elem` flgs) . liftIO $ mapM_ print mipsc
 
     liftIO . writeFile mipsf . unlines . map show $ toList mipsc
 

@@ -19,6 +19,9 @@ module Language.Sapphire.TAC
     , binaryToRelation
     , binaryToBinOperator
     , unaryToUnOperator
+    , hasGoto
+    , getLabel
+    , isPutLabel
     ) where
 
 import           Language.Sapphire.Program
@@ -61,7 +64,7 @@ instance Show Value where
         ValInt    v -> show v
         ValFloat  v -> show v
         ValBool   v -> map toLower (show v)
-        ValChar   v -> [v]
+        ValChar   v -> show v
         ValString v -> v
 
 data Instruction
@@ -104,7 +107,7 @@ data Instruction
     | ReadChar  Reference
     | ReadBool  Reference
     -- Goto
-    | Goto Label
+    | Goto                                     Label
     | IfGoto      Relation Reference Reference Label
     | IfTrueGoto  Reference                    Label
     | IfFalseGoto Reference                    Label
@@ -217,3 +220,25 @@ unaryToUnOperator :: Unary -> UnOperator
 unaryToUnOperator = \case
     OpNot    -> NOT
     OpNegate -> NEG
+
+hasGoto :: Instruction -> Bool
+hasGoto = \case
+    Goto              _ -> True
+    IfGoto      _ _ _ _ -> True
+    IfTrueGoto  _     _ -> True
+    IfFalseGoto _     _ -> True
+    _                   -> False
+
+getLabel :: Instruction -> Label
+getLabel = \case
+    PutLabel        l _ -> l
+    Goto              l -> l
+    IfGoto      _ _ _ l -> l
+    IfTrueGoto  _     l -> l
+    IfFalseGoto _     l -> l
+    _                   -> error "TAC.getLabel: getting label from non-labeled Instruction"
+
+isPutLabel :: Instruction -> Bool
+isPutLabel = \case
+    PutLabel _ _ -> True
+    _            -> False
