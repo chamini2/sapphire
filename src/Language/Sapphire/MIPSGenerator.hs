@@ -19,6 +19,7 @@ import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (concat, forM_, mapM_, toList)
+import           Data.Maybe                    (fromJust)
 import           Data.Sequence                 (Seq, empty, singleton)
 import qualified Data.Map.Strict               as Map (Map, empty, insert,
                                                 singleton, fromList, member,
@@ -222,7 +223,10 @@ getRegister reason ref = do
                 case mEmptyReg of
                     Just emptyReg -> return emptyReg
                     Nothing  -> error "MIPSGenerator.getRegister: can't spill yet"  
-    return reg
+    if reason == Read
+        then return reg
+        else markDirty reg
+             return reg
     {-if reason == Write -}
         {-then markDirty reg >> return reg-}
         {-else -}
@@ -243,13 +247,9 @@ findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey check
             (Just _, _)       -> mReg
             (Nothing, [])     -> Just keyReg
             (Nothing, values) -> Nothing
-    {-where-}
-        {-checkRegister Nothing      reg []   = Just reg-}
-        {-checkRegister Nothing      _   vals = Nothing-}
-        {-checkRegister reg@(Just _) _   _    = reg-}
 
-{-getRegDescriptor :: Register -> MIPSGenerator RegDescriptor-}
-{-getRegDescriptor reg = gets registerDescriptors >>= Map.lookup reg >>= return -}
+getRegDescriptor :: Register -> MIPSGenerator RegDescriptor
+getRegDescriptor reg = gets registerDescriptors >>= return . fromJust . Map.lookup reg 
 
 {-getDescriptorInfo :: Register -> (RegDescriptor -> a) -> MIPSGenerator a-}
 {-getDescriptorInfo f = getRegDescriptor >>= return . f-}
@@ -257,7 +257,7 @@ findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey check
 locationsAreSame :: Reference -> Reference -> MIPSGenerator ()
 locationsAreSame r1 r2 = return ()
 
-markDirty :: Register -> MIPSGenerator ()
+markDirty :: Register -> () MIPSGenerator ()
 markDirty reg = do
     regDes <- gets registerDescriptors 
     if Map.member reg regDes 
@@ -300,13 +300,7 @@ tac2Mips = \case
 
       AssignBin x op y z -> do
         ry  <- getRegister Read y
-        opl <- buildOperand y
-        generate $ Ld ry opl
-
         rz  <- getRegister Read z
-        opr <- buildOperand y
-        generate $ Ld rz opr
-
         rx  <- getRegister Write x
 
         case op of
