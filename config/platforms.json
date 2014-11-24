@@ -1,6 +1,6 @@
 [
   {
-    "arch": "mips",
+    "name": "mips",
     "types": [
         { "Int"     : 4 },
         { "Float"   : 4 },
@@ -11,7 +11,7 @@
     "frame": 8
   },
   {
-    "arch": "llvm",
+    "name": "llvm",
     "types": [
         { "Int"     : 4 },
         { "Float"   : 4 },
