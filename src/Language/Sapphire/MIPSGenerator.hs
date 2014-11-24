@@ -22,7 +22,7 @@ import           Data.Foldable                 (concat, forM_, mapM_, toList)
 import           Data.Sequence                 (Seq, empty, singleton)
 import qualified Data.Map.Strict               as Map (Map, empty, insert,
                                                 singleton, fromList, member,
-                                                adjust)
+                                                adjust, lookup, foldlWithKey)
 import           Prelude                       hiding (EQ, LT, GT, concat,
                                                 mapM_)
 
@@ -39,35 +39,43 @@ data MIPSState = MIPSState
     , scopeId             :: Scope
     , ast                 :: Program
 
-    , registerDescriptors :: Map.Map Register RegDescriptor
+    , registerDescriptors :: RegDescriptorTable
 
     {-, variablesDescriptors :: -}
     }
 
+type RegDescriptorTable = Map.Map Register RegDescriptor
+
 initialRegDescriptors :: RegDescriptorTable
 initialRegDescriptors = Map.fromList
-    [ (T0, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T1, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T2, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T3, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T4, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T5, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T6, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T7, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T8, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (T9, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S0, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S1, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S2, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S3, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S4, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S5, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S6, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
-    , (S7, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    [ (T0, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T1, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T2, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T3, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T4, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T5, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T6, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T7, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T8, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (T9, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S0, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S1, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S2, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S3, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S4, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S5, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S6, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (S7, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (A0, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (A1, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (A2, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (A3, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (V0, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    , (V1, RegDescriptor { values = [], genPurpose = True, dirty = False })
     ]
 
 data RegDescriptor = RegDescriptor
-    { value      :: Maybe Reference
+    { values       :: [Reference] 
     , genPurpose :: Bool
     , dirty      :: Bool
     }
@@ -152,25 +160,12 @@ emitPreamble = do
     --  Generate .data section
     generateGlobals
 
-    generate $ MIPS.PutLabel ".text"       ""
-    generate $ MIPS.PutLabel ".align 2"    ""
-    generate $ MIPS.PutLabel ".globl main" ""
+    generate $ MIPS.PutDirective ".text"       
+    generate $ MIPS.PutDirective ".align 2"    
+    generate $ MIPS.PutDirective ".globl main" 
 
 {-
  -    Generates MIPS code for printing scalar data types
- -
- -    List of codes used by syscall
- -    1  - Print Integer      $A0  Integer to print
- -    2  - Print Float        $F12 Float to print
- -    3  - Print Double       $F12 Double to print
- -    4  - Print String       $A0  Address of null terminated string to print
- -    11 - Print Character
- -    5  - Read Integer
- -    6  - Read Float
- -    7  - Read Double
- -    8  - Read String
- -    12 - Read Character
- -
  -}
 generatePrintString :: Offset -> MIPSGenerator ()
 generatePrintString off  = do
@@ -192,7 +187,7 @@ generateRead ref code = do
 
 generateGlobals :: MIPSGenerator ()
 generateGlobals = do
-    generate $ MIPS.PutLabel ".data" ""
+    generate $ MIPS.PutDirective ".data" 
     syms <- gets (toSeq . getTable)
     forM_ syms $ \(idn, sym) -> do
         case sym of
@@ -218,26 +213,46 @@ data Reason = Read | Write
 
 getRegister :: Reason -> Reference -> MIPSGenerator Register
 getRegister reason ref = do
-    mReg <- findRegisterWithContents (Just ref)
-    case mReg of
-        Just reg -> return reg 
-        Nothing -> do
-            mReg <- findRegisterWithContents Nothing
-            case mReg of
-                Just reg -> return reg
-                Nothing  -> return ()
-    if reason == Write then markDirty reg else return ()
+    reg <- do
+        mReg <- findRegisterWithContents ref
+        case mReg of
+            Just reg -> return reg 
+            Nothing -> do
+                mEmptyReg <- findEmptyRegister
+                case mEmptyReg of
+                    Just emptyReg -> return emptyReg
+                    Nothing  -> error "MIPSGenerator.getRegister: can't spill yet"  
+    return reg
+    {-if reason == Write -}
+        {-then markDirty reg >> return reg-}
+        {-else -}
 
 getRegisterForWrite :: Reference -> MIPSGenerator Register
 getRegisterForWrite = getRegister Write
 
-findRegisterWithContents :: Maybe Reference -> MIPSGenerator (Maybe Register)
-findRegisterWithContents ref = do
-    regs <- gets registerDescriptor
-    let reg = fold checkRegister Nothing regs 
-    where checkRegister r mReg = case mReg of
-            Just reg -> Just mReg
-            Nothing  -> if locationsAreTheSame ref then else 
+findRegisterWithContents :: Reference -> MIPSGenerator (Maybe Register)
+findRegisterWithContents ref = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing
+        where 
+            checkRegister Nothing      reg regDes = if ref `elem` values regDes then Just reg else Nothing
+            checkRegister reg@(Just _) _   _    = reg
+
+findEmptyRegister :: MIPSGenerator (Maybe Register)
+findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing 
+    where
+        checkRegister mReg keyReg regDes = case (mReg, values regDes) of
+            (Just _, _)       -> mReg
+            (Nothing, [])     -> Just keyReg
+            (Nothing, values) -> Nothing
+    {-where-}
+        {-checkRegister Nothing      reg []   = Just reg-}
+        {-checkRegister Nothing      _   vals = Nothing-}
+        {-checkRegister reg@(Just _) _   _    = reg-}
+
+{-getRegDescriptor :: Register -> MIPSGenerator RegDescriptor-}
+{-getRegDescriptor reg = gets registerDescriptors >>= Map.lookup reg >>= return -}
+
+{-getDescriptorInfo :: Register -> (RegDescriptor -> a) -> MIPSGenerator a-}
+{-getDescriptorInfo f = getRegDescriptor >>= return . f-}
 
 locationsAreSame :: Reference -> Reference -> MIPSGenerator ()
 locationsAreSame r1 r2 = return ()
@@ -246,7 +261,7 @@ markDirty :: Register -> MIPSGenerator ()
 markDirty reg = do
     regDes <- gets registerDescriptors 
     if Map.member reg regDes 
-        then Map.adjust (\rd -> rd { isDirty = True }) reg regDes
+        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = True }) reg regDes }
         else error "MIPSGenerator.markDirty: marking unexistant register as dirty"
 
 spillRegister :: Register -> MIPSGenerator ()
@@ -357,10 +372,10 @@ tac2Mips = \case
         generate $ Jr RA                    -- Return from function
 
       PCall lab nInt  -> do
-        generate $ Jal ("_" ++ lab)
+        generate $ Jal lab
 
       FCall ref lab n -> do
-        generate $ Jal ("_" ++ lab)
+        generate $ Jal lab
         -- get return value TO DO
         ret <- getRegister Write ref
         generate $ Move ret V0 -- Copy return value from $v0 - MIPS Convention

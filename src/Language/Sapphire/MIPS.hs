@@ -8,6 +8,7 @@ module Language.Sapphire.MIPS
     , Register(..)
     , Value
     {-, FloatRegister-}
+    , Code
     , Operand(..)
     , Instruction(..)
     ) where
@@ -20,6 +21,8 @@ import           Data.Data
 -}
 
 type Label = String
+
+type Directive = String                     -- MIPS language directives: .data .global .text
 
 {-|
     MIPS 32 registers
@@ -90,11 +93,25 @@ instance Show Value where
         ValChar   v -> show v
         ValString v -> v
 
+{-|
+ -    List of codes used by syscall
+ -    1  - Print Integer      $A0  Integer to print
+ -    2  - Print Float        $F12 Float to print
+ -    3  - Print Double       $F12 Double to print
+ -    4  - Print String       $A0  Address of null terminated string to print
+ -    11 - Print Character
+ -    5  - Read Integer
+ -    6  - Read Float
+ -    7  - Read Double
+ -    8  - Read String
+ -    12 - Read Character
+ -}
 type Code = Int
 
 data Instruction 
     = Comment String
     | PutLabel Label String
+    | PutDirective Directive
     -- Data declarations
     | Asciiz Label String
     {-| Word ???-}
@@ -148,7 +165,8 @@ data Instruction
 instance Show Instruction where
     show = \case
         Comment str      -> "# " ++ str
-        PutLabel lab str -> lab ++ tabs (length lab) ++ "# " ++ str
+        PutLabel lab str -> lab ++ ":" ++ tabs (length lab) ++ "# " ++ str
+        PutDirective dir -> dir
         ins -> "\t" ++ case ins of
             --  Data declarations
             Asciiz lab str  -> lab ++ ": .asciiz " ++ str

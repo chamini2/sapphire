@@ -1,4 +1,4 @@
-def binky : Int a, Int b -> Int
+def binky : (Int a, Int b) -> Int
     c : Int 
     c = a + b
     return c

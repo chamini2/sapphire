@@ -45,6 +45,7 @@ data Reference
     = Address   Identifier Reference Global
     | Constant  Value
     | Temporary Serial
+    deriving (Eq)
 
 instance Show Reference where
     show = \case
@@ -58,6 +59,7 @@ data Value
     | ValBool   Bool
     | ValChar   Char
     | ValString String
+    deriving (Eq)
 
 instance Show Value where
     show = \case
