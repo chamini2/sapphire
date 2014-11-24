@@ -13,7 +13,7 @@ import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC         as TAC hiding (Label)
 
-import           Control.Monad                 (liftM, unless)
+import           Control.Monad                 (liftM, unless, when, void)
 import           Control.Monad.Reader          (asks)
 import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
@@ -36,10 +36,6 @@ type MIPSGenerator = RWS SappReader MIPSWriter MIPSState
 
 data MIPSState = MIPSState
     { table               :: SymbolTable
-    , stack               :: Stack Scope
-    , scopeId             :: Scope
-    , ast                 :: Program
-
     , registerDescriptors :: RegDescriptorTable
 
     {-, variablesDescriptors :: -}
@@ -76,7 +72,7 @@ initialRegDescriptors = Map.fromList
     ]
 
 data RegDescriptor = RegDescriptor
-    { values       :: [Reference] 
+    { values     :: [Reference]
     , genPurpose :: Bool
     , dirty      :: Bool
     }
@@ -90,14 +86,14 @@ data RegDescriptor = RegDescriptor
 -- Instances
 
 instance SappState MIPSState where
-    getTable   = table
-    getStack   = stack
-    getScopeId = scopeId
-    getAst     = ast
-    putTable   tab s = s { table   = tab }
-    putStack   stk s = s { stack   = stk }
-    putScopeId sc  s = s { scopeId = sc  }
-    putAst     as  s = s { ast     = as  }
+    getTable       = table
+    putTable tab s = s { table = tab }
+    getStack   = undefined
+    getScopeId = undefined
+    getAst     = undefined
+    putStack   = undefined
+    putScopeId = undefined
+    putAst     = undefined
 
 instance Show MIPSState where
     show = showSappState
@@ -108,9 +104,6 @@ instance Show MIPSState where
 initialState :: MIPSState
 initialState = MIPSState
     { table   = emptyTable
-    , stack   = globalStack
-    , scopeId = globalScope
-    , ast     = Program empty
 
     , registerDescriptors = initialRegDescriptors
     {-, variablesDescriptors-}
@@ -161,9 +154,9 @@ emitPreamble = do
     --  Generate .data section
     generateGlobals
 
-    generate $ MIPS.PutDirective ".text"       
-    generate $ MIPS.PutDirective ".align 2"    
-    generate $ MIPS.PutDirective ".globl main" 
+    generate $ MIPS.PutDirective ".text"
+    generate $ MIPS.PutDirective ".align 2"
+    generate $ MIPS.PutDirective ".globl main"
 
 {-
  -    Generates MIPS code for printing scalar data types
@@ -188,7 +181,7 @@ generateRead ref code = do
 
 generateGlobals :: MIPSGenerator ()
 generateGlobals = do
-    generate $ MIPS.PutDirective ".data" 
+    generate $ MIPS.PutDirective ".data"
     syms <- gets (toSeq . getTable)
     forM_ syms $ \(idn, sym) -> do
         case sym of
@@ -211,37 +204,45 @@ generateGlobals = do
  -}
 
 data Reason = Read | Write
+            deriving (Eq)
 
 getRegister :: Reason -> Reference -> MIPSGenerator Register
 getRegister reason ref = do
     reg <- do
         mReg <- findRegisterWithContents ref
         case mReg of
-            Just reg -> return reg 
+            Just reg -> return reg
             Nothing -> do
                 mEmptyReg <- findEmptyRegister
-                case mEmptyReg of
+                reg <- case mEmptyReg of
                     Just emptyReg -> return emptyReg
-                    Nothing  -> error "MIPSGenerator.getRegister: can't spill yet"  
-    if reason == Read
-        then return reg
-        else markDirty reg
-             return reg
-    {-if reason == Write -}
-        {-then markDirty reg >> return reg-}
-        {-else -}
+                    Nothing -> error "MIPSGenerator.getRegister: can't spill yet"
+
+                slaveReference ref reg
+                when (reason == Read) $ do
+                    op <- buildOperand ref
+                    -- case op of
+                    --     Register ry         -> generate $ Move reg ry
+                    --     immm@(Const imm)    -> generate $ Li reg immm
+                    --     ind@(Indexed int r) -> generate $ Lw reg ind
+                    generate $ Lw reg op
+                    markClean reg
+                return reg
+
+    when (reason == Write) $ markDirty reg
+    return reg
 
 getRegisterForWrite :: Reference -> MIPSGenerator Register
 getRegisterForWrite = getRegister Write
 
 findRegisterWithContents :: Reference -> MIPSGenerator (Maybe Register)
 findRegisterWithContents ref = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing
-        where 
+        where
             checkRegister Nothing      reg regDes = if ref `elem` values regDes then Just reg else Nothing
             checkRegister reg@(Just _) _   _    = reg
 
 findEmptyRegister :: MIPSGenerator (Maybe Register)
-findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing 
+findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing
     where
         checkRegister mReg keyReg regDes = case (mReg, values regDes) of
             (Just _, _)       -> mReg
@@ -249,20 +250,34 @@ findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey check
             (Nothing, values) -> Nothing
 
 getRegDescriptor :: Register -> MIPSGenerator RegDescriptor
-getRegDescriptor reg = gets registerDescriptors >>= return . fromJust . Map.lookup reg 
+getRegDescriptor = flip getsRegDescriptor id
 
-{-getDescriptorInfo :: Register -> (RegDescriptor -> a) -> MIPSGenerator a-}
-{-getDescriptorInfo f = getRegDescriptor >>= return . f-}
+getsRegDescriptor :: Register -> (RegDescriptor -> a) -> MIPSGenerator a
+getsRegDescriptor reg f = gets registerDescriptors >>= return . f . fromJust . Map.lookup reg
+
+slaveReference :: Reference -> Register -> MIPSGenerator ()
+slaveReference ref reg = do
+    regDes <- gets registerDescriptors
+    if Map.member reg regDes
+        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { values = ref : values rd }) reg regDes }
+        else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
 
 locationsAreSame :: Reference -> Reference -> MIPSGenerator ()
 locationsAreSame r1 r2 = return ()
 
-markDirty :: Register -> () MIPSGenerator ()
+markDirty :: Register -> MIPSGenerator ()
 markDirty reg = do
-    regDes <- gets registerDescriptors 
-    if Map.member reg regDes 
+    regDes <- gets registerDescriptors
+    if Map.member reg regDes
         then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = True }) reg regDes }
-        else error "MIPSGenerator.markDirty: marking unexistant register as dirty"
+        else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
+
+markClean :: Register -> MIPSGenerator ()
+markClean reg = do
+    regDes <- gets registerDescriptors
+    if Map.member reg regDes
+        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = False }) reg regDes }
+        else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
 
 spillRegister :: Register -> MIPSGenerator ()
 spillRegister reg = return ()
@@ -271,14 +286,21 @@ spillAllDirtyRegisters :: MIPSGenerator ()
 spillAllDirtyRegisters = return ()
 
 buildOperand :: Reference -> MIPSGenerator Operand
-buildOperand ref = case ref of
-    Address   iden ref glob -> do
-        return $ Indexed 1 T1
-    Constant  val -> do
+buildOperand = \case
+    Address   _ ref glob -> do
+        off <- offset
+        return $ Indexed off (if glob then GP else FP)
+            where
+                offset = case ref of
+                    Constant val -> case val of
+                        ValInt int -> return int
+                        _          -> error "MIPSGenerator.buildOperand: constant is not an integer"
+                    _            -> error "MIPSGenerator.buildOperand: offset is not a constant"
+    Constant val -> do
         case val of
             ValInt int -> return $ Const int
-            otherwise  -> return $ Const 2
-    Temporary int -> return $ Const 3
+            _          -> error "MIPSGenerator.buildOperand: constant is not an integer"
+    Temporary int -> error "MIPSGenerator.buildOperand: offset is not a constant"
 
 {-generateLoadConstant :: Reference -> Int -> MIPSGenerator ()-}
 {-generateLoadConstant dst imm = do-}
@@ -319,12 +341,9 @@ tac2Mips = \case
             NEG -> return () -- Arithmetic negation
 
       Assign x y -> do
-        rx <- getRegister Write x
-        op <- buildOperand y
-        case op of
-            Register ry         -> generate $ Move rx ry
-            immm@(Const imm)    -> generate $ Li rx immm
-            ind@(Indexed int r) -> generate $ Lw rx ind
+        getRegister Read y
+        void $ getRegister Write x
+
 
 --    | AssignArrR
 --    | AssignArrL
@@ -336,9 +355,7 @@ tac2Mips = \case
         generate $ Sw    RA (Indexed 4 SP)          -- Save ra
                                                     -- Save return value
         generate $ Addiu FP SP (Const 8)            -- Setup new fp
-        if (w == 0)
-            then generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
-            else return ()
+        when (w /= 0) . generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
 
       EndFunction       -> do
         return ()
@@ -392,11 +409,7 @@ tac2Mips = \case
         generate $ B lab        --  Unconditional branch
       IfGoto      rel le ri lab -> do
         regLe <- getRegister Read le
-        ople  <- buildOperand le
-        generate $ Ld regLe ople
         regRi <- getRegister Read ri
-        opri  <- buildOperand ri
-        generate $ Ld regRi opri
         case rel of
             EQ -> do
                 generate $ Sub regLe regLe regRi
