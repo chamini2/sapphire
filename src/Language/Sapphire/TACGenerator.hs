@@ -39,8 +39,6 @@ import           Prelude                       hiding (Ordering (..), exp,
                                                 null, reverse, zip, foldl, 
                                                 concatMap, foldr)
 
-import Debug.Trace (trace)
-
 --------------------------------------------------------------------------------
 
 type TACGenerator = RWS TACReader TACWriter TACState
@@ -120,14 +118,15 @@ buildTACGenerator tab program@(Program block) = do
 
     --  We turn the sequence of TAC code into a TAC Graph of basic blocks
     let blocks = makeBasicBlocks tac
+    return ()
     {-trace ("Printing BLOCKS:\n" ++ (unlines . toList) (fmap show (makeBasicBlocks tac)) ++ line) $ return ()-}
-    trace ("Printing basic blocks:\n" ++ printBlocks blocks ++ line) $ return ()
-        where 
-            printBlocks :: Seq (Seq Instruction) -> String
-            printBlocks = snd . foldl printBlock (0, "")
-            printBlock :: (Int, String) -> Seq Instruction -> (Int, String) 
-            printBlock (blockNum, str) block = (succ blockNum, str ++ "\nBlock num: " ++ show blockNum ++ "\n" ++ (unlines . toList $ fmap show block))
-            line = "\n-------------------------------------------------------------\n"
+    {-trace ("Printing basic blocks:\n" ++ printBlocks blocks ++ line) $ return ()-}
+        {-where -}
+            {-printBlocks :: Seq (Seq Instruction) -> String-}
+            {-printBlocks = snd . foldl printBlock (0, "")-}
+            {-printBlock :: (Int, String) -> Seq Instruction -> (Int, String) -}
+            {-printBlock (blockNum, str) block = (succ blockNum, str ++ "\nBlock num: " ++ show blockNum ++ "\n" ++ (unlines . toList $ fmap show block))-}
+            {-line = "\n-------------------------------------------------------------\n"-}
 
 --------------------------------------------------------------------------------
 -- Using the Monad

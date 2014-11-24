@@ -19,6 +19,8 @@ import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (mapM_, forM_)
 import           Data.Sequence                 (Seq, empty, singleton)
+import           Data.Map.Strict               as Map (Map, empty, insert,
+                                                singleton, toList)
 import           Prelude                       hiding (mapM_, EQ, LT, GT)
 
 --------------------------------------------------------------------------------
@@ -29,14 +31,48 @@ type MIPSGenerator = RWS SappReader MIPSWriter MIPSState
 -- State
 
 data MIPSState = MIPSState
-    { table       :: SymbolTable
-    , stack       :: Stack Scope
-    , scopeId     :: Scope
-    , ast         :: Program
+    { table               :: SymbolTable
+    , stack               :: Stack Scope
+    , scopeId             :: Scope
+    , ast                 :: Program
 
-    , registerDescriptors
-    , variablesDescriptors
+    , registerDescriptors :: Map.Map Register RegDescriptor
+
+    {-, variablesDescriptors :: -}
     }
+
+initialRegDescriptors :: RegDescriptorTable
+initialRegDescriptors = Map.fromList [
+        (T0, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
+        (T1, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
+        (T2, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
+        (T3, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
+        (T4, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
+        (T5, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (T6, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (T7, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (T8, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (T9, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S0, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S1, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S2, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S3, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S4, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S5, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S6, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (S7, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+    ]                                                      
+
+data RegDescriptor = RegDescriptor
+    { value   :: Maybe Reference
+    , isGen   :: Bool
+    , isDirty :: Bool
+    } 
+
+{-data VarDescriptor = VarDescriptor -}
+    {-{ var       :: Reference-}
+    {-, locations :: Reference-}
+    {-}-}
 
 ----------------------------------------
 -- Instances
@@ -63,6 +99,9 @@ initialState = MIPSState
     , stack       = globalStack
     , scopeId     = globalScope
     , ast         = Program empty
+
+    , registerDescriptors = initialRegDescriptors
+    {-, variablesDescriptors-}
     }
 
 --------------------------------------------------------------------------------
@@ -147,7 +186,7 @@ generateGlobals = do
     forM_ syms $ \(idn, sym) -> do
         case sym of
             SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_string" ++ show off) idn
-            otherwise                -> return ()
+            otherwise                                          -> return ()
      {-mapM_ (\(c, n) generateString) -}
 
 ----------------------------------------
@@ -164,17 +203,28 @@ generateGlobals = do
  -  - A modified (dirty) register. We have to spill it
  -
  -}
-{-getRegister :: Reference -> Reason -> MIPSGenerator Register-}
-getRegister :: Reason -> Reference -> MIPSGenerator Register
-getRegister reason ref = findRegisterWithContents ref
 
 data Reason = Read | Write
+
+getRegister :: Reason -> Reference -> MIPSGenerator Register
+getRegister reason ref = do
+    mReg <- findRegisterWithContents ref
+    case mReg of
+        Just 
 
 getRegisterForWrite :: Reference -> MIPSGenerator Register
 getRegisterForWrite = getRegister Write
 
-findRegisterWithContents :: Reference -> MIPSGenerator Register
-findRegisterWithContents ref = return Zero
+findRegisterWithContents :: Reference -> MIPSGenerator (Maybe Register)
+findRegisterWithContents ref = do
+    regs <- gets registerDescriptor
+    let reg = fold checkRegister Nothing regs 
+    where checkRegister r mReg = case mReg of
+        Just reg -> Just mReg
+        Nothing  -> if locationsAreTheSame 
+
+locationsAreSame :: Reference -> Reference -> MIPSGenerator ()
+locationsAreSame = return ()
 
 spillRegister :: Register -> MIPSGenerator ()
 spillRegister reg = return ()
@@ -214,43 +264,39 @@ tac2Mips tac = case tac of
             then generate $ MIPS.PutLabel "main:" str 
             else generate $ MIPS.PutLabel (lab ++ ":") str
 
-      AssignBin res op l r -> do
-        rDst   <- getRegister res
+      AssignBin x op y z -> do
+        ry  <- getRegister y
+        opl <- buildOperand y
+        generate $ Ld ry opl
 
-        lef    <- getRegister l
-        opl    <- buildOperand l
-        generate $ Ld lef opl
+        rz  <- getRegister z
+        opr <- buildOperand y
+        generate $ Ld rz opr
 
-        rig    <- getRegister r
-        opr    <- buildOperand l
-        generate $ Ld rig opr
+        rx  <- getRegisterForWrite x
 
         case op of 
-            ADD   -> generate $ Add rDst lef rig
-            SUB   -> generate $ Sub rDst lef rig
-            MUL   -> generate $ Mul rDst lef rig
-            DIV   -> do
-                generate $ Div lef rig
-                generate $ Mflo rDst
-            MOD   -> do
-                generate $ Div lef rig
-                generate $ Mfhi rDst
+            ADD -> generate $ Add rx ry rz
+            SUB -> generate $ Sub rx ry rz
+            MUL -> generate $ Mul rx ry rz
+            DIV -> generate (Div ry rz) >> generate (Mflo rx)
+            MOD -> generate (Div ry rz) >> generate (Mfhi rx)
             {-POW   -> "^"-}
-            OR    -> generate $ Or  rDst lef rig
-            AND   -> generate $ And rDst lef rig
+            OR  -> generate $ Or  rx ry rz
+            AND -> generate $ And rx ry rz
 
       AssignUn res unop op -> do
         case unop of 
-            NOT -> return () -- tac2Mips $ AssignBin Sub op  -- Boolean not
-            NEG -> return () -- tac2Mips $     -- Arithmetic negation
+            NOT -> return () -- Boolean not
+            NEG -> return () -- Arithmetic negation
 
-      Assign dst src       -> do
-        reg <- getRegister  dst
-        op  <- buildOperand src
+      Assign x y -> do
+        rx <- getRegisterForWrite x
+        op <- buildOperand y
         case op of
-            Register r          -> generate $ Move reg r
-            immm@(Const imm)    -> generate $ Li reg immm
-            ind@(Indexed int r) -> generate $ Lw reg ind
+            Register ry         -> generate $ Move rx ry
+            immm@(Const imm)    -> generate $ Li rx immm
+            ind@(Indexed int r) -> generate $ Lw rx ind
 
 --    | AssignArrR
 --    | AssignArrL

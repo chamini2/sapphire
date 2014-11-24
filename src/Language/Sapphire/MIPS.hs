@@ -60,10 +60,10 @@ instance Show Register where
     {-| RA                                    -- Record address-}
 
 data Operand 
-    = Register         Register
-    | Const            Int 
-    | Indexed          Int Register
-    | Label            Label
+    = Register Register
+    | Const    Int 
+    | Indexed  Int Register
+    | Label    Label
     {-| IndirectRegister Register-}
     {-| IndirectIndexed  Value Register-}
 
