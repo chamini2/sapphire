@@ -90,6 +90,8 @@ instance Show Value where
         ValChar   v -> [v]
         ValString v -> v
 
+type Code = Int
+
 data Instruction 
     = Comment String
     | PutLabel Label String 

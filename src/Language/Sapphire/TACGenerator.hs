@@ -28,11 +28,11 @@ import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (foldl', forM_, mapM_, toList)
 import           Data.Functor                  ((<$>))
 import           Data.Maybe                    (fromJust, isJust)
-import           Data.Sequence                 (Seq, adjust, empty, fromList,
+import           Data.Sequence                 (Seq, empty, fromList,
                                                 length, null, reverse,
                                                 singleton, zip, (|>))
 import           Data.Traversable              (forM, mapM)
-import           Prelude                       hiding (Ordering (..), exp,
+import           Prelude                       as P hiding (Ordering (..), exp,
                                                 length, lookup, mapM, mapM_,
                                                 null, reverse, zip)
 
@@ -484,8 +484,6 @@ dataTypeWidth dt = if isArray dt
 ----------------------------------------
 
 type Leader = Bool
-
-type Str = (Seq (Leader, Instruction), [Label], Bool)
 
 makeBasicBlocks :: TAC -> Seq TAC
 makeBasicBlocks = separateBlocks . markLeaders

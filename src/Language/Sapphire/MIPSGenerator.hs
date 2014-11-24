@@ -20,7 +20,8 @@ import           Control.Monad.Writer          (tell)
 import           Data.Foldable                 (mapM_, forM_)
 import           Data.Sequence                 (Seq, empty, singleton)
 import           Data.Map.Strict               as Map (Map, empty, insert,
-                                                singleton, toList)
+                                                singleton, toList, member,
+                                                adjust)
 import           Prelude                       hiding (mapM_, EQ, LT, GT)
 
 --------------------------------------------------------------------------------
@@ -43,30 +44,30 @@ data MIPSState = MIPSState
 
 initialRegDescriptors :: RegDescriptorTable
 initialRegDescriptors = Map.fromList [
-        (T0, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
-        (T1, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
-        (T2, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
-        (T3, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
-        (T4, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False })
-        (T5, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (T6, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (T7, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (T8, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (T9, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S0, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S1, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S2, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S3, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S4, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S5, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S6, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
-        (S7, RegDescriptor { value = Nothing, isGen = Tru, isDirty = False} )
+        (T0, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T1, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T2, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T3, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T4, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T5, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T6, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T7, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T8, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (T9, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S0, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S1, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S2, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S3, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S4, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S5, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S6, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
+        (S7, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
     ]                                                      
 
 data RegDescriptor = RegDescriptor
-    { value   :: Maybe Reference
-    , isGen   :: Bool
-    , isDirty :: Bool
+    { value     :: Maybe Reference
+    , isGeneral :: Bool
+    , isDirty   :: Bool
     } 
 
 {-data VarDescriptor = VarDescriptor -}
@@ -167,17 +168,23 @@ emitPreamble = do
  -    12 - Read Character
  -
  -}
-generatePrint :: MIPS.Label -> Int -> MIPSGenerator ()
-generatePrint lab code = do
-    generate $ Li V0 (Const code)
-    generate $ La A0 (Label lab)
+generatePrintString :: Offset -> MIPSGenerator ()
+generatePrintString off  = do
+    generate $ Li V0 (Const 4)
+    generate $ La A0 (Label ("_string" ++ show off))
     generate Syscall
 
-generatePrintString :: Offset -> MIPSGenerator ()
-generatePrintString off = generatePrint ("_string" ++ show off) 4
+generatePrint :: Reference -> MIPS.Code -> MIPSGenerator ()
+generatePrint ref code  = do
+    generate $ Li V0 (Const code)
+    {-generate $ Lw A0 (Indexed int reg) -}
+    generate Syscall
 
-generateRead :: Label -> Int -> MIPSGenerator ()
-generateRead fname code = return ()
+generateRead :: Reference -> MIPS.Code -> MIPSGenerator ()
+generateRead ref code = do
+    generate $ Li V0 (Const code)
+    {-generate $ Lw A0 (Indexed int reg) -}
+    generate Syscall
 
 generateGlobals :: MIPSGenerator ()
 generateGlobals = do
@@ -208,23 +215,36 @@ data Reason = Read | Write
 
 getRegister :: Reason -> Reference -> MIPSGenerator Register
 getRegister reason ref = do
-    mReg <- findRegisterWithContents ref
+    mReg <- findRegisterWithContents (Just ref)
     case mReg of
-        Just 
+        Just reg -> return reg 
+        Nothing -> do
+            mReg <- findRegisterWithContents Nothing
+            case mReg of
+                Just reg -> return reg
+                Nothing  -> return ()
+    if reason == Write then markDirty reg else return ()
 
 getRegisterForWrite :: Reference -> MIPSGenerator Register
 getRegisterForWrite = getRegister Write
 
-findRegisterWithContents :: Reference -> MIPSGenerator (Maybe Register)
+findRegisterWithContents :: Maybe Reference -> MIPSGenerator (Maybe Register)
 findRegisterWithContents ref = do
     regs <- gets registerDescriptor
     let reg = fold checkRegister Nothing regs 
     where checkRegister r mReg = case mReg of
-        Just reg -> Just mReg
-        Nothing  -> if locationsAreTheSame 
+            Just reg -> Just mReg
+            Nothing  -> if locationsAreTheSame ref then else 
 
 locationsAreSame :: Reference -> Reference -> MIPSGenerator ()
-locationsAreSame = return ()
+locationsAreSame r1 r2 = return ()
+
+markDirty :: Register -> MIPSGenerator ()
+markDirty reg = do
+    regDes <- gets registerDescriptors 
+    if Map.member reg regDes 
+        then Map.adjust (\rd -> rd { isDirty = True }) reg regDes
+        else error "MIPSGenerator.markDirty: marking unexistant register as dirty"
 
 spillRegister :: Register -> MIPSGenerator ()
 spillRegister reg = return ()
@@ -235,12 +255,12 @@ spillAllDirtyRegisters = return ()
 buildOperand :: Reference -> MIPSGenerator Operand
 buildOperand ref = case ref of
     Address   iden ref glob -> do
-        return $ Indexed 99 T1
+        return $ Indexed 1 T1
     Constant  val -> do
         case val of 
             ValInt int -> return $ Const int
-            otherwise  -> return $ Const 101
-    Temporary int -> return $ Const 101
+            otherwise  -> return $ Const 2
+    Temporary int -> return $ Const 3
 
 {-generateLoadConstant :: Reference -> Int -> MIPSGenerator ()-}
 {-generateLoadConstant dst imm = do-}
@@ -347,7 +367,7 @@ tac2Mips tac = case tac of
         generate $ Move ret V0 -- Copy return value from $v0 - MIPS Convention
         
       -- Print
-      PrintInt    ref   -> return () --generatePrintInt ref
+      PrintInt    ref   -> generatePrint ref 1
       PrintFloat  ref   -> return ()
       PrintChar   ref   -> return ()
       PrintBool   ref   -> return ()
