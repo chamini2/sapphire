@@ -1,28 +1,30 @@
+{-# LANGUAGE LambdaCase #-}
 {-|
     MIPS code generation module
  -}
-module Language.Sapphire.MIPSGenerator 
+module Language.Sapphire.MIPSGenerator
     ( MIPSGenerator
     , processMIPSGenerator
     ) where
 
-import           Language.Sapphire.MIPS        as MIPS             
+import           Language.Sapphire.MIPS        as MIPS
 import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.TAC as TAC  hiding (generate(..), Label)
+import           Language.Sapphire.TAC         as TAC hiding (Label)
 
 import           Control.Monad                 (liftM, unless)
-import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.Reader          (asks)
+import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Writer          (tell)
-import           Data.Foldable                 (mapM_, forM_)
+import           Data.Foldable                 (concat, forM_, mapM_, toList)
 import           Data.Sequence                 (Seq, empty, singleton)
-import           Data.Map.Strict               as Map (Map, empty, insert,
-                                                singleton, toList, member,
+import qualified Data.Map.Strict               as Map (Map, empty, insert,
+                                                singleton, fromList, member,
                                                 adjust)
-import           Prelude                       hiding (mapM_, EQ, LT, GT)
+import           Prelude                       hiding (EQ, LT, GT, concat,
+                                                mapM_)
 
 --------------------------------------------------------------------------------
 
@@ -43,32 +45,32 @@ data MIPSState = MIPSState
     }
 
 initialRegDescriptors :: RegDescriptorTable
-initialRegDescriptors = Map.fromList [
-        (T0, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T1, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T2, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T3, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T4, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T5, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T6, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T7, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T8, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (T9, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S0, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S1, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S2, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S3, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S4, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S5, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S6, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-        (S7, RegDescriptor { value = Nothing, isGeneral = Tru, isDirty = False })
-    ]                                                      
+initialRegDescriptors = Map.fromList
+    [ (T0, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T1, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T2, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T3, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T4, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T5, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T6, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T7, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T8, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (T9, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S0, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S1, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S2, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S3, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S4, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S5, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S6, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    , (S7, RegDescriptor { value = Nothing, genPurpose = True, dirty = False })
+    ]
 
 data RegDescriptor = RegDescriptor
-    { value     :: Maybe Reference
-    , isGeneral :: Bool
-    , isDirty   :: Bool
-    } 
+    { value      :: Maybe Reference
+    , genPurpose :: Bool
+    , dirty      :: Bool
+    }
 
 {-data VarDescriptor = VarDescriptor -}
     {-{ var       :: Reference-}
@@ -96,10 +98,10 @@ instance Show MIPSState where
 
 initialState :: MIPSState
 initialState = MIPSState
-    { table       = emptyTable
-    , stack       = globalStack
-    , scopeId     = globalScope
-    , ast         = Program empty
+    { table   = emptyTable
+    , stack   = globalStack
+    , scopeId = globalScope
+    , ast     = Program empty
 
     , registerDescriptors = initialRegDescriptors
     {-, variablesDescriptors-}
@@ -124,17 +126,19 @@ generate = tell . singleton
 --------------------------------------------------------------------------------
 -- Building the Monad
 
-buildMIPSGenerator :: SymbolTable -> TAC -> MIPSGenerator ()
-buildMIPSGenerator tab tac = do
+buildMIPSGenerator :: SymbolTable -> Seq TAC -> MIPSGenerator ()
+buildMIPSGenerator tab blocks = do
     modify $ \s -> s { table = tab }
     tell initialWriter
     emitPreamble
+
+    let tac = concat $ fmap toList blocks
     mapM_ tac2Mips tac
 
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processMIPSGenerator :: SappReader -> SymbolTable -> TAC -> MIPSWriter
+processMIPSGenerator :: SappReader -> SymbolTable -> Seq TAC -> MIPSWriter
 processMIPSGenerator r s = generateMIPS r . buildMIPSGenerator s
 
 generateMIPS :: SappReader -> MIPSGenerator a -> MIPSWriter
@@ -160,11 +164,11 @@ emitPreamble = do
  -    2  - Print Float        $F12 Float to print
  -    3  - Print Double       $F12 Double to print
  -    4  - Print String       $A0  Address of null terminated string to print
- -    11 - Print Character    
+ -    11 - Print Character
  -    5  - Read Integer
  -    6  - Read Float
  -    7  - Read Double
- -    8  - Read String 
+ -    8  - Read String
  -    12 - Read Character
  -
  -}
@@ -189,22 +193,21 @@ generateRead ref code = do
 generateGlobals :: MIPSGenerator ()
 generateGlobals = do
     generate $ MIPS.PutLabel ".data" ""
-    syms <- liftM toSeq $ gets getTable
+    syms <- gets (toSeq . getTable)
     forM_ syms $ \(idn, sym) -> do
         case sym of
             SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_string" ++ show off) idn
-            otherwise                                          -> return ()
-     {-mapM_ (\(c, n) generateString) -}
+            otherwise -> return ()
 
 ----------------------------------------
 --  Register allocation
 
 {-|
- -  Given a Reference, say r, of a current var or temporary, 
- -  a reason (to read or to write), this function will assign 
+ -  Given a Reference, say r, of a current var or temporary,
+ -  a reason (to read or to write), this function will assign
  -  a register for r according to the following rules:
  -
- -  - A register already holding r 
+ -  - A register already holding r
  -  - An empty register
  -  - An unmodified register
  -  - A modified (dirty) register. We have to spill it
@@ -257,7 +260,7 @@ buildOperand ref = case ref of
     Address   iden ref glob -> do
         return $ Indexed 1 T1
     Constant  val -> do
-        case val of 
+        case val of
             ValInt int -> return $ Const int
             otherwise  -> return $ Const 2
     Temporary int -> return $ Const 3
@@ -275,27 +278,23 @@ buildOperand ref = case ref of
 ----------------------------------------
 
 tac2Mips :: TAC.Instruction -> MIPSGenerator ()
-tac2Mips tac = case tac of 
-      TAC.Comment str      -> generate $ MIPS.Comment str
+tac2Mips = \case
+      TAC.Comment str -> generate $ MIPS.Comment str
 
-      TAC.PutLabel lab str -> do
-        {-spillAllDirtyRegisters  -}
-        if (lab == "_main")
-            then generate $ MIPS.PutLabel "main:" str 
-            else generate $ MIPS.PutLabel (lab ++ ":") str
+      TAC.PutLabel lab str -> generate $ MIPS.PutLabel lab str
 
       AssignBin x op y z -> do
-        ry  <- getRegister y
+        ry  <- getRegister Read y
         opl <- buildOperand y
         generate $ Ld ry opl
 
-        rz  <- getRegister z
+        rz  <- getRegister Read z
         opr <- buildOperand y
         generate $ Ld rz opr
 
-        rx  <- getRegisterForWrite x
+        rx  <- getRegister Write x
 
-        case op of 
+        case op of
             ADD -> generate $ Add rx ry rz
             SUB -> generate $ Sub rx ry rz
             MUL -> generate $ Mul rx ry rz
@@ -306,12 +305,12 @@ tac2Mips tac = case tac of
             AND -> generate $ And rx ry rz
 
       AssignUn res unop op -> do
-        case unop of 
+        case unop of
             NOT -> return () -- Boolean not
             NEG -> return () -- Arithmetic negation
 
       Assign x y -> do
-        rx <- getRegisterForWrite x
+        rx <- getRegister Write x
         op <- buildOperand y
         case op of
             Register ry         -> generate $ Move rx ry
@@ -328,9 +327,9 @@ tac2Mips tac = case tac of
         generate $ Sw    RA (Indexed 4 SP)          -- Save ra
                                                     -- Save return value
         generate $ Addiu FP SP (Const 8)            -- Setup new fp
-        if (w == 0) 
+        if (w == 0)
             then generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
-            else return ()     
+            else return ()
 
       EndFunction       -> do
         return ()
@@ -338,13 +337,13 @@ tac2Mips tac = case tac of
 
       PushParameter ref -> do
         generate $ Subu SP SP (Const 4)     -- Decrement sp to make space for param
-        reg <- getRegister ref
+        reg <- getRegister Read ref
         generate $ Sw reg (Indexed 4 SP)    -- Copy param value to stack
 
       PopParameters int -> do
         generate $ Addi SP SP (Const int)   -- Pop params of stack
 
-      Return mayA     -> do 
+      Return mayA     -> do
         case mayA of
             Just ref -> do
                 {-Register reg <- getRegister ref-}
@@ -358,14 +357,14 @@ tac2Mips tac = case tac of
         generate $ Jr RA                    -- Return from function
 
       PCall lab nInt  -> do
-        generate $ Jal ("_" ++ lab) 
+        generate $ Jal ("_" ++ lab)
 
       FCall ref lab n -> do
-        generate $ Jal ("_" ++ lab) 
+        generate $ Jal ("_" ++ lab)
         -- get return value TO DO
-        ret <- getRegisterForWrite ref
+        ret <- getRegister Write ref
         generate $ Move ret V0 -- Copy return value from $v0 - MIPS Convention
-        
+
       -- Print
       PrintInt    ref   -> generatePrint ref 1
       PrintFloat  ref   -> return ()
@@ -380,13 +379,13 @@ tac2Mips tac = case tac of
       ReadBool  ref -> return ()
       -- Goto
       Goto lab                  -> do
-        spillAllDirtyRegisters 
+        spillAllDirtyRegisters
         generate $ B lab        --  Unconditional branch
       IfGoto      rel le ri lab -> do
-        regLe <- getRegister le 
+        regLe <- getRegister Read le
         ople  <- buildOperand le
         generate $ Ld regLe ople
-        regRi <- getRegister ri
+        regRi <- getRegister Read ri
         opri  <- buildOperand ri
         generate $ Ld regRi opri
         case rel of
@@ -408,11 +407,11 @@ tac2Mips tac = case tac of
             GE -> do
                 generate $ Sub regLe regLe regRi
                 generate $ Blez regLe lab
-        
+
       IfTrueGoto  ref lab       -> do
-        reg <- getRegister ref
+        reg <- getRegister Read ref
         generate $ Beqz reg lab
       IfFalseGoto ref lab       -> do
-        reg <- getRegister ref
+        reg <- getRegister Read ref
         generate $ Bnez reg lab
       _                         -> error "MIPSGenerator.tac2Mips unknown instruction"
