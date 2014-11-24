@@ -1,5 +1,5 @@
+{-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 {-|
  - TAC Generator Monad
  -
@@ -19,27 +19,22 @@ import           Language.Sapphire.TAC
 import           Language.Sapphire.TypeChecker (processAccessChecker,
                                                 processExpressionChecker)
 
-import           Control.Arrow                 ((&&&))
+import           Control.Arrow                 (second, (&&&))
 import           Control.Monad                 (guard, liftM, unless, void)
 import           Control.Monad.RWS             (RWS, execRWS, lift)
 import           Control.Monad.State           (get, gets, modify)
 import           Control.Monad.Trans.Maybe     (runMaybeT)
-import           Control.Monad.Writer          (tell, listen)
-import           Data.Foldable                 (forM_, mapM_, foldl, concatMap,
-                                                foldr, toList)
-import           Data.Functor                  ((<$>), fmap)
-{-import           Data.Graph.Inductive                    -}
+import           Control.Monad.Writer          (tell)
+import           Data.Foldable                 (foldl', forM_, mapM_, toList)
+import           Data.Functor                  ((<$>))
 import           Data.Maybe                    (fromJust, isJust)
-import           Data.Sequence                 (empty, length, null,
-                                                reverse, singleton, zip,
-                                                (|>), (<|), Seq, adjust)
+import           Data.Sequence                 (Seq, adjust, empty, fromList,
+                                                length, null, reverse,
+                                                singleton, zip, (|>))
 import           Data.Traversable              (forM, mapM)
 import           Prelude                       hiding (Ordering (..), exp,
                                                 length, lookup, mapM, mapM_,
-                                                null, reverse, zip, foldl, 
-                                                concatMap, foldr)
-
-import Debug.Trace (trace)
+                                                null, reverse, zip)
 
 --------------------------------------------------------------------------------
 
@@ -107,7 +102,7 @@ initialWriter = empty
 ----------------------------------------
 
 generate :: Instruction -> TACGenerator ()
-generate = tell . singleton 
+generate = tell . singleton
 
 --------------------------------------------------------------------------------
 -- Building the Monad
@@ -115,25 +110,14 @@ generate = tell . singleton
 buildTACGenerator :: SymbolTable -> Program -> TACGenerator ()
 buildTACGenerator tab program@(Program block) = do
     modify $ \s -> s { table = tab, ast = program }
-    {-tell initialWriter-}
-    ((), tac) <- listen $ linearizeStatements block
-
-    --  We turn the sequence of TAC code into a TAC Graph of basic blocks
-    let blocks = makeBasicBlocks tac
-    {-trace ("Printing BLOCKS:\n" ++ (unlines . toList) (fmap show (makeBasicBlocks tac)) ++ line) $ return ()-}
-    trace ("Printing basic blocks:\n" ++ printBlocks blocks ++ line) $ return ()
-        where 
-            printBlocks :: Seq (Seq Instruction) -> String
-            printBlocks = snd . foldl printBlock (0, "")
-            printBlock :: (Int, String) -> Seq Instruction -> (Int, String) 
-            printBlock (blockNum, str) block = (succ blockNum, str ++ "\nBlock num: " ++ show blockNum ++ "\n" ++ (unlines . toList $ fmap show block))
-            line = "\n-------------------------------------------------------------\n"
+    tell initialWriter
+    linearizeStatements block
 
 --------------------------------------------------------------------------------
 -- Using the Monad
 
-processTACGenerator :: TACReader -> SymbolTable -> Program -> (TACState, TACWriter)
-processTACGenerator r s = generateTAC r . buildTACGenerator s
+processTACGenerator :: TACReader -> SymbolTable -> Program -> (TACState, Seq TAC)
+processTACGenerator r s = second makeBasicBlocks . generateTAC r . buildTACGenerator s
 
 generateTAC :: TACReader -> TACGenerator a -> (TACState, TACWriter)
 generateTAC r = flip (flip execRWS r) initialState
@@ -504,32 +488,30 @@ type Leader = Bool
 type Str = (Seq (Leader, Instruction), [Label], Bool)
 
 makeBasicBlocks :: TAC -> Seq TAC
-makeBasicBlocks = fst . foldl buildBlock (empty, -1) . leaderInstructionPairs 
-    where 
-        buildBlock :: (Seq (Seq Instruction), Int) -> (Leader, Instruction) -> (Seq (Seq Instruction), Int)
-        buildBlock (blocks, blockNum) (True,  ins) = (blocks |> singleton ins, succ blockNum)
-        buildBlock (blocks, blockNum) (False, ins) = (adjust (\cb -> cb |> ins) blockNum blocks, blockNum)
-
-leaderInstructionPairs :: Seq Instruction -> Seq (Leader, Instruction)
-leaderInstructionPairs = markGotoDests . markLeaders 
+makeBasicBlocks = separateBlocks . markLeaders
     where
-        markLeaders :: Seq Instruction -> Str
-        markLeaders = foldl checkBlockLeader (empty, [], True) 
+        separateBlocks :: Seq (Leader, Instruction) -> Seq TAC
+        separateBlocks = fmap fromList . separate empty . toList
+            where
+                separate blcs = \case
+                    []                 -> blcs
+                    ((True, it) : its) -> separate (blcs |> blc) rest
+                        where
+                            blc  = it : (map snd $ takeWhile (not . fst) its)
+                            rest = dropWhile (not . fst) its
+                    _ -> error "TACGenerator.makeBasicBlocks: non-leader instruction pattern-matched"
 
-        markGotoDests :: Str -> Seq (Leader, Instruction)
-        markGotoDests (pairs, labels, _) = fmap (markAsLeader labels) pairs
+        markLeaders :: Seq Instruction -> Seq (Leader, Instruction)
+        markLeaders = markLabels . markGotos
 
-        checkBlockLeader :: Str -> Instruction -> Str
-        checkBlockLeader str@(insSeq, leaders, markThisOne) ins = case ins of 
-            Goto lab          -> markNextOne markThisOne lab
-            IfGoto _ _ _  lab -> markNextOne markThisOne lab
-            IfTrueGoto  _ lab -> markNextOne markThisOne lab
-            IfFalseGoto _ lab -> markNextOne markThisOne lab
-            _                 -> (insSeq |> (markThisOne, ins), leaders, False) 
-            where 
-                markNextOne thisOne l = (insSeq |> (thisOne, ins), l : leaders, True)
+        markGotos :: Seq Instruction -> (Seq (Leader, Instruction), [Label])
+        markGotos = (\(its, lbs, _) -> (its, lbs)) . foldl' func (empty, [], True)
+            where
+                func (its, lbs, mrk) it = if hasGoto it
+                    then (its |> (mrk, it), getLabel it : lbs, True)
+                    else (its |> (mrk, it), lbs              , False)
 
-        markAsLeader :: [Label] -> (Leader, Instruction) -> (Leader, Instruction)
-        markAsLeader leaders pair@(isLeader, ins) = case ins of 
-            PutLabel lab _ -> if lab `elem` leaders then (True, ins) else pair
-            _              -> pair
+        markLabels :: (Seq (Leader, Instruction), [Label]) -> Seq (Leader, Instruction)
+        markLabels = uncurry (foldl' (flip func))
+            where
+                func lb = fmap $ \(mrk, it) -> (mrk || isPutLabel it && (lb == getLabel it), it)
