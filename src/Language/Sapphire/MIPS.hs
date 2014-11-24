@@ -37,10 +37,10 @@ data Register
     | FP                                    -- Frame pointer
     | SP                                    -- Stack pointer
     | RA                                    -- Record address
-    deriving (Eq, Typeable, Data)
+    deriving (Eq, Ord, Typeable, Data)
 
 instance Show Register where
-    show reg = "$" ++ (map toLower) (showConstr $ toConstr reg)
+    show reg = "$" ++ map toLower (showConstr $ toConstr reg)
 
 {-|
     MIPS 32 floating-point registers
@@ -60,10 +60,10 @@ instance Show Register where
     {-| RA                                    -- Record address-}
 
 data Operand
-    = Register         Register
-    | Const            Int
-    | Indexed          Int Register
-    | Label            Label
+    = Register Register
+    | Const    Int
+    | Indexed  Int Register
+    | Label    Label
     {-| IndirectRegister Register-}
     {-| IndirectIndexed  Value Register-}
 
@@ -146,7 +146,7 @@ data Instruction
 instance Show Instruction where
     show = \case
         Comment str      -> "# " ++ str
-        PutLabel lab str -> lab ++ tabs (length lab) ++ ("# " ++ str)
+        PutLabel lab str -> lab ++ tabs (length lab) ++ "# " ++ str
         ins -> "\t" ++ case ins of
             --  Data declarations
             Asciiz lab str  -> lab ++ ": .asciiz " ++ str
