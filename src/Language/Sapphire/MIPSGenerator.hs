@@ -11,7 +11,7 @@ import           Language.Sapphire.MIPS        as MIPS
 import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.TAC         as TAC 
+import           Language.Sapphire.TAC         as TAC
 
 import           Control.Monad                 (when, void)
 import           Control.Monad.Reader          (asks)
@@ -135,7 +135,9 @@ buildMIPSGenerator tab blocks = do
     emitPreamble
 
     let tac = concat $ fmap toList blocks
-    mapM_ emit tac
+    flip mapM_ (filter (not . isComment) tac) $ \ins -> do
+        generate $ MIPS.Comment $ show ins
+        emit ins
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -310,13 +312,12 @@ spillAllDirtyRegisters = return ()
 
 emit :: TAC.Instruction -> MIPSGenerator ()
 emit = \case
-      TAC.Comment str -> generate $ MIPS.Comment str
 
-      TAC.PutLabel lab -> generate $ MIPS.PutLabel lab 
+      TAC.PutLabel lab -> generate $ MIPS.PutLabel lab
 
       LoadConstant dst val -> do
         reg <- getRegister Write dst
-        let imm = case val of 
+        let imm = case val of
                 ValInt   v -> v
                 ValFloat v -> error "MIPSGenerator.emit.LoadConstant: loading float constant"
                 ValBool  v -> if v then 1 else 0
@@ -336,7 +337,7 @@ emit = \case
       UnaryOp res NOT op -> do
         ry <- getRegister Read op
         rx <- getRegister Write res
-        generate $ Not rx ry 
+        generate $ Not rx ry
 
       BinaryOp x op y z -> do
         ry  <- getRegister Read y

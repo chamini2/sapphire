@@ -21,6 +21,7 @@ module Language.Sapphire.TAC
     , binaryToBinOperator
     , hasGoto
     , isPutLabel
+    , isComment
     ) where
 
 import           Language.Sapphire.Program
@@ -294,3 +295,8 @@ isPutLabel :: Instruction -> Bool
 isPutLabel = \case
     PutLabel _ -> True
     _          -> False
+
+isComment :: Instruction -> Bool
+isComment = \case
+    Comment _ -> True
+    _         -> False
