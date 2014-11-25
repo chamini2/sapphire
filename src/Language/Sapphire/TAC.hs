@@ -3,13 +3,14 @@
     Three-address code (TAC) generation module
 -}
 module Language.Sapphire.TAC
-    ( Reference(..)
+    ( Location(..)
     , Value(..)
 
     , TAC
     , Label
     , Serial
     , Global
+    , Base
 
     , Instruction(..)
     , BinOperator(..)
@@ -18,9 +19,7 @@ module Language.Sapphire.TAC
 
     , binaryToRelation
     , binaryToBinOperator
-    , unaryToUnOperator
     , hasGoto
-    , getLabel
     , isPutLabel
     ) where
 
@@ -28,6 +27,7 @@ import           Language.Sapphire.Program
 import           Language.Sapphire.SymbolTable
 
 import           Data.Char                     (toLower)
+import           Data.Maybe                    (fromMaybe)
 import           Data.Sequence                 (Seq)
 import           Prelude                       hiding (Ordering (..))
 
@@ -40,11 +40,12 @@ type TAC = Seq Instruction
 type Label  = String
 type Serial = Int
 type Global = Bool
+type Base   = Int
 
 data Location = Address
-        { adrName   :: Identifier
-        , adrOffset :: Offset
-        , adrGlobal :: Global
+        { addrName   :: Identifier
+        , addrOffset :: Offset
+        , addrGlobal :: Global
         }
     deriving (Eq)
 
@@ -68,57 +69,74 @@ instance Show Value where
 data Instruction
     = Comment       { comment :: String }
     -- Loads
-    | LoadConstant  { dst :: Location, val :: Value }
+    | LoadConstant  { dst :: Location, val   :: Value }
     | LoadLabel     { dst :: Location, label :: Label }
-    | Assign        { dst :: Location, src :: Location }
-    | Load          { dst :: Location, src :: Location, offset :: Offset }
-    | Store         { dst :: Location, src :: Location, offset :: Offset }
-    | BinaryOp      { dst :: Location, op  :: BinOp, left :: Location, right :: Location }
+    | Assign        { dst :: Location, src   :: Location }
+    | Load          { dst :: Location, base  :: Base, indirect :: Location }
+    | Store         { dst :: Location, base  :: Base, indirect :: Location }
+    | UnaryOp       { dst :: Location, unop  :: UnOperator , src      :: Location }
+    | BinaryOp      { dst :: Location, binop :: BinOperator, left     :: Location, right :: Location }
     -- Label
-    | PutLabel      { label :: Label, comment :: String }
+    | PutLabel      { label :: Label }
     -- Jumps
     | Goto          { label :: Label }
-    | IfTrueGoto    { test :: Location, label :: Label}
+    | IfTrueGoto    { test  :: Location, label :: Label}
     -- Functions
     | BeginFunction { frame :: Width }
     | EndFunction
-    | Return        { mSrc :: Maybe Location }
-    | PushParam     { src :: Location }
-    | PopParams     { bytes :: Width }
-    | PCall         { label :: Label }
-    | FCall         { label :: Label, dst :: Location }
+    | Return        { maySrc :: Maybe Location }
+    | PushParam     { src    :: Location }
+    | PopParams     { bytes  :: Width }
+    | PCall         { label  :: Label }
+    | FCall         { label  :: Label, dst :: Location }
     -- Print
-    | PrintInt      { src :: Location }
-    | PrintFloat    { src :: Location }
-    | PrintChar     { src :: Location }
-    | PrintBool     { src :: Location }
+    | PrintInt      { src   :: Location }
+    | PrintFloat    { src   :: Location }
+    | PrintChar     { src   :: Location }
+    | PrintBool     { src   :: Location }
     | PrintString   { label :: Label }
+    -- Read
+    | ReadInt       { dst :: Location }
+    | ReadFloat     { dst :: Location }
+    | ReadChar      { dst :: Location }
+    | ReadBool      { dst :: Location }
 
 instance Show Instruction where
     show = \case
-        Comment com      -> "# " ++ com
-        PutLabel lab com -> lab ++ ":" ++ replicate (10 - div (length lab + 1) 4) '\t' ++ "# " ++ str
+        Comment com  -> "# " ++ com
+        -- Label
+        PutLabel lab -> lab ++ ":"
         instruction -> "\t" ++ case instruction of
-            LoadConstant  dst val     -> show dst ++ " := " ++ show val
-            LoadLabel     dst lab     -> show dst ++ " := " ++ lab
-            Assign        dst src     -> show dst ++ " := " ++ show src
-            Load          dst src off -> show dst ++ " := *(" ++ show src ++ (if off /= 0 then " + " ++ show off else []) ++ ")"
-            Store         dst src off -> "*(" ++ show dst ++ (if off /= 0 then " + " ++ show off else "") ++ ")"++ " := " ++ show src
-            BinaryOp      dst op l r  -> show dst ++ " := " ++ show l ++ " " ++ show op ++ " " ++ show r
-            Goto          lab         -> "goto " ++ lab
-            IfTrueGoto    tst lab     -> "if " ++ show tst ++ " goto " ++ lab
-            BeginFunction frm         -> "function " ++ show frm
-            EndFunction               -> "endfunction"
-            Return        mSrc        -> "return " ++ fromMaybe "" mSrc
-            PushParam     src         -> "param " ++ show src
-            PopParams     byt         -> "unparams " ++ show byt
-            PCall         lab         -> "call " ++ lab
-            FCall         lab dst     -> show dst ++ " := " ++ " call " ++ lab
-            PrintInt    ref           -> "printint "    ++ show ref
-            PrintFloat  ref           -> "printfloat "  ++ show ref
-            PrintChar   ref           -> "printchar "   ++ show ref
-            PrintBool   ref           -> "printbool "   ++ show ref
-            PrintString lab           -> "printstring " ++ lab
+            -- Loads
+            LoadConstant  d v      ->         show d ++ " := " ++ show v
+            LoadLabel     d lab    ->         show d ++ " := " ++ lab
+            Assign        d s      ->         show d ++ " := " ++ show s
+            Load          d b ind  ->         show d ++ " := *(" ++ show ind ++ (if b /= 0 then " + " ++ show b else []) ++ ")"
+            Store         d b ind  -> "*(" ++ show d ++ (if b /= 0 then " + " ++ show b else "") ++ ")"++ " := " ++ show ind
+            UnaryOp       d op s   ->         show d ++ " := " ++ show op ++ " " ++ show s
+            BinaryOp      d op l r ->         show d ++ " := " ++ show l ++ " " ++ show op ++ " " ++ show r
+            -- Jumps
+            Goto          lab     -> "goto " ++ lab
+            IfTrueGoto    tst lab -> "if " ++ show tst ++ " goto " ++ lab
+            -- Functions
+            BeginFunction frm   -> "function " ++ show frm
+            EndFunction         -> "endfunction"
+            Return        mSrc  -> "return " ++ fromMaybe "" (fmap show mSrc)
+            PushParam     s     -> "param " ++ show s
+            PopParams     byt   -> "unparams " ++ show byt
+            PCall         lab   -> "call " ++ lab
+            FCall         lab d -> show d ++ " := " ++ " call " ++ lab
+            -- Print
+            PrintInt      s   -> "printint "    ++ show s
+            PrintFloat    s   -> "printfloat "  ++ show s
+            PrintChar     s   -> "printchar "   ++ show s
+            PrintBool     s   -> "printbool "   ++ show s
+            PrintString   lab -> "printstring " ++ lab
+            -- Read
+            ReadInt       d -> "readint "   ++ show d
+            ReadFloat     d -> "readfloat " ++ show d
+            ReadChar      d -> "readchar "  ++ show d
+            ReadBool      d -> "readbool "  ++ show d
             _  -> error "TAC.Show Instruction: unrecognized instruction"
 
 -- data Instruction
@@ -199,12 +217,17 @@ instance Show Instruction where
 data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW
     | OR   | AND
---    | ArrR | ArrL
     | Rel Relation
     deriving (Eq)
 
-data UnOperator
-    = NOT | NEG
+data UnOperator = NOT
+                deriving (Eq)
+
+data Relation
+    = EQ | NE
+    | LT | LE
+    | GT | GE
+    deriving (Eq)
 
 instance Show BinOperator where
     show = \case
@@ -223,13 +246,6 @@ instance Show BinOperator where
 instance Show UnOperator where
     show = \case
         NOT -> "!"
-        NEG -> "-"
-
-data Relation
-    = EQ | NE
-    | LT | LE
-    | GT | GE
-    deriving (Eq)
 
 instance Show Relation where
     show = \case
@@ -258,7 +274,6 @@ binaryToBinOperator = \case
     OpDivide  -> DIV
     OpModulo  -> MOD
     OpPower   -> POW
-    -- OpFromTo  ->
     OpOr      -> OR
     OpAnd     -> AND
     OpEqual   -> Rel EQ
@@ -268,31 +283,16 @@ binaryToBinOperator = \case
     OpGreat   -> Rel GT
     OpGreatEq -> Rel GE
     _         -> error "TAC.binaryToBinOperator: trying to convert '@' or '..' to a intermediate code binary operator"
-    -- OpBelongs ->
-
-unaryToUnOperator :: Unary -> UnOperator
-unaryToUnOperator = \case
-    OpNot    -> NOT
-    OpNegate -> NEG
+    -- OpFromTo
+    -- OpBelongs
 
 hasGoto :: Instruction -> Bool
 hasGoto = \case
-    Goto              _ -> True
-    IfGoto      _ _ _ _ -> True
-    IfTrueGoto  _     _ -> True
-    IfFalseGoto _     _ -> True
-    _                   -> False
-
-getLabel :: Instruction -> Label
-getLabel = \case
-    PutLabel        l _ -> l
-    Goto              l -> l
-    IfGoto      _ _ _ l -> l
-    IfTrueGoto  _     l -> l
-    IfFalseGoto _     l -> l
-    _                   -> error "TAC.getLabel: getting label from non-labeled Instruction"
+    Goto         _ -> True
+    IfTrueGoto _ _ -> True
+    _              -> False
 
 isPutLabel :: Instruction -> Bool
 isPutLabel = \case
-    PutLabel _ _ -> True
-    _            -> False
+    PutLabel _ -> True
+    _          -> False

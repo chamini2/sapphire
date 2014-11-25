@@ -133,6 +133,8 @@ sizeOffsetStatement stL = case lexInfo stL of
         enterFunction
         enterScope
 
+        addOffset 4 -- For MIPS parameters
+
         -- Parameters offsets
         forM_ prms $ \(Lex dcl _) -> do
             let prmIdn = lexInfo $ dclIdentifier dcl
@@ -144,6 +146,8 @@ sizeOffsetStatement stL = case lexInfo stL of
         -- Restarts the offset in 0 for the statements block
         prmsWdt <- currentOffset
         resetOffset
+
+        addOffset 8 -- For MIPS parameters
 
         sizeOffsetStatements block
         exitScope

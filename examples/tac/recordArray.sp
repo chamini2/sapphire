@@ -17,12 +17,13 @@ end
 c : C
 b : B
 
-print c.is[2][1]
-print c.ra.b
-print c.ra.a[2]
-print b.aa[1].b
-print b.aa[1].a[2]
-
+main
+  print c.is[2][1]
+  print c.ra.b
+  print c.ra.a[2]
+  print b.aa[1].b
+  print b.aa[1].a[2]
+end
 
 # # line 1, record A
 # L1:                   # next statement of line 1, record A
