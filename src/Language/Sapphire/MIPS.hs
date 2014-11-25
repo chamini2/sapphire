@@ -99,7 +99,7 @@ data Instruction
     | PutDirective Directive
     -- Data declarations
     | Asciiz Label String
-    | Word   Label 
+    | Word   Label
     -- Arithmetic
     | Add   Register Register Register
     | Addi  Register Register Operand
@@ -126,6 +126,7 @@ data Instruction
     | Mthi Register
     -- Store instructions
     | Sw  Register Operand
+    -- Set if instructions
     | Slt Register Register Register        --  Set Rd to 1 if Rs < Rt, 0 otherwise
     | Seq Register Register Register        --  Set Rd to 1 if Rs == Rt, 0 otherwise
     -- Branch instructions
@@ -156,7 +157,7 @@ instance Show Instruction where
         ins -> "\t" ++ case ins of
             --  Data declarations
             Asciiz lab str  -> lab ++ ": .asciiz " ++ str
-            Word   lab      -> lab ++ ": .word\t\t0" 
+            Word   lab      -> lab ++ ": .word\t\t0"
             --  Arithmetic
             Add   rd rs rt  -> "add"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             Addi  rd rs imm -> "addi"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm
@@ -169,7 +170,7 @@ instance Show Instruction where
             --  Boolean
             Or  rd rs rt -> "or"  ++ (tabs 2) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             And rd rs rt -> "and" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
-            Not rd rs    -> "not" ++ (tabs 3) ++ show rd ++ ", " ++ show rs 
+            Not rd rs    -> "not" ++ (tabs 3) ++ show rd ++ ", " ++ show rs
             --  Move
             Move rd rs    -> "move" ++ (tabs 4) ++ show rd ++ ", " ++ show rs
             --  Load instructions

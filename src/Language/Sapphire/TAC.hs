@@ -75,7 +75,7 @@ data Instruction
     | LoadConstant  { dst :: Location, val   :: Value }
     | Assign        { dst :: Location, src   :: Location }
     | Load          { dst :: Location, base  :: Base, indirect :: Location }
-    | Store         { dst :: Location, base  :: Base, indirect :: Location }
+    | Store         { src :: Location, base  :: Base, indirect :: Location }
     | UnaryOp       { dst :: Location, unop  :: UnOperator , src  :: Location }
     | BinaryOp      { dst :: Location, binop :: BinOperator, left :: Location, right :: Location }
     -- Jumps
@@ -111,7 +111,7 @@ instance Show Instruction where
             LoadConstant  d v      -> show d ++ " := " ++ show v
             Assign        d s      -> show d ++ " := " ++ show s
             Load          d b ind  -> show d ++ " := *(" ++ show ind ++ (if b /= 0 then " + " ++ show b else []) ++ ")"
-            Store         d b ind  -> "*(" ++ show d ++ (if b /= 0 then " + " ++ show b else "") ++ ")"++ " := " ++ show ind
+            Store         s b ind  -> "*(" ++ show ind ++ (if b /= 0 then " + " ++ show b else "") ++ ")"++ " := " ++ show s
             UnaryOp       d op s   -> show d ++ " := " ++ show op ++ " " ++ show s
             BinaryOp      d op l r -> show d ++ " := " ++ show l ++ " " ++ show op ++ " " ++ show r
             -- Jumps
