@@ -328,11 +328,13 @@ emit = \case
         getRegister Read y
         void $ getRegister Write x
 
-      Load dst b (Address idn off isGlobal) -> do
+      Load dst b (Address _ off isGlobal) -> do
         rDst <- getRegister Write dst
         generate $ Lw rDst (Indexed (b + off) (pointerRegister isGlobal))
 
-      Store dst base ind -> return ()
+      Store src b (Address _ off isGlobal) -> do
+        rSrc <- getRegister Read src
+        generate $ Sw rSrc (Indexed (b + off) (pointerRegister isGlobal))
 
       UnaryOp res NOT op -> do
         ry <- getRegister Read op

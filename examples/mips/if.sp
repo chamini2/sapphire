@@ -1,6 +1,6 @@
 main
   a : Int
-  if 32 then
+  if 3 == 0 then
       a = 1
   end
 end
