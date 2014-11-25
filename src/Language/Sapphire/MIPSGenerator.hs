@@ -13,18 +13,19 @@ import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC         as TAC
 
-import           Control.Monad                 (when, void)
+import           Control.Monad                 (void, when)
 import           Control.Monad.Reader          (asks)
 import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Char                     (ord)
 import           Data.Foldable                 (concat, forM_, mapM_, toList)
-import           Data.Maybe                    (fromJust, isJust)
+import qualified Data.Map.Strict               as Map (Map, adjust,
+                                                       foldlWithKey, fromList,
+                                                       lookup, member)
+import           Data.Maybe                    (fromJust, fromMaybe, isJust)
 import           Data.Sequence                 (Seq, empty, singleton)
-import qualified Data.Map.Strict               as Map (Map, fromList, member,
-                                                adjust, lookup, foldlWithKey)
-import           Prelude                       hiding (EQ, LT, GT, concat,
+import           Prelude                       hiding (EQ, GT, LT, concat,
                                                 mapM_)
 
 --------------------------------------------------------------------------------
@@ -173,7 +174,7 @@ generatePrintString lab = do
 generatePrint :: Location -> MIPS.Code -> MIPSGenerator ()
 generatePrint ref code  = do
     generate $ Li V0 code
-    rSrc <- getRegister Read ref
+    rSrc <- getRegister Read ref []
     generate $ Move A0 rSrc
     generate Syscall
 
@@ -181,7 +182,7 @@ generateRead :: Location -> MIPS.Code -> MIPSGenerator ()
 generateRead ref code = do
     generate $ Li V0 code
     generate Syscall
-    rDst <- getRegister Write ref
+    rDst <- getRegister Write ref []
     generate $ Move rDst V0
 
 generateGlobals :: MIPSGenerator ()
@@ -212,8 +213,8 @@ generateGlobals = do
 data Reason = Read | Write
             deriving (Eq)
 
-getRegister :: Reason -> Location -> MIPSGenerator Register
-getRegister reason ref@(Address _ off isGlobal) = do
+getRegister :: Reason -> Location -> [Register] -> MIPSGenerator Register
+getRegister reason ref@(Address _ off isGlobal) avoid = do
     reg <- do
         mReg <- findRegisterWithContents ref
         case mReg of
@@ -222,7 +223,10 @@ getRegister reason ref@(Address _ off isGlobal) = do
                 mEmptyReg <- findEmptyRegister
                 reg <- case mEmptyReg of
                     Just emptyReg -> return emptyReg
-                    Nothing -> error "MIPSGenerator.getRegister: can't spill yet"
+                    Nothing -> do
+                        reg <- selectRegisterToSpill avoid
+                        spillRegister reg
+                        return reg
 
                 slaveLocation ref reg
                 when (reason == Read) $ do
@@ -232,9 +236,6 @@ getRegister reason ref@(Address _ off isGlobal) = do
 
     when (reason == Write) $ markDirty reg
     return reg
-
-getRegisterForWrite :: Location -> MIPSGenerator Register
-getRegisterForWrite = getRegister Write
 
 findRegisterWithContents :: Location -> MIPSGenerator (Maybe Register)
 findRegisterWithContents ref = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing
@@ -258,30 +259,51 @@ getsRegDescriptor reg f = gets registerDescriptors >>= return . f . fromJust . M
 
 slaveLocation :: Location -> Register -> MIPSGenerator ()
 slaveLocation ref reg = do
-    regDes <- gets registerDescriptors
-    if Map.member reg regDes
-        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { values = ref : values rd }) reg regDes }
+    tab <- gets registerDescriptors
+    if Map.member reg tab
+        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { values = ref : values rd }) reg tab }
         else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
-
-locationsAreSame :: Location -> Location -> MIPSGenerator ()
-locationsAreSame r1 r2 = return ()
 
 markDirty :: Register -> MIPSGenerator ()
 markDirty reg = do
-    regDes <- gets registerDescriptors
-    if Map.member reg regDes
-        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = True }) reg regDes }
+    tab <- gets registerDescriptors
+    if Map.member reg tab
+        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = True }) reg tab }
         else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
 
 markClean :: Register -> MIPSGenerator ()
 markClean reg = do
-    regDes <- gets registerDescriptors
-    if Map.member reg regDes
-        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = False }) reg regDes }
+    tab <- gets registerDescriptors
+    if Map.member reg tab
+        then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { dirty = False }) reg tab }
         else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
 
+selectRegisterToSpill :: [Register] -> MIPSGenerator Register
+selectRegisterToSpill avoid = gets registerDescriptors >>= \tab -> return . nonAvoid tab $ nonDirty tab
+    where
+        nonDirty :: RegDescriptorTable -> Maybe Register
+        nonDirty = Map.foldlWithKey func Nothing
+            where
+                func mReg keyReg regDes = case (mReg, dirty regDes, keyReg `elem` avoid) of
+                    (Just _ , _    , _    ) -> mReg
+                    (Nothing, _    , True ) -> Nothing
+                    (Nothing, True , _    ) -> Nothing
+                    (Nothing, False, False) -> Just keyReg
+        nonAvoid :: RegDescriptorTable -> Maybe Register -> Register
+        nonAvoid tab = fromMaybe (fromJust $ Map.foldlWithKey func Nothing tab)
+            where
+                func mReg keyReg regDes = case (mReg, keyReg `elem` avoid) of
+                    (Just _ , _    ) -> mReg
+                    (Nothing, True ) -> Nothing
+                    (Nothing, False) -> Just keyReg
+
 spillRegister :: Register -> MIPSGenerator ()
-spillRegister reg = return ()
+spillRegister reg = do
+    tab <- gets registerDescriptors
+    let regDes = fromJust $ Map.lookup reg tab
+    when (dirty regDes) $ forM_ (values regDes) $ \(Address _ off isGlobal) ->
+        generate $ Sw reg (Indexed off (pointerRegister isGlobal))
+    modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { values = [] }) reg tab }
 
 spillAllDirtyRegisters :: MIPSGenerator ()
 spillAllDirtyRegisters = return ()
@@ -316,7 +338,7 @@ emit = \case
       TAC.PutLabel lab -> generate $ MIPS.PutLabel lab
 
       LoadConstant dst val -> do
-        reg <- getRegister Write dst
+        reg <- getRegister Write dst []
         let imm = case val of
                 ValInt   v -> v
                 ValFloat v -> error "MIPSGenerator.emit.LoadConstant: loading float constant"
@@ -324,22 +346,18 @@ emit = \case
                 ValChar  v -> ord v
         generate $ Li reg imm
 
-      Assign x y -> do
-        getRegister Read y
-        void $ getRegister Write x
-
       Load dst b (Address _ off isGlobal) -> do
-        rDst <- getRegister Write dst
+        rDst <- getRegister Write dst []
         generate $ Lw rDst (Indexed (b + off) (pointerRegister isGlobal))
 
       Store src b (Address _ off isGlobal) -> do
-        rSrc <- getRegister Read src
+        rSrc <- getRegister Read src []
         generate $ Sw rSrc (Indexed (b + off) (pointerRegister isGlobal))
 
       BinaryOp x op y z -> do
-        ry  <- getRegister Read y
-        rz  <- getRegister Read z
-        rx  <- getRegister Write x
+        ry  <- getRegister Read y []
+        rz  <- getRegister Read z [ry]
+        rx  <- getRegister Write x [ry, rz]
 
         case op of
             ADD -> generate $ Add rx ry rz
@@ -357,7 +375,7 @@ emit = \case
                 LT -> generate $ Slt rx ry rz
 
     -- Function related instructions
-      BeginFunction w   -> do
+      BeginFunction w -> do
         generate $ Subu  SP SP (Const 8)            -- Decrement $sp to make space to save $ra, $fp
         {-generate $ Subu  SP SP (Const 12)           -- Decrement $sp to make space to save $ra, $fp and return value-}
         generate $ Sw    FP (Indexed 8 SP)          -- Save fp
@@ -366,20 +384,20 @@ emit = \case
         generate $ Addiu FP SP (Const 8)            -- Setup new fp
         when (w /= 0) . generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
 
-      EndFunction       -> do
+      EndFunction -> do
         return ()
         -- We could have an implicit return statement here, but in our case return statements are mandatory
 
       PushParam ref -> do
         generate $ Subu SP SP (Const 4)     -- Decrement sp to make space for param
-        reg <- getRegister Read ref
+        reg <- getRegister Read ref []
         generate $ Sw reg (Indexed 4 SP)    -- Copy param value to stack
 
       PopParams bytes -> do
         generate $ Addi SP SP (Const bytes)   -- Pop params of stack
 
-      Return mayA     -> do
-        when (isJust mayA) $ getRegister Read (fromJust mayA) >>= generate . Move V0
+      Return mayA -> do
+        when (isJust mayA) $ getRegister Read (fromJust mayA) [] >>= generate . Move V0
         generate $ Move SP FP               -- Pop callee frame off stack
         {-generate $ Lw FP (Indexed (-8)  FP)    -- Restore saved return value-}
         generate $ Lw RA (Indexed (-4) FP)  -- Restore saved ra
@@ -392,7 +410,7 @@ emit = \case
       FCall lab addr -> do
         generate $ Jal lab
         -- get return value TO DO
-        ret <- getRegister Write addr
+        ret <- getRegister Write addr []
         generate $ Move ret V0  -- Copy return value from $v0 - MIPS Convention
 
       -- Print
@@ -414,7 +432,7 @@ emit = \case
         generate $ B lab        --  Unconditional branch
 
       IfTrueGoto ref lab -> do
-        reg <- getRegister Read ref
+        reg <- getRegister Read ref []
         generate $ Bnez reg lab
 
       ins                      -> error $ "MIPSGenerator.emit unknown instruction " ++ show ins

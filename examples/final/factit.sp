@@ -1,5 +1,5 @@
 # asume n >= 0
-def fact : Int n -> Int
+def fact : (Int n) -> Int
   for i in 2..n do
     n = n * i
   end

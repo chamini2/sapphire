@@ -1,5 +1,5 @@
 # asume n >= 0
-def fact : Int n -> Int
+def fact : (Int n) -> Int
   if n == 0 then
     return 1
   else
