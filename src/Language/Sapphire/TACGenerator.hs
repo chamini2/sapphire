@@ -166,7 +166,7 @@ linearizeStatement nextLabel (Lex st posn) = do
                 generate $ Comment $ "true label for " ++ showStatement
 
                 generate $ LoadConstant trueTemp $ ValBool True
-                generate $ Store accAddr 0 trueTemp
+                generate $ Store trueTemp 0 accAddr
 
                 generate $ Goto nextLabel
 
@@ -174,11 +174,11 @@ linearizeStatement nextLabel (Lex st posn) = do
                 generate $ Comment $ "false label for " ++ showStatement
 
                 generate $ LoadConstant falseTemp $ ValBool False
-                generate $ Store accAddr 0 falseTemp
+                generate $ Store falseTemp 0 accAddr
 
             else do
                 expAddr <- linearizeExpression expL
-                generate $ Store accAddr 0 expAddr
+                generate $ Store expAddr 0 accAddr
 
         StReturn mayExpL ->  (=<<) (generate . Return) . runMaybeT $ do
             guard (isJust mayExpL)
