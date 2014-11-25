@@ -11,7 +11,7 @@ import           Control.Monad.State  (MonadState, gets, modify)
 import           Control.Monad.Writer (MonadWriter, tell)
 import           Data.Function        (on)
 import qualified Data.Map.Strict      as Map (Map, fromList)
-import           Data.Maybe           (isJust)
+import           Data.Maybe           (isJust, fromJust)
 import           Data.Sequence        (Seq, singleton, empty, filter)
 import           Prelude              hiding (filter)
 
@@ -196,3 +196,15 @@ modifySymbol idn f = getsSymbol idn scopeStack >>= \case
 markUsed :: (SappState s, MonadState s m)
          => Identifier -> m ()
 markUsed idn = modifySymbol idn $ \sym -> sym { used = True }
+
+--------------------------------------------------------------------------------
+-- DataType
+
+dataTypeWidth :: (SappState s, MonadState s m) => DataType -> m Width
+dataTypeWidth dt = if isArray dt
+    then do
+        let Array inDtL sizL = dt
+        inDtWdt <- dataTypeWidth $ lexInfo inDtL
+        return $ inDtWdt * lexInfo sizL
+    else liftM fromJust $ getsSymbol (toIdentifier dt) width
+

@@ -13,9 +13,11 @@ module Language.Sapphire.MIPS
     , Instruction(..)
     ) where
 
-import           Data.Char             (toLower)
+import           Language.Sapphire.SymbolTable (Width)
+import           Language.Sapphire.TAC         (Label, Value (..))
+
+import           Data.Char                     (toLower)
 import           Data.Data
-import           Language.Sapphire.TAC (Value(..), Label)
 
 {-|
     MIPS related information and data types
@@ -99,6 +101,8 @@ data Instruction
     -- Data declarations
     | Asciiz Label String
     | Word   Label
+    | Byte   Label
+    | Space  Label Width
     -- Arithmetic
     | Add   Register Register Register
     | Addi  Register Register Operand
@@ -161,6 +165,8 @@ instance Show Instruction where
             --  Data declarations
             Asciiz lab str  -> lab ++ ": .asciiz " ++ str
             Word   lab      -> lab ++ ": .word\t\t0"
+            Byte   lab      -> lab ++ ": .byte\t\t0"
+            Space  lab byt  -> lab ++ ": .space\t\t" ++ show byt
             --  Arithmetic
             Add   rd rs rt  -> "add"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             Addi  rd rs imm -> "addi"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm

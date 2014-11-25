@@ -19,10 +19,10 @@ import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Char                     (ord)
-import           Data.Foldable                 (concat, forM_, mapM_, toList)
+import           Data.Foldable                 (forM_, mapM_, toList)
 import qualified Data.Map.Strict               as Map (Map, adjust,
                                                        foldlWithKey, fromList,
-                                                       lookup, member)
+                                                       lookup, member, toList)
 import           Data.Maybe                    (fromJust, fromMaybe, isJust)
 import           Data.Sequence                 (Seq, empty, singleton)
 import           Prelude                       hiding (EQ, GT, LT, concat,
@@ -37,6 +37,7 @@ type MIPSGenerator = RWS SappReader MIPSWriter MIPSState
 
 data MIPSState = MIPSState
     { table               :: SymbolTable
+    , stack               :: Stack Scope
     , registerDescriptors :: RegDescriptorTable
 
     {-, variablesDescriptors :: -}
@@ -78,23 +79,18 @@ data RegDescriptor = RegDescriptor
     , dirty      :: Bool
     }
 
-{-data VarDescriptor = VarDescriptor -}
-    {-{ var       :: Location-}
-    {-, locations :: Location-}
-    {-}-}
-
 ----------------------------------------
 -- Instances
 
 instance SappState MIPSState where
-    getTable       = table
+    getTable = table
+    getStack = stack
     putTable tab s = s { table = tab }
-    getStack   = undefined
-    getScopeId = undefined
-    getAst     = undefined
-    putStack   = undefined
-    putScopeId = undefined
-    putAst     = undefined
+    putStack stk s = s { stack   = stk }
+    getScopeId = error "MIPSGenerator.getScopeId"
+    getAst     = error "MIPSGenerator.getAst"
+    putScopeId = error "MIPSGenerator.putScopeId"
+    putAst     = error "MIPSGenerator.putAst"
 
 instance Show MIPSState where
     show = showSappState
@@ -104,8 +100,8 @@ instance Show MIPSState where
 
 initialState :: MIPSState
 initialState = MIPSState
-    { table   = emptyTable
-
+    { table = emptyTable
+    , stack = globalStack
     , registerDescriptors = initialRegDescriptors
     {-, variablesDescriptors-}
     }
@@ -135,10 +131,11 @@ buildMIPSGenerator tab blocks = do
     tell initialWriter
     emitPreamble
 
-    let tac = concat $ fmap toList blocks
-    flip mapM_ (filter (not . isComment) tac) $ \ins -> do
-        generate $ MIPS.Comment $ show ins
-        emit ins
+    forM_ blocks $ \tac -> do
+        -- Removing comments
+        forM_ (filter (not . isComment) $ toList tac) $
+            \ins -> (generate $ MIPS.Comment $ show ins) >> emit ins
+        spillAllDirtyRegisters
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -188,11 +185,16 @@ generateRead ref code = do
 generateGlobals :: MIPSGenerator ()
 generateGlobals = do
     generate $ MIPS.PutDirective ".data"
-    syms <- gets (toSeq . getTable)
+    -- Only global symbols
+    syms <- gets (filter ((==globalScope) . scope . snd) . toList . toSeq . getTable)
     forM_ syms $ \(idn, sym) -> do
         case sym of
-            SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_str" ++ show off) idn
-            {-SymInfo { dataType = Lex Int    _ , offset = off } -> generate $ Word   ("_" ++ show off) idn-}
+            SymInfo { dataType = Lex String _, offset = off } -> generate $ Asciiz ("_str" ++ show off) idn
+            SymInfo { dataType = Lex Int    _, offset = off } -> generate $ Word   ("_glb" ++ show off)
+            SymInfo { dataType = Lex Float  _, offset = off } -> generate $ Word   ("_glb" ++ show off)
+            SymInfo { dataType = Lex Char   _, offset = off } -> generate $ Byte   ("_glb" ++ show off)
+            SymInfo { dataType = Lex Bool   _, offset = off } -> generate $ Byte   ("_glb" ++ show off)
+            SymInfo { dataType = Lex dt     _, offset = off } -> dataTypeWidth dt >>= generate . Space  ("_glb" ++ show off)
             _ -> return ()
 
 ----------------------------------------
@@ -306,7 +308,9 @@ spillRegister reg = do
     modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { values = [] }) reg tab }
 
 spillAllDirtyRegisters :: MIPSGenerator ()
-spillAllDirtyRegisters = return ()
+spillAllDirtyRegisters = do
+    tab <- gets registerDescriptors
+    mapM_ spillRegister . fmap fst . filter (dirty . snd) $ Map.toList tab
 
 {-buildOperand :: Location -> MIPSGenerator Operand-}
 {-buildOperand = \case-}

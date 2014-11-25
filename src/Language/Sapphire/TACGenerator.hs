@@ -517,16 +517,6 @@ accessLocation accL = do
 
 ----------------------------------------
 
-dataTypeWidth :: DataType -> TACGenerator Width
-dataTypeWidth dt = if isArray dt
-    then do
-        let Array inDtL sizL = dt
-        inDtWdt <- dataTypeWidth $ lexInfo inDtL
-        return $ inDtWdt * lexInfo sizL
-    else liftM fromJust $ getsSymbol (toIdentifier dt) width
-
-----------------------------------------
-
 type Leader = Bool
 
 makeBasicBlocks :: TAC -> Seq TAC

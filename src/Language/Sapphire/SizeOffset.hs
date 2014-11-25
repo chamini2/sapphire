@@ -105,7 +105,7 @@ addOffset :: Offset -> SizeOffset ()
 addOffset off = do
     scp <- currentScope
     if scp == globalScope
-        then modify $ \s -> s { globalOffset = globalOffset s - off }
+        then modify $ \s -> s { globalOffset = globalOffset s + off }
         else modify $ \s -> s { offStack = touch (\t -> t - off) (offStack s) }
 
 resetOffset :: SizeOffset ()
@@ -155,7 +155,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         blockWdt <- exitFunction
         modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { blockWidth = negate blockWdt, prmsWidth = negate prmsWdt }
 
-    StPrint expL -> addStrings expL
+    StPrint expL -> addString expL
 
     StIf _ trueBlock falseBlock -> do
         enterScope
@@ -207,8 +207,8 @@ sizeOffsetStatement stL = case lexInfo stL of
 --------------------------------------------------------------------------------
 
 -- We only need to check for Strings to add them to the SymbolTable
-addStrings :: Lexeme Expression -> SizeOffset ()
-addStrings (Lex exp _) = case exp of
+addString :: Lexeme Expression -> SizeOffset ()
+addString (Lex exp _) = case exp of
 
     LitString strL -> do
         strOff <- gets globalOffset
