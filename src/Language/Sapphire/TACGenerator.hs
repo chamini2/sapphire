@@ -343,8 +343,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ PutLabel condLabel
             generate $ Comment $ "condition label for " ++ showStatement
 
-            testTemp <- newTemporary
-            generate $ BinaryOp testTemp (Rel GT) idnAddr toAddr
+            testTemp <- binaryToBinOperator OpGreat idnAddr toAddr
 
             generate $ IfTrueGoto testTemp nextLabel
 
@@ -438,9 +437,8 @@ linearizeExpression (Lex exp _) = case exp of
     ExpBinary (Lex op _) lExpL rExpL -> do
         lAddr <- linearizeExpression lExpL
         rAddr <- linearizeExpression rExpL
-        resTemp <- newTemporary
-        generate $ BinaryOp resTemp (binaryToBinOperator op) lAddr rAddr
-        return resTemp
+
+        binaryToBinOperator op lAddr rAddr
 
     ExpUnary (Lex op _) expL -> do
         expAddr <- linearizeExpression expL
@@ -461,6 +459,57 @@ linearizeExpression (Lex exp _) = case exp of
             temp <- newTemporary
             generate $ LoadConstant temp v
             return temp
+
+
+binaryToBinOperator :: Binary -> Location -> Location -> TACGenerator Location
+binaryToBinOperator op lAddr rAddr = do
+    resTemp <- newTemporary
+
+    case op of
+        OpPlus    -> generate $ BinaryOp resTemp ADD      lAddr rAddr
+        OpMinus   -> generate $ BinaryOp resTemp SUB      lAddr rAddr
+        OpTimes   -> generate $ BinaryOp resTemp MUL      lAddr rAddr
+        OpDivide  -> generate $ BinaryOp resTemp DIV      lAddr rAddr
+        OpModulo  -> generate $ BinaryOp resTemp MOD      lAddr rAddr
+        OpPower   -> generate $ BinaryOp resTemp POW      lAddr rAddr
+        OpOr      -> generate $ BinaryOp resTemp OR       lAddr rAddr
+        OpAnd     -> generate $ BinaryOp resTemp AND      lAddr rAddr
+        OpEqual   -> generate $ BinaryOp resTemp (Rel EQ) lAddr rAddr
+        OpUnequal -> generate $ BinaryOp resTemp (Rel NE) lAddr rAddr
+        OpLess    -> generate $ BinaryOp resTemp (Rel LT) lAddr rAddr
+        OpLessEq  -> do
+            ltTemp <- newTemporary
+            generate $ BinaryOp ltTemp (Rel LT) lAddr  rAddr
+
+            eqTemp <- newTemporary
+            generate $ BinaryOp eqTemp (Rel EQ) lAddr  rAddr
+
+            generate $ BinaryOp resTemp  OR     ltTemp eqTemp
+        OpGreat   -> do
+            ltTemp <- newTemporary
+            generate $ BinaryOp ltTemp (Rel LT) lAddr rAddr
+
+            nlTemp <- newTemporary
+            generate $ UnaryOp nlTemp NOT ltTemp
+
+            eqTemp <- newTemporary
+            generate $ BinaryOp eqTemp (Rel EQ) lAddr rAddr
+
+            neTemp <- newTemporary
+            generate $ UnaryOp nlTemp NOT eqTemp
+
+            generate $ BinaryOp resTemp  AND nlTemp neTemp
+        OpGreatEq -> do
+            ltTemp <- newTemporary
+            generate $ BinaryOp ltTemp (Rel LT) lAddr rAddr
+
+            generate $ UnaryOp resTemp NOT ltTemp
+        _         -> error "TAC.binaryToBinOperator: trying to convert '@' or '..' to a intermediate code binary operator"
+        -- OpFromTo
+        -- OpBelongs
+
+    return resTemp
+
 
 --------------------------------------------------------------------------------
 

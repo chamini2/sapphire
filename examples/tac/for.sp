@@ -1,7 +1,9 @@
 #   TAC generation - For statement
-for i in 1..10 do
-    print "rollin'"
-    i = i + 1
+main
+    for i in 1..10 do
+        print "rollin'"
+        i = i + 1
+    end
 end
 
 #

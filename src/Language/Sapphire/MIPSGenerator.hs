@@ -357,10 +357,6 @@ emit = \case
                 EQ -> generate $ Seq rx ry rz
                 NE -> generate (Sub rx ry rz) >> generate (Not rx rx)
                 LT -> generate $ Slt rx ry rz
-                LE -> undefined
-                GT -> undefined
-                GE -> undefined
-
 
       {-IfGoto      rel le ri lab -> do-}
         {-regLe <- getRegister Read le-}

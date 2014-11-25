@@ -17,8 +17,6 @@ module Language.Sapphire.TAC
     , UnOperator(..)
     , Relation(..)
 
-    , binaryToRelation
-    , binaryToBinOperator
     , hasGoto
     , isPutLabel
     , isComment
@@ -222,11 +220,8 @@ data BinOperator
 data UnOperator = NOT
                 deriving (Eq)
 
-data Relation
-    = EQ | NE
-    | LT | LE
-    | GT | GE
-    deriving (Eq)
+data Relation = EQ | NE | LT
+              deriving (Eq)
 
 instance Show BinOperator where
     show = \case
@@ -251,39 +246,6 @@ instance Show Relation where
         EQ -> "=="
         NE -> "/="
         LT -> "<"
-        LE -> "<="
-        GT -> ">"
-        GE -> ">="
-
-binaryToRelation :: Binary -> Relation
-binaryToRelation = \case
-    OpEqual   -> EQ
-    OpUnequal -> NE
-    OpLess    -> LT
-    OpLessEq  -> LE
-    OpGreat   -> GT
-    OpGreatEq -> GE
-    _         -> error "TAC.binaryToRelation: trying to convert a non-relation binary operator to a intermediate code relation operator"
-
-binaryToBinOperator :: Binary -> BinOperator
-binaryToBinOperator = \case
-    OpPlus    -> ADD
-    OpMinus   -> SUB
-    OpTimes   -> MUL
-    OpDivide  -> DIV
-    OpModulo  -> MOD
-    OpPower   -> POW
-    OpOr      -> OR
-    OpAnd     -> AND
-    OpEqual   -> Rel EQ
-    OpUnequal -> Rel NE
-    OpLess    -> Rel LT
-    OpLessEq  -> Rel LE
-    OpGreat   -> Rel GT
-    OpGreatEq -> Rel GE
-    _         -> error "TAC.binaryToBinOperator: trying to convert '@' or '..' to a intermediate code binary operator"
-    -- OpFromTo
-    -- OpBelongs
 
 hasGoto :: Instruction -> Bool
 hasGoto = \case
