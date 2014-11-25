@@ -419,7 +419,7 @@ linearizeExpression (Lex exp _) = case exp of
         accAddr <- accessLocation accL
 
         resTemp <- newTemporary
-        generate $ Assign resTemp accAddr
+        generate $ Load resTemp 0 accAddr
         return resTemp
 
     FunctionCall idnL prmLs -> do

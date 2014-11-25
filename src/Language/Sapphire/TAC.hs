@@ -61,23 +61,23 @@ data Value
 
 instance Show Value where
     show = \case
-        ValInt    v -> show v
-        ValFloat  v -> show v
-        ValBool   v -> map toLower (show v)
-        ValChar   v -> show v
+        ValInt   v -> show v
+        ValFloat v -> show v
+        ValBool  v -> map toLower (show v)
+        ValChar  v -> show v
 
 data Instruction
     = Comment       { comment :: String }
+    -- Label
+    | PutLabel      { label :: Label }
     -- Loads
     | LoadConstant  { dst :: Location, val   :: Value }
     | LoadLabel     { dst :: Location, label :: Label }
     | Assign        { dst :: Location, src   :: Location }
     | Load          { dst :: Location, base  :: Base, indirect :: Location }
     | Store         { dst :: Location, base  :: Base, indirect :: Location }
-    | UnaryOp       { dst :: Location, unop  :: UnOperator , src      :: Location }
-    | BinaryOp      { dst :: Location, binop :: BinOperator, left     :: Location, right :: Location }
-    -- Label
-    | PutLabel      { label :: Label }
+    | UnaryOp       { dst :: Location, unop  :: UnOperator , src  :: Location }
+    | BinaryOp      { dst :: Location, binop :: BinOperator, left :: Location, right :: Location }
     -- Jumps
     | Goto          { label :: Label }
     | IfTrueGoto    { test  :: Location, label :: Label}
