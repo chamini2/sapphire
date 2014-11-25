@@ -14,7 +14,6 @@ module Language.Sapphire.TAC
 
     , Instruction(..)
     , BinOperator(..)
-    , UnOperator(..)
     , Relation(..)
 
     , hasGoto
@@ -74,7 +73,6 @@ data Instruction
     | Assign        { dst :: Location, src   :: Location }
     | Load          { dst :: Location, base  :: Base, indirect :: Location }
     | Store         { src :: Location, base  :: Base, indirect :: Location }
-    | UnaryOp       { dst :: Location, unop  :: UnOperator , src  :: Location }
     | BinaryOp      { dst :: Location, binop :: BinOperator, left :: Location, right :: Location }
     -- Jumps
     | Goto          { label :: Label }
@@ -110,7 +108,6 @@ instance Show Instruction where
             Assign        d s      -> show d ++ " := " ++ show s
             Load          d b ind  -> show d ++ " := *(" ++ show ind ++ (if b /= 0 then " + " ++ show b else []) ++ ")"
             Store         s b ind  -> "*(" ++ show ind ++ (if b /= 0 then " + " ++ show b else "") ++ ")"++ " := " ++ show s
-            UnaryOp       d op s   -> show d ++ " := " ++ show op ++ " " ++ show s
             BinaryOp      d op l r -> show d ++ " := " ++ show l ++ " " ++ show op ++ " " ++ show r
             -- Jumps
             Goto          lab     -> "goto " ++ lab
@@ -136,89 +133,11 @@ instance Show Instruction where
             ReadBool      d -> "readbool "  ++ show d
             _  -> error "TAC.Show Instruction: unrecognized instruction"
 
--- data Instruction
---     = Comment String
---     | PutLabel Label String
---     | AssignBin
---         { result :: Reference
---         , binop  :: BinOperator
---         , left   :: Reference
---         , right  :: Reference
---         }
---     | AssignUn
---         { result  :: Reference
---         , unop    :: UnOperator
---         , operand :: Reference
---         }
---     | Assign
---         { dst :: Reference
---         , src :: Reference
---         }
--- --    | AssignArrR
--- --    | AssignArrL
---     -- Function related instructions
---     | BeginFunction Width
---     | EndFunction
---     | PushParameter Reference
---     | PopParameters Int
---     | Return (Maybe Reference)
---     | PCall           Label Int
---     | FCall Reference Label Int
---     -- Print
---     | PrintInt    Reference
---     | PrintFloat  Reference
---     | PrintChar   Reference
---     | PrintBool   Reference
---     | PrintString Offset    Width
---     -- Read
---     | ReadInt   Reference
---     | ReadFloat Reference
---     | ReadChar  Reference
---     | ReadBool  Reference
---     -- Goto
---     | Goto                                     Label
---     | IfGoto      Relation Reference Reference Label
---     | IfTrueGoto  Reference                    Label
---     | IfFalseGoto Reference                    Label
-
--- instance Show Instruction where
---     show = \case
---         Comment str     -> "# " ++ str
---         PutLabel lab str -> lab ++ ":" ++ replicate (10 - div (length lab + 1) 4) '\t' ++ "# " ++ str
---         ins -> "\t" ++ case ins of
---             AssignBin res o le ri -> show res ++ " := " ++ show le ++ " " ++ show o ++ " " ++ show ri
---             AssignUn  res o n     -> show res ++ " := " ++ show o  ++ " " ++ show n
---             Assign ds sr          -> show ds ++ " := " ++ show sr
---             BeginFunction by      -> "begin_function " ++ show by
---             EndFunction           -> "end_function"
---             PushParameter ref     -> "param " ++ show ref
---             PopParameters n       -> "popparams " ++ show n
---             Return mayA           -> "return" ++ maybe "" ((" " ++) . show) mayA
---             PCall lab n           -> "call " ++ lab ++ ", " ++ show n
---             FCall ref lab n       -> show ref ++ " := " ++ "call " ++ lab ++ ", " ++ show n
---             PrintInt    ref       -> "print_int "    ++ show ref
---             PrintFloat  ref       -> "print_float "  ++ show ref
---             PrintChar   ref       -> "print_char "   ++ show ref
---             PrintBool   ref       -> "print_bool "   ++ show ref
---             PrintString off wdt   -> "print_string " ++ show off ++ " " ++ show wdt
---             ReadInt   ref         -> "read_int "   ++ show ref
---             ReadFloat ref         -> "read_float " ++ show ref
---             ReadChar  ref         -> "read_char "  ++ show ref
---             ReadBool  ref         -> "read_bool "  ++ show ref
---             Goto lab              -> "goto " ++ lab
---             IfGoto rel le ri lab  -> "if " ++ show le ++ " " ++ show rel ++ " " ++ show ri ++ " goto " ++ lab
---             IfTrueGoto  ref  lab  -> "if "    ++ show ref ++ " goto " ++ lab
---             IfFalseGoto ref  lab  -> "ifnot " ++ show ref ++ " goto " ++ lab
---             _  -> error "TAC.Show Instruction: unrecognized instruction"
-
 data BinOperator
     = ADD  | SUB | MUL | DIV | MOD | POW
-    | OR   | AND
+    | OR   | AND | XOR
     | Rel Relation
     deriving (Eq)
-
-data UnOperator = NOT
-                deriving (Eq)
 
 data Relation = EQ | NE | LT
               deriving (Eq)
@@ -233,13 +152,10 @@ instance Show BinOperator where
         POW   -> "^"
         OR    -> "|"
         AND   -> "&"
+        XOR   -> "~"
         -- ArrR  -> "=[]"
         -- ArrL  -> "[]="
         Rel r -> show r
-
-instance Show UnOperator where
-    show = \case
-        NOT -> "!"
 
 instance Show Relation where
     show = \case

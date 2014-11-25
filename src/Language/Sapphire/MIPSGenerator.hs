@@ -336,11 +336,6 @@ emit = \case
         rSrc <- getRegister Read src
         generate $ Sw rSrc (Indexed (b + off) (pointerRegister isGlobal))
 
-      UnaryOp res NOT op -> do
-        ry <- getRegister Read op
-        rx <- getRegister Write res
-        generate $ Not rx ry
-
       BinaryOp x op y z -> do
         ry  <- getRegister Read y
         rz  <- getRegister Read z
@@ -355,32 +350,11 @@ emit = \case
             {-POW   -> "^"-}
             OR  -> generate $ Or  rx ry rz
             AND -> generate $ And rx ry rz
+            XOR -> generate $ Xor rx ry rz
             Rel rel -> case rel of
                 EQ -> generate $ Seq rx ry rz
-                NE -> generate (Sub rx ry rz) >> generate (Not rx rx)
+                NE -> generate $ Sne rx ry rz
                 LT -> generate $ Slt rx ry rz
-
-      {-IfGoto      rel le ri lab -> do-}
-        {-regLe <- getRegister Read le-}
-        {-regRi <- getRegister Read ri-}
-        {-case rel of-}
-            {-EQ -> do-}
-            {-NE -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bnez regLe lab-}
-            {-LT -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bgtz regLe lab-}
-            {-LE -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bgez regLe lab-}
-            {-GT -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bltz regLe lab-}
-            {-GE -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Blez regLe lab-}
-
 
     -- Function related instructions
       BeginFunction w   -> do

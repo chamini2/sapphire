@@ -112,7 +112,7 @@ data Instruction
     -- Boolean operations
     | Or  Register Register Register
     | And Register Register Register
-    | Not Register Register
+    | Xor Register Register Register
     -- Move
     | Move Register Register
     -- Load instructions
@@ -127,8 +127,12 @@ data Instruction
     -- Store instructions
     | Sw  Register Operand
     -- Set if instructions
-    | Slt Register Register Register        --  Set Rd to 1 if Rs < Rt, 0 otherwise
-    | Seq Register Register Register        --  Set Rd to 1 if Rs == Rt, 0 otherwise
+    | Seq Register Register Register
+    | Sge Register Register Register
+    | Sgt Register Register Register
+    | Sle Register Register Register
+    | Slt Register Register Register
+    | Sne Register Register Register
     -- Branch instructions
     | B    Label                            --  Unconditional branch
     | Beq  Register Register Label          --  Branch if registers hold the same value
@@ -170,7 +174,7 @@ instance Show Instruction where
             --  Boolean
             Or  rd rs rt -> "or"  ++ (tabs 2) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             And rd rs rt -> "and" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
-            Not rd rs    -> "not" ++ (tabs 3) ++ show rd ++ ", " ++ show rs
+            Xor rd rs rt -> "xor" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             --  Move
             Move rd rs    -> "move" ++ (tabs 4) ++ show rd ++ ", " ++ show rs
             --  Load instructions
@@ -184,8 +188,13 @@ instance Show Instruction where
             Mthi rs       -> "mthi" ++ (tabs 4) ++ show rs
             --  Store instructions
             Sw  rs ind    -> "sw"  ++ (tabs 2) ++ show rs ++ ", " ++ show ind
-            Slt rd rs  rt -> "slt" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            -- Set if instructions
             Seq rd rs  rt -> "seq" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Sge rd rs  rt -> "sge" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Sgt rd rs  rt -> "sgt" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Sle rd rs  rt -> "sle" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Slt rd rs  rt -> "slt" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Sne rd rs  rt -> "sne" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             --  Branch instructions
             B          lab -> "b"    ++ (tabs 1) ++ lab
             Beq  rs rt lab -> "beq"  ++ (tabs 3) ++ show rs ++ ", " ++ show rt ++ ", " ++ lab
@@ -206,4 +215,5 @@ instance Show Instruction where
             Break   -> "break"
             Syscall -> "syscall"
             _       -> error "MIPS.Show Instruction: unrecognized instruction"
-        where tabs l = replicate (5 - div (l + 1) 4) '\t'
+        where
+            tabs l = replicate (5 - div (l + 1) 4) '\t'

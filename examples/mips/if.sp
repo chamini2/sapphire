@@ -1,6 +1,9 @@
 main
   a : Int
-  if 3 == 0 then
-      a = 1
+  a = 10
+  if a > 2 then
+    print "si"
+  else
+    print "no"
   end
 end
