@@ -123,7 +123,7 @@ currentLoop = gets (top . loopStack)
 newTemporary :: TACGenerator Location
 newTemporary = do
     (ser, off) <- gets ((succ . tempSerial) &&& tempWidth)
-    modify $ \s -> s { tempSerial = ser, tempWidth = off + 4 } -- word size = 4
+    modify $ \s -> s { tempSerial = ser, tempWidth = off - 4 } -- word size = 4
     let idn = "_tmp" ++ show ser
     return $ Address idn off False
 

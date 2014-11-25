@@ -105,8 +105,8 @@ addOffset :: Offset -> SizeOffset ()
 addOffset off = do
     scp <- currentScope
     if scp == globalScope
-        then modify $ \s -> s { globalOffset = off + globalOffset s }
-        else modify $ \s -> s { offStack = touch (off+) (offStack s) }
+        then modify $ \s -> s { globalOffset = globalOffset s - off }
+        else modify $ \s -> s { offStack = touch (\t -> t - off) (offStack s) }
 
 resetOffset :: SizeOffset ()
 resetOffset = exitFunction >> enterFunction
@@ -153,7 +153,7 @@ sizeOffsetStatement stL = case lexInfo stL of
         exitScope
 
         blockWdt <- exitFunction
-        modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { blockWidth = blockWdt, prmsWidth = prmsWdt }
+        modifySymbolWithScope idn (scopeStack sym) $ \sym' -> sym' { blockWidth = negate blockWdt, prmsWidth = negate prmsWdt }
 
     StPrint expL -> addStrings expL
 

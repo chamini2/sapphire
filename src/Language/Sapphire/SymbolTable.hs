@@ -53,7 +53,6 @@ import qualified Data.Map.Strict           as Map (Map, adjust, elems, empty,
 import           Data.Maybe                (isJust)
 import           Data.Sequence             (Seq, empty, fromList)
 import           Prelude                   hiding (concatMap, foldr, lookup)
-import qualified Prelude                   as P (fmap)
 
 type SymbolTable = Map.Map Identifier (Map.Map Scope Symbol)
 
@@ -265,7 +264,7 @@ lookup idn tab = Map.lookup idn tab >>= return . head . Map.elems
 lookupWithScope :: Identifier -> Stack Scope -> SymbolTable -> Maybe Symbol
 lookupWithScope idn scps tab = do
     scpTab <- Map.lookup idn tab
-    msum $ P.fmap (flip Map.lookup scpTab) scps
+    msum $ fmap (flip Map.lookup scpTab) scps
 
 ----------------------------------------
 
@@ -274,7 +273,7 @@ lookupWithScope idn scps tab = do
  -}
 update :: Identifier -> (Symbol -> Symbol) -> SymbolTable -> SymbolTable
 update idn f tab = if Map.member idn tab
-    then Map.adjust (P.fmap f) idn tab
+    then Map.adjust (fmap f) idn tab
     else error "SymbolTable.update: updating symbol that does not exist in SymbolTable"
 
 {- |

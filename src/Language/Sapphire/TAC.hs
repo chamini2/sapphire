@@ -72,7 +72,6 @@ data Instruction
     | PutLabel      { label :: Label }
     -- Loads
     | LoadConstant  { dst :: Location, val   :: Value }
-    | LoadLabel     { dst :: Location, label :: Label }
     | Assign        { dst :: Location, src   :: Location }
     | Load          { dst :: Location, base  :: Base, indirect :: Location }
     | Store         { dst :: Location, base  :: Base, indirect :: Location }
@@ -108,13 +107,12 @@ instance Show Instruction where
         PutLabel lab -> lab ++ ":"
         instruction -> "\t" ++ case instruction of
             -- Loads
-            LoadConstant  d v      ->         show d ++ " := " ++ show v
-            LoadLabel     d lab    ->         show d ++ " := " ++ lab
-            Assign        d s      ->         show d ++ " := " ++ show s
-            Load          d b ind  ->         show d ++ " := *(" ++ show ind ++ (if b /= 0 then " + " ++ show b else []) ++ ")"
+            LoadConstant  d v      -> show d ++ " := " ++ show v
+            Assign        d s      -> show d ++ " := " ++ show s
+            Load          d b ind  -> show d ++ " := *(" ++ show ind ++ (if b /= 0 then " + " ++ show b else []) ++ ")"
             Store         d b ind  -> "*(" ++ show d ++ (if b /= 0 then " + " ++ show b else "") ++ ")"++ " := " ++ show ind
-            UnaryOp       d op s   ->         show d ++ " := " ++ show op ++ " " ++ show s
-            BinaryOp      d op l r ->         show d ++ " := " ++ show l ++ " " ++ show op ++ " " ++ show r
+            UnaryOp       d op s   -> show d ++ " := " ++ show op ++ " " ++ show s
+            BinaryOp      d op l r -> show d ++ " := " ++ show l ++ " " ++ show op ++ " " ++ show r
             -- Jumps
             Goto          lab     -> "goto " ++ lab
             IfTrueGoto    tst lab -> "if " ++ show tst ++ " goto " ++ lab
