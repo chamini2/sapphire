@@ -20,7 +20,7 @@ import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Char                     (ord)
 import           Data.Foldable                 (concat, forM_, mapM_, toList)
-import           Data.Maybe                    (fromJust)
+import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (Seq, empty, singleton)
 import qualified Data.Map.Strict               as Map (Map, fromList, member,
                                                 adjust, lookup, foldlWithKey)
@@ -376,12 +376,7 @@ emit = \case
         generate $ Addi SP SP (Const bytes)   -- Pop params of stack
 
       Return mayA     -> do
-        case mayA of
-            Just ref -> do
-                {-Register reg <- getRegister ref-}
-                generate $ Move V0 T5
-                return ()
-            Nothing  -> return ()
+        when (isJust mayA) $ getRegister Read (fromJust mayA) >>= generate . Move V0
         generate $ Move SP FP               -- Pop callee frame off stack
         {-generate $ Lw FP (Indexed (-8)  FP)    -- Restore saved return value-}
         generate $ Lw RA (Indexed (-4) FP)  -- Restore saved ra
