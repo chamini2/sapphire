@@ -390,7 +390,7 @@ emit = \case
         generate $ Addiu FP SP (Const 8)            -- Setup new fp
         when (w /= 0) . generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
 
-      EndFunction -> spillAllDirtyRegisters
+      EndFunction -> spillAllDirtyRegisters >> emit (Return Nothing)
         -- We could have an implicit return statement here, but in our case return statements are mandatory
 
       PushParam ref -> do
