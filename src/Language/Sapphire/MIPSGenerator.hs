@@ -20,7 +20,7 @@ import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
 import           Data.Char                     (ord)
 import           Data.Foldable                 (concat, forM_, mapM_, toList)
-import           Data.Maybe                    (fromJust)
+import           Data.Maybe                    (fromJust, isJust)
 import           Data.Sequence                 (Seq, empty, singleton)
 import qualified Data.Map.Strict               as Map (Map, fromList, member,
                                                 adjust, lookup, foldlWithKey)
@@ -328,11 +328,13 @@ emit = \case
         getRegister Read y
         void $ getRegister Write x
 
-      Load dst b (Address idn off isGlobal) -> do
+      Load dst b (Address _ off isGlobal) -> do
         rDst <- getRegister Write dst
         generate $ Lw rDst (Indexed (b + off) (pointerRegister isGlobal))
 
-      Store dst base ind -> return ()
+      Store src b (Address _ off isGlobal) -> do
+        rSrc <- getRegister Read src
+        generate $ Sw rSrc (Indexed (b + off) (pointerRegister isGlobal))
 
       UnaryOp res NOT op -> do
         ry <- getRegister Read op
@@ -403,12 +405,7 @@ emit = \case
         generate $ Addi SP SP (Const bytes)   -- Pop params of stack
 
       Return mayA     -> do
-        case mayA of
-            Just ref -> do
-                {-Register reg <- getRegister ref-}
-                generate $ Move V0 T5
-                return ()
-            Nothing  -> return ()
+        when (isJust mayA) $ getRegister Read (fromJust mayA) >>= generate . Move V0
         generate $ Move SP FP               -- Pop callee frame off stack
         {-generate $ Lw FP (Indexed (-8)  FP)    -- Restore saved return value-}
         generate $ Lw RA (Indexed (-4) FP)  -- Restore saved ra

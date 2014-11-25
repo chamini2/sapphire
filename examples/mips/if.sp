@@ -1,5 +1,6 @@
 main
-  if 0 < 1 then
-      print "hello"
+  a : Int
+  if 3 == 0 then
+      a = 1
   end
 end
