@@ -2,7 +2,7 @@
 module Main where
 
 import           Language.Sapphire.Definition
--- import           Language.Sapphire.MIPSGenerator
+import           Language.Sapphire.MIPSGenerator
 import           Language.Sapphire.Parser
 import           Language.Sapphire.SappMonad
 import           Language.Sapphire.SizeOffset
@@ -63,8 +63,7 @@ main = void $ runMaybeT $ do
 
     let (tacS, blocks) = processTACGenerator (getTable sizS) prog
 
-    -- let mipsc = processMIPSGenerator reader (getTable tacS) blocks
-    let mipsc = [1,2,3]
+    let mipsc = processMIPSGenerator reader (getTable tacS) blocks
         mipsf = flip replaceExtension "s" $ takeFileName filepath
 
     when (ShowSymbolTable `elem` flgs) . liftIO $ print (getTable sizS)

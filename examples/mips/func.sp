@@ -1,4 +1,3 @@
-num : Int
 
 def binky : (Int a, Int b) -> Int
     c : Int
@@ -7,6 +6,7 @@ def binky : (Int a, Int b) -> Int
 end
 
 main
+    num : Int
     num = binky(4, 10)
     print num
 end

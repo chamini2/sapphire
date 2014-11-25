@@ -4,23 +4,22 @@
     MIPS related data structures
 -}
 module Language.Sapphire.MIPS
-    ( Label
-    , Register(..)
+    ( Register(..)
     , Value
     {-, FloatRegister-}
+    , pointerRegister
     , Code
     , Operand(..)
     , Instruction(..)
     ) where
 
-import           Data.Char (toLower)
+import           Data.Char             (toLower)
 import           Data.Data
+import           Language.Sapphire.TAC (Value(..), Label)
 
 {-|
     MIPS related information and data types
 -}
-
-type Label = String
 
 type Directive = String                     -- MIPS language directives: .data .global .text
 
@@ -67,8 +66,6 @@ data Operand
     | Const    Int
     | Indexed  Int Register
     | Label    Label
-    {-| IndirectRegister Register-}
-    {-| IndirectIndexed  Value Register-}
 
 instance Show Operand where
     show = \case
@@ -77,6 +74,9 @@ instance Show Operand where
         Indexed int reg -> show int ++ "(" ++ show reg ++ ")"
         Label lab       -> lab
         _               -> error "MIPS: show operand not defined entirely"
+
+pointerRegister :: Bool -> Register
+pointerRegister isGlobal = if isGlobal then GP else FP
 
 {-|
  -    List of codes used by syscall
@@ -99,7 +99,7 @@ data Instruction
     | PutDirective Directive
     -- Data declarations
     | Asciiz Label String
-    | Word   Label Width
+    | Word   Label 
     -- Arithmetic
     | Add   Register Register Register
     | Addi  Register Register Operand
@@ -112,11 +112,12 @@ data Instruction
     -- Boolean operations
     | Or  Register Register Register
     | And Register Register Register
+    | Not Register Register
     -- Move
     | Move Register Register
     -- Load instructions
     | La Register Operand   -- Load address
-    | Li Register Operand   -- Load immediate
+    | Li Register Int       -- Load immediate
     | Lw Register Operand   -- Load word
     | Ld Register Operand   -- Load double word
     | Mflo Register
@@ -155,6 +156,7 @@ instance Show Instruction where
         ins -> "\t" ++ case ins of
             --  Data declarations
             Asciiz lab str  -> lab ++ ": .asciiz " ++ str
+            Word   lab      -> lab ++ ": .word\t\t0" 
             --  Arithmetic
             Add   rd rs rt  -> "add"   ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             Addi  rd rs imm -> "addi"  ++ (tabs 4) ++ show rd ++ ", " ++ show rs ++ ", " ++ show imm
@@ -167,6 +169,7 @@ instance Show Instruction where
             --  Boolean
             Or  rd rs rt -> "or"  ++ (tabs 2) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
             And rd rs rt -> "and" ++ (tabs 3) ++ show rd ++ ", " ++ show rs ++ ", " ++ show rt
+            Not rd rs    -> "not" ++ (tabs 3) ++ show rd ++ ", " ++ show rs 
             --  Move
             Move rd rs    -> "move" ++ (tabs 4) ++ show rd ++ ", " ++ show rs
             --  Load instructions

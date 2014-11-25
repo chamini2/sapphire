@@ -11,18 +11,18 @@ import           Language.Sapphire.MIPS        as MIPS
 import           Language.Sapphire.Program
 import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.TAC         as TAC hiding (Label)
+import           Language.Sapphire.TAC         as TAC 
 
-import           Control.Monad                 (liftM, unless, when, void)
+import           Control.Monad                 (when, void)
 import           Control.Monad.Reader          (asks)
-import           Control.Monad.RWS             (RWS, execRWS, lift)
-import           Control.Monad.State           (get, gets, modify)
+import           Control.Monad.RWS             (RWS, execRWS)
+import           Control.Monad.State           (gets, modify)
 import           Control.Monad.Writer          (tell)
+import           Data.Char                     (ord)
 import           Data.Foldable                 (concat, forM_, mapM_, toList)
 import           Data.Maybe                    (fromJust)
 import           Data.Sequence                 (Seq, empty, singleton)
-import qualified Data.Map.Strict               as Map (Map, empty, insert,
-                                                singleton, fromList, member,
+import qualified Data.Map.Strict               as Map (Map, fromList, member,
                                                 adjust, lookup, foldlWithKey)
 import           Prelude                       hiding (EQ, LT, GT, concat,
                                                 mapM_)
@@ -63,23 +63,23 @@ initialRegDescriptors = Map.fromList
     , (S5, RegDescriptor { values = [], genPurpose = True, dirty = False })
     , (S6, RegDescriptor { values = [], genPurpose = True, dirty = False })
     , (S7, RegDescriptor { values = [], genPurpose = True, dirty = False })
-    , (A0, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    {-, (A0, RegDescriptor { values = [], genPurpose = True, dirty = False })-}
     , (A1, RegDescriptor { values = [], genPurpose = True, dirty = False })
     , (A2, RegDescriptor { values = [], genPurpose = True, dirty = False })
     , (A3, RegDescriptor { values = [], genPurpose = True, dirty = False })
-    , (V0, RegDescriptor { values = [], genPurpose = True, dirty = False })
+    {-, (V0, RegDescriptor { values = [], genPurpose = True, dirty = False })-}
     , (V1, RegDescriptor { values = [], genPurpose = True, dirty = False })
     ]
 
 data RegDescriptor = RegDescriptor
-    { values     :: [Reference]
+    { values     :: [Location]
     , genPurpose :: Bool
     , dirty      :: Bool
     }
 
 {-data VarDescriptor = VarDescriptor -}
-    {-{ var       :: Reference-}
-    {-, locations :: Reference-}
+    {-{ var       :: Location-}
+    {-, locations :: Location-}
     {-}-}
 
 ----------------------------------------
@@ -135,7 +135,7 @@ buildMIPSGenerator tab blocks = do
     emitPreamble
 
     let tac = concat $ fmap toList blocks
-    mapM_ tac2Mips tac
+    mapM_ emit tac
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -161,23 +161,26 @@ emitPreamble = do
 {-
  -    Generates MIPS code for printing scalar data types
  -}
-generatePrintString :: Offset -> MIPSGenerator ()
-generatePrintString off  = do
-    generate $ Li V0 (Const 4)
-    generate $ La A0 (Label ("_string" ++ show off))
+generatePrintString :: Label -> MIPSGenerator ()
+generatePrintString lab = do
+    generate $ Li V0 4
+    generate $ La A0 (Label lab)
     generate Syscall
 
-generatePrint :: Reference -> MIPS.Code -> MIPSGenerator ()
+
+generatePrint :: Location -> MIPS.Code -> MIPSGenerator ()
 generatePrint ref code  = do
-    generate $ Li V0 (Const code)
-    {-generate $ Lw A0 (Indexed int reg) -}
+    generate $ Li V0 code
+    rSrc <- getRegister Read ref
+    generate $ Move A0 rSrc
     generate Syscall
 
-generateRead :: Reference -> MIPS.Code -> MIPSGenerator ()
+generateRead :: Location -> MIPS.Code -> MIPSGenerator ()
 generateRead ref code = do
-    generate $ Li V0 (Const code)
-    {-generate $ Lw A0 (Indexed int reg) -}
+    generate $ Li V0 code
     generate Syscall
+    rDst <- getRegister Write ref
+    generate $ Move rDst V0
 
 generateGlobals :: MIPSGenerator ()
 generateGlobals = do
@@ -185,14 +188,15 @@ generateGlobals = do
     syms <- gets (toSeq . getTable)
     forM_ syms $ \(idn, sym) -> do
         case sym of
-            SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_string" ++ show off) idn
+            SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_str" ++ show off) idn
+            {-SymInfo { dataType = Lex Int    _ , offset = off } -> generate $ Word   ("_" ++ show off) idn-}
             otherwise -> return ()
 
 ----------------------------------------
 --  Register allocation
 
 {-|
- -  Given a Reference, say r, of a current var or temporary,
+ -  Given a Location, say r, of a current var or temporary,
  -  a reason (to read or to write), this function will assign
  -  a register for r according to the following rules:
  -
@@ -206,8 +210,8 @@ generateGlobals = do
 data Reason = Read | Write
             deriving (Eq)
 
-getRegister :: Reason -> Reference -> MIPSGenerator Register
-getRegister reason ref = do
+getRegister :: Reason -> Location -> MIPSGenerator Register
+getRegister reason ref@(Address _ off isGlobal) = do
     reg <- do
         mReg <- findRegisterWithContents ref
         case mReg of
@@ -218,24 +222,19 @@ getRegister reason ref = do
                     Just emptyReg -> return emptyReg
                     Nothing -> error "MIPSGenerator.getRegister: can't spill yet"
 
-                slaveReference ref reg
+                slaveLocation ref reg
                 when (reason == Read) $ do
-                    op <- buildOperand ref
-                    -- case op of
-                    --     Register ry         -> generate $ Move reg ry
-                    --     immm@(Const imm)    -> generate $ Li reg immm
-                    --     ind@(Indexed int r) -> generate $ Lw reg ind
-                    generate $ Lw reg op
+                    generate $ Lw reg (Indexed off (if isGlobal then GP else FP))
                     markClean reg
                 return reg
 
     when (reason == Write) $ markDirty reg
     return reg
 
-getRegisterForWrite :: Reference -> MIPSGenerator Register
+getRegisterForWrite :: Location -> MIPSGenerator Register
 getRegisterForWrite = getRegister Write
 
-findRegisterWithContents :: Reference -> MIPSGenerator (Maybe Register)
+findRegisterWithContents :: Location -> MIPSGenerator (Maybe Register)
 findRegisterWithContents ref = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing
         where
             checkRegister Nothing      reg regDes = if ref `elem` values regDes then Just reg else Nothing
@@ -255,14 +254,14 @@ getRegDescriptor = flip getsRegDescriptor id
 getsRegDescriptor :: Register -> (RegDescriptor -> a) -> MIPSGenerator a
 getsRegDescriptor reg f = gets registerDescriptors >>= return . f . fromJust . Map.lookup reg
 
-slaveReference :: Reference -> Register -> MIPSGenerator ()
-slaveReference ref reg = do
+slaveLocation :: Location -> Register -> MIPSGenerator ()
+slaveLocation ref reg = do
     regDes <- gets registerDescriptors
     if Map.member reg regDes
         then modify $ \s -> s { registerDescriptors = Map.adjust (\rd -> rd { values = ref : values rd }) reg regDes }
         else error "MIPSGenerator.markDirty: marking non-existent register as dirty"
 
-locationsAreSame :: Reference -> Reference -> MIPSGenerator ()
+locationsAreSame :: Location -> Location -> MIPSGenerator ()
 locationsAreSame r1 r2 = return ()
 
 markDirty :: Register -> MIPSGenerator ()
@@ -285,42 +284,61 @@ spillRegister reg = return ()
 spillAllDirtyRegisters :: MIPSGenerator ()
 spillAllDirtyRegisters = return ()
 
-buildOperand :: Reference -> MIPSGenerator Operand
-buildOperand = \case
-    Address   _ ref glob -> do
-        off <- offset
-        return $ Indexed off (if glob then GP else FP)
-            where
-                offset = case ref of
-                    Constant val -> case val of
-                        ValInt int -> return int
-                        _          -> error "MIPSGenerator.buildOperand: constant is not an integer"
-                    _            -> error "MIPSGenerator.buildOperand: offset is not a constant"
-    Constant val -> do
-        case val of
-            ValInt int -> return $ Const int
-            _          -> error "MIPSGenerator.buildOperand: constant is not an integer"
-    Temporary int -> error "MIPSGenerator.buildOperand: offset is not a constant"
+{-buildOperand :: Location -> MIPSGenerator Operand-}
+{-buildOperand = \case-}
+    {-Address   _ ref glob -> do-}
+        {-off <- offset-}
+        {-return $ Indexed off (if glob then GP else FP)-}
+            {-where-}
+                {-offset = case ref of-}
+                    {-Constant val -> case val of-}
+                        {-ValInt int -> return int-}
+                        {-_          -> error "MIPSGenerator.buildOperand: constant is not an integer"-}
+                    {-_            -> error "MIPSGenerator.buildOperand: offset is not a constant"-}
 
-{-generateLoadConstant :: Reference -> Int -> MIPSGenerator ()-}
+{-generateLoadConstant :: Location -> Int -> MIPSGenerator ()-}
 {-generateLoadConstant dst imm = do-}
     {-reg <- getRegisterForWrite dst-}
-    {-generate $ Li reg (Const imm)-}
+    {-generate $ Li reg imm-}
 
-{-generateLoadAddress :: Reference -> MIPS.Label -> MIPSGenerator ()-}
+{-generateLoadAddress :: Location -> Label -> MIPSGenerator ()-}
 {-generateLoadAddress dst lab = do-}
     {-reg <- getRegisterForWrite dst-}
     {-generate $ La reg lab-}
 
 ----------------------------------------
 
-tac2Mips :: TAC.Instruction -> MIPSGenerator ()
-tac2Mips = \case
+emit :: TAC.Instruction -> MIPSGenerator ()
+emit = \case
       TAC.Comment str -> generate $ MIPS.Comment str
 
-      TAC.PutLabel lab str -> generate $ MIPS.PutLabel lab str
+      TAC.PutLabel lab -> generate $ MIPS.PutLabel lab 
 
-      AssignBin x op y z -> do
+      LoadConstant dst val -> do
+        reg <- getRegister Write dst
+        let imm = case val of 
+                ValInt   v -> v
+                ValFloat v -> error "MIPSGenerator.emit.LoadConstant: loading float constant"
+                ValBool  v -> if v then 1 else 0
+                ValChar  v -> ord v
+        generate $ Li reg imm
+
+      Assign x y -> do
+        getRegister Read y
+        void $ getRegister Write x
+
+      Load dst b (Address idn off isGlobal) -> do
+        rDst <- getRegister Write dst
+        generate $ Lw rDst (Indexed (b + off) (pointerRegister isGlobal))
+
+      Store dst base ind -> return ()
+
+      UnaryOp res NOT op -> do
+        ry <- getRegister Read op
+        rx <- getRegister Write res
+        generate $ Not rx ry 
+
+      BinaryOp x op y z -> do
         ry  <- getRegister Read y
         rz  <- getRegister Read z
         rx  <- getRegister Write x
@@ -335,18 +353,6 @@ tac2Mips = \case
             OR  -> generate $ Or  rx ry rz
             AND -> generate $ And rx ry rz
 
-      AssignUn res unop op -> do
-        case unop of
-            NOT -> return () -- Boolean not
-            NEG -> return () -- Arithmetic negation
-
-      Assign x y -> do
-        getRegister Read y
-        void $ getRegister Write x
-
-
---    | AssignArrR
---    | AssignArrL
     -- Function related instructions
       BeginFunction w   -> do
         generate $ Subu  SP SP (Const 8)            -- Decrement $sp to make space to save $ra, $fp
@@ -359,15 +365,15 @@ tac2Mips = \case
 
       EndFunction       -> do
         return ()
-        -- We could have an implicit return value here, but in our case return statements are mandatory
+        -- We could have an implicit return statement here, but in our case return statements are mandatory
 
-      PushParameter ref -> do
+      PushParam ref -> do
         generate $ Subu SP SP (Const 4)     -- Decrement sp to make space for param
         reg <- getRegister Read ref
         generate $ Sw reg (Indexed 4 SP)    -- Copy param value to stack
 
-      PopParameters int -> do
-        generate $ Addi SP SP (Const int)   -- Pop params of stack
+      PopParams bytes -> do
+        generate $ Addi SP SP (Const bytes)   -- Pop params of stack
 
       Return mayA     -> do
         case mayA of
@@ -382,58 +388,58 @@ tac2Mips = \case
         generate $ Lw FP (Indexed 0  FP)    -- Restore saved fp
         generate $ Jr RA                    -- Return from function
 
-      PCall lab nInt  -> do
+      PCall lab -> do
         generate $ Jal lab
 
-      FCall ref lab n -> do
+      FCall lab addr -> do
         generate $ Jal lab
         -- get return value TO DO
-        ret <- getRegister Write ref
-        generate $ Move ret V0 -- Copy return value from $v0 - MIPS Convention
+        ret <- getRegister Write addr
+        generate $ Move ret V0  -- Copy return value from $v0 - MIPS Convention
 
       -- Print
       PrintInt    ref   -> generatePrint ref 1
-      PrintFloat  ref   -> return ()
-      PrintChar   ref   -> return ()
-      PrintBool   ref   -> return ()
-      PrintString off _ -> generatePrintString off
+      PrintFloat  ref   -> generatePrint ref 2
+      PrintChar   ref   -> generatePrint ref 11
+      PrintBool   ref   -> generatePrint ref 1
+      PrintString lab   -> generatePrintString lab
 
       -- Read
-      ReadInt   ref -> return ()
-      ReadFloat ref -> return ()
-      ReadChar  ref -> return ()
-      ReadBool  ref -> return ()
+      ReadInt   ref -> generateRead ref 5
+      ReadFloat ref -> generateRead ref 6
+      ReadChar  ref -> generateRead ref 12
+      {-ReadBool  ref -> generateRead ref 1-}
       -- Goto
       Goto lab                  -> do
         spillAllDirtyRegisters
         generate $ B lab        --  Unconditional branch
-      IfGoto      rel le ri lab -> do
-        regLe <- getRegister Read le
-        regRi <- getRegister Read ri
-        case rel of
-            EQ -> do
-                generate $ Sub regLe regLe regRi
-                generate $ Beqz regLe lab
-            NE -> do
-                generate $ Sub regLe regLe regRi
-                generate $ Bnez regLe lab
-            LT -> do
-                generate $ Sub regLe regLe regRi
-                generate $ Bgtz regLe lab
-            LE -> do
-                generate $ Sub regLe regLe regRi
-                generate $ Bgez regLe lab
-            GT -> do
-                generate $ Sub regLe regLe regRi
-                generate $ Bltz regLe lab
-            GE -> do
-                generate $ Sub regLe regLe regRi
-                generate $ Blez regLe lab
+      {-IfGoto      rel le ri lab -> do-}
+        {-regLe <- getRegister Read le-}
+        {-regRi <- getRegister Read ri-}
+        {-case rel of-}
+            {-EQ -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Beqz regLe lab-}
+            {-NE -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bnez regLe lab-}
+            {-LT -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bgtz regLe lab-}
+            {-LE -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bgez regLe lab-}
+            {-GT -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bltz regLe lab-}
+            {-GE -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Blez regLe lab-}
 
       IfTrueGoto  ref lab       -> do
         reg <- getRegister Read ref
         generate $ Beqz reg lab
-      IfFalseGoto ref lab       -> do
-        reg <- getRegister Read ref
-        generate $ Bnez reg lab
-      _                         -> error "MIPSGenerator.tac2Mips unknown instruction"
+      {-IfFalseGoto ref lab       -> do-}
+        {-reg <- getRegister Read ref-}
+        {-generate $ Bnez reg lab-}
+      ins                      -> error $ "MIPSGenerator.emit unknown instruction " ++ show ins
