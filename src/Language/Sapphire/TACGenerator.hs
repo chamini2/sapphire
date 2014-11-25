@@ -185,22 +185,22 @@ linearizeStatement nextLabel (Lex st posn) = do
             lift . linearizeExpression $ fromJust mayExpL
 
         StFunctionDef idnL _ block -> do
-            blockWdt <- liftM fromJust $ getsSymbol (lexInfo idnL) blockWidth
+            blockOff <- liftM (negate . fromJust) $ getsSymbol (lexInfo idnL) blockWidth
 
             generate $ PutLabel (lexInfo idnL)
 
             -- Calculate the width with temporaries included
             befCode <- gets code
-            modify $ \s -> s { code = empty, tempWidth = blockWdt }
+            modify $ \s -> s { code = empty, tempWidth = blockOff }
 
             enterScope
             linearizeStatements block
             exitScope
 
-            (aftCode, blockWdt') <- gets (code &&& tempWidth)
+            (aftCode, blockOff') <- gets (code &&& (negate . tempWidth))
 
             -- Build the code again
-            let code' = ((befCode |> BeginFunction (blockWdt' - 8)) >< aftCode) |> EndFunction
+            let code' = ((befCode |> BeginFunction (blockOff' - 8)) >< aftCode) |> EndFunction
             modify $ \s -> s { code = code' }
 
         StProcedureCall idnL prmLs -> do
