@@ -353,6 +353,36 @@ emit = \case
             {-POW   -> "^"-}
             OR  -> generate $ Or  rx ry rz
             AND -> generate $ And rx ry rz
+            Rel rel -> case rel of
+                EQ -> generate $ Seq rx ry rz
+                NE -> generate (Sub rx ry rz) >> generate (Not rx rx)
+                LT -> generate $ Slt rx ry rz
+                LE -> undefined
+                GT -> undefined
+                GE -> undefined
+
+
+      {-IfGoto      rel le ri lab -> do-}
+        {-regLe <- getRegister Read le-}
+        {-regRi <- getRegister Read ri-}
+        {-case rel of-}
+            {-EQ -> do-}
+            {-NE -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bnez regLe lab-}
+            {-LT -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bgtz regLe lab-}
+            {-LE -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bgez regLe lab-}
+            {-GT -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Bltz regLe lab-}
+            {-GE -> do-}
+                {-generate $ Sub regLe regLe regRi-}
+                {-generate $ Blez regLe lab-}
+
 
     -- Function related instructions
       BeginFunction w   -> do
@@ -410,37 +440,14 @@ emit = \case
       ReadFloat ref -> generateRead ref 6
       ReadChar  ref -> generateRead ref 12
       {-ReadBool  ref -> generateRead ref 1-}
+
       -- Goto
-      Goto lab                  -> do
+      Goto lab -> do
         spillAllDirtyRegisters
         generate $ B lab        --  Unconditional branch
-      {-IfGoto      rel le ri lab -> do-}
-        {-regLe <- getRegister Read le-}
-        {-regRi <- getRegister Read ri-}
-        {-case rel of-}
-            {-EQ -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Beqz regLe lab-}
-            {-NE -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bnez regLe lab-}
-            {-LT -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bgtz regLe lab-}
-            {-LE -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bgez regLe lab-}
-            {-GT -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Bltz regLe lab-}
-            {-GE -> do-}
-                {-generate $ Sub regLe regLe regRi-}
-                {-generate $ Blez regLe lab-}
 
-      IfTrueGoto  ref lab       -> do
+      IfTrueGoto ref lab -> do
         reg <- getRegister Read ref
-        generate $ Beqz reg lab
-      {-IfFalseGoto ref lab       -> do-}
-        {-reg <- getRegister Read ref-}
-        {-generate $ Bnez reg lab-}
+        generate $ Bnez reg lab
+
       ins                      -> error $ "MIPSGenerator.emit unknown instruction " ++ show ins
