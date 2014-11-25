@@ -131,11 +131,10 @@ buildMIPSGenerator tab blocks = do
     tell initialWriter
     emitPreamble
 
-    forM_ blocks $ \tac -> do
+    forM_ blocks $ \blc -> do
         -- Removing comments
-        forM_ (filter (not . isComment) $ toList tac) $
+        forM_ (filter (not . isComment) $ toList blc) $
             \ins -> (generate $ MIPS.Comment $ show ins) >> emit ins
-        spillAllDirtyRegisters
 
 --------------------------------------------------------------------------------
 -- Using the Monad
@@ -339,7 +338,7 @@ spillAllDirtyRegisters = do
 emit :: TAC.Instruction -> MIPSGenerator ()
 emit = \case
 
-      TAC.PutLabel lab -> generate $ MIPS.PutLabel lab
+      TAC.PutLabel lab -> spillAllDirtyRegisters >> generate (MIPS.PutLabel lab)
 
       LoadConstant dst val -> do
         reg <- getRegister Write dst []
@@ -391,8 +390,7 @@ emit = \case
         generate $ Addiu FP SP (Const 8)            -- Setup new fp
         when (w /= 0) . generate $ Subu SP SP (Const w)    -- Decrement sp to make space for locals/temps
 
-      EndFunction -> do
-        return ()
+      EndFunction -> spillAllDirtyRegisters
         -- We could have an implicit return statement here, but in our case return statements are mandatory
 
       PushParam ref -> do
@@ -405,18 +403,18 @@ emit = \case
 
       Return mayA -> do
         when (isJust mayA) $ getRegister Read (fromJust mayA) [] >>= generate . Move V0
+        spillAllDirtyRegisters
         generate $ Move SP FP               -- Pop callee frame off stack
-        {-generate $ Lw FP (Indexed (-8)  FP)    -- Restore saved return value-}
         generate $ Lw RA (Indexed (-4) FP)  -- Restore saved ra
         generate $ Lw FP (Indexed 0  FP)    -- Restore saved fp
         generate $ Jr RA                    -- Return from function
 
-      PCall lab -> do
-        generate $ Jal lab
+      PCall lab -> spillAllDirtyRegisters >> generate (Jal lab)
 
       FCall lab addr -> do
+        spillAllDirtyRegisters
         generate $ Jal lab
-        -- get return value TO DO
+        -- Get return value TO DO
         ret <- getRegister Write addr []
         generate $ Move ret V0  -- Copy return value from $v0 - MIPS Convention
 
@@ -434,12 +432,11 @@ emit = \case
       {-ReadBool  ref -> generateRead ref 1-}
 
       -- Goto
-      Goto lab -> do
-        spillAllDirtyRegisters
-        generate $ B lab        --  Unconditional branch
+      Goto lab -> spillAllDirtyRegisters >> generate (B lab)    -- Unconditional branch
 
       IfTrueGoto ref lab -> do
+        spillAllDirtyRegisters
         reg <- getRegister Read ref []
         generate $ Bnez reg lab
 
-      ins                      -> error $ "MIPSGenerator.emit unknown instruction " ++ show ins
+      ins -> error $ "MIPSGenerator.emit unknown instruction " ++ show ins

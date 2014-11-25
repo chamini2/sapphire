@@ -8,7 +8,9 @@ def fact : (Int n) -> Int
 end
 
 main
-  for i in 0..20 do
+  i : Int
+  while i < 20 do
     print "fact(", i, ") = ", fact(i), "\n"
+    i = i + 1
   end
 end

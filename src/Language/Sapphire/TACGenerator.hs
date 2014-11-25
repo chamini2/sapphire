@@ -357,6 +357,8 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ LoadConstant stepTemp $ ValInt 1
 
             generate $ BinaryOp idnAddr ADD idnAddr stepTemp
+            generate $ Store    idnAddr 0 idnAddr
+
             generate $ Goto condLabel
 
         StBreak    -> currentLoop >>= generate . Goto . snd
