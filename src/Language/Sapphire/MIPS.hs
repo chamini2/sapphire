@@ -78,21 +78,6 @@ instance Show Operand where
         Label lab       -> lab
         _               -> error "MIPS: show operand not defined entirely"
 
-data Value
-    = ValInt    Int
-    {-| ValFloat  Float-}
-    {-| ValBool   Bool-}
-    | ValChar   Char
-    | ValString String
-
-instance Show Value where
-    show = \case
-        ValInt    v -> show v
-        {-ValFloat  v -> show v-}
-        {-ValBool   v -> map toLower (show v)-}
-        ValChar   v -> show v
-        ValString v -> v
-
 {-|
  -    List of codes used by syscall
  -    1  - Print Integer      $A0  Integer to print
@@ -108,13 +93,13 @@ instance Show Value where
  -}
 type Code = Int
 
-data Instruction 
+data Instruction
     = Comment String
-    | PutLabel Label String
+    | PutLabel Label
     | PutDirective Directive
     -- Data declarations
     | Asciiz Label String
-    {-| Word ???-}
+    | Word   Label Width
     -- Arithmetic
     | Add   Register Register Register
     | Addi  Register Register Operand
@@ -165,7 +150,7 @@ data Instruction
 instance Show Instruction where
     show = \case
         Comment str      -> "# " ++ str
-        PutLabel lab str -> lab ++ ":" ++ tabs (length lab) ++ "# " ++ str
+        PutLabel lab     -> lab ++ ":"
         PutDirective dir -> dir
         ins -> "\t" ++ case ins of
             --  Data declarations
