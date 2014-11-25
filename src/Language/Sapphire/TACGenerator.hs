@@ -344,7 +344,7 @@ linearizeStatement nextLabel (Lex st posn) = do
             generate $ Comment $ "condition label for " ++ showStatement
 
             testTemp <- newTemporary
-            binaryToTAC OpGreat testTemp idnAddr toAddr
+            generate $ BinaryOp testTemp (Rel GT) idnAddr toAddr
 
             generate $ IfTrueGoto testTemp nextLabel
 
@@ -440,14 +440,22 @@ linearizeExpression (Lex exp _) = case exp of
         rAddr <- linearizeExpression rExpL
         resTemp <- newTemporary
 
-        binaryToTAC op resTemp lAddr rAddr
+        generate $ BinaryOp resTemp (binaryToBinOperator op) lAddr rAddr
         return resTemp
 
     ExpUnary (Lex op _) expL -> do
         expAddr <- linearizeExpression expL
         resTemp <- newTemporary
+        opTemp  <- newTemporary
 
-        unaryToTAC op resTemp expAddr
+        case op of
+            OpNegate -> do
+                generate $ LoadConstant opTemp $ ValInt 0
+                generate $ BinaryOp resTemp SUB opTemp expAddr
+            OpNot -> do
+                generate $ LoadConstant opTemp $ ValInt (-1)
+                generate $ BinaryOp resTemp XOR expAddr opTemp
+
         return resTemp
 
     where
@@ -456,60 +464,6 @@ linearizeExpression (Lex exp _) = case exp of
             temp <- newTemporary
             generate $ LoadConstant temp v
             return temp
-
-unaryToTAC :: Unary -> Location -> Location -> TACGenerator ()
-unaryToTAC op resAddr expAddr = do
-    opTemp  <- newTemporary
-
-    case op of
-        OpNegate -> do
-            generate $ LoadConstant opTemp $ ValInt 0
-            generate $ BinaryOp resAddr SUB opTemp expAddr
-        OpNot -> do
-            generate $ LoadConstant opTemp $ ValInt (-1)
-            generate $ BinaryOp resAddr XOR expAddr opTemp
-
-binaryToTAC :: Binary -> Location -> Location -> Location -> TACGenerator ()
-binaryToTAC op resAddr lAddr rAddr = case op of
-    OpPlus    -> generate $ BinaryOp resAddr ADD      lAddr rAddr
-    OpMinus   -> generate $ BinaryOp resAddr SUB      lAddr rAddr
-    OpTimes   -> generate $ BinaryOp resAddr MUL      lAddr rAddr
-    OpDivide  -> generate $ BinaryOp resAddr DIV      lAddr rAddr
-    OpModulo  -> generate $ BinaryOp resAddr MOD      lAddr rAddr
-    OpPower   -> generate $ BinaryOp resAddr POW      lAddr rAddr
-    OpOr      -> generate $ BinaryOp resAddr OR       lAddr rAddr
-    OpAnd     -> generate $ BinaryOp resAddr AND      lAddr rAddr
-    OpEqual   -> generate $ BinaryOp resAddr (Rel EQ) lAddr rAddr
-    OpUnequal -> generate $ BinaryOp resAddr (Rel NE) lAddr rAddr
-    OpLess    -> generate $ BinaryOp resAddr (Rel LT) lAddr rAddr
-    OpLessEq  -> do
-        ltTemp <- newTemporary
-        generate $ BinaryOp ltTemp (Rel LT) lAddr  rAddr
-
-        eqTemp <- newTemporary
-        generate $ BinaryOp eqTemp (Rel EQ) lAddr  rAddr
-
-        generate $ BinaryOp resAddr  OR     ltTemp eqTemp
-    OpGreat   -> do
-        ltTemp <- newTemporary
-        generate $ BinaryOp ltTemp (Rel LT) lAddr rAddr
-
-        nlTemp <- newTemporary
-        unaryToTAC OpNot nlTemp ltTemp
-
-        neTemp <- newTemporary
-        generate $ BinaryOp neTemp (Rel NE) lAddr rAddr
-
-        generate $ BinaryOp resAddr  AND nlTemp neTemp
-    OpGreatEq -> do
-        ltTemp <- newTemporary
-        generate $ BinaryOp ltTemp (Rel LT) lAddr rAddr
-
-        unaryToTAC OpNot resAddr ltTemp
-    _         -> error "TACGenerator.binaryToTAC: trying to convert '@' or '..' to a intermediate code binary operator"
-    -- OpFromTo
-    -- OpBelongs
-
 
 --------------------------------------------------------------------------------
 
@@ -560,43 +514,6 @@ accessLocation accL = do
                 _ -> error "TACGenerator.calculateAccessAddress: unrecognized Access"
 
             Nothing -> return baseAddr
-
--- calculateAccessOffset :: AccessZipper -> Reference -> DataType -> TACGenerator Reference
--- calculateAccessOffset accZ offAddr dt = case defocusAccess <$> backAccess accZ of
-
---     Just accL -> case lexInfo accL of
-
---         ArrayAccess _ expL -> do
---             let inDt = arrayInnerDataType dt
-
---             dtWdt   <- dataTypeWidth inDt
---             expAddr <- linearizeExpression expL
-
---             -- wdtTemp <- newTemporary
---             indTemp <- newTemporary
---             resTemp <- newTemporary
-
---             -- generate $ Assign wdtTemp (Constant $ ValInt dtWdt)
---             generate $ AssignBin indTemp MUL expAddr (Constant $ ValInt dtWdt)
---             generate $ AssignBin resTemp ADD indTemp offAddr
-
---             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (arrayInnerDataType dt)
-
---         StructAccess _ fldIdnL -> do
---             tab <- liftM (fromJust . fromJust) $ getsSymbol (toIdentifier dt) fields
---             let (fldOff, fldDtL) = ((offset &&& dataType) . fromJust) $ lookup (lexInfo fldIdnL) tab
-
---             -- fldTemp <- newTemporary
---             resTemp <- newTemporary
-
---             -- generate $ Assign fldTemp (Constant $ ValInt fldOff)
---             generate $ AssignBin resTemp ADD offAddr (Constant $ ValInt fldOff)
-
---             calculateAccessOffset (fromJust $ backAccess accZ) resTemp (lexInfo fldDtL)
-
---         _ -> error "TACGenerator.calculateAccessOffset: unrecognized Access"
-
---     Nothing -> return offAddr
 
 ----------------------------------------
 

@@ -73,7 +73,6 @@ instance Show Operand where
         Const int       -> show int
         Indexed int reg -> show int ++ "(" ++ show reg ++ ")"
         Label lab       -> lab
-        _               -> error "MIPS: show operand not defined entirely"
 
 pointerRegister :: Bool -> Register
 pointerRegister isGlobal = if isGlobal then GP else FP

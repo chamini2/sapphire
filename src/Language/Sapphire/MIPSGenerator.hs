@@ -13,7 +13,7 @@ import           Language.Sapphire.SappMonad   hiding (initialWriter)
 import           Language.Sapphire.SymbolTable
 import           Language.Sapphire.TAC         as TAC
 
-import           Control.Monad                 (void, when)
+import           Control.Monad                 (when)
 import           Control.Monad.Reader          (asks)
 import           Control.Monad.RWS             (RWS, execRWS)
 import           Control.Monad.State           (gets, modify)
@@ -193,7 +193,7 @@ generateGlobals = do
         case sym of
             SymInfo { dataType = Lex String _ , offset = off } -> generate $ Asciiz ("_str" ++ show off) idn
             {-SymInfo { dataType = Lex Int    _ , offset = off } -> generate $ Word   ("_" ++ show off) idn-}
-            otherwise -> return ()
+            _ -> return ()
 
 ----------------------------------------
 --  Register allocation
@@ -247,15 +247,15 @@ findEmptyRegister :: MIPSGenerator (Maybe Register)
 findEmptyRegister = gets registerDescriptors >>= return . Map.foldlWithKey checkRegister Nothing
     where
         checkRegister mReg keyReg regDes = case (mReg, values regDes) of
-            (Just _, _)       -> mReg
-            (Nothing, [])     -> Just keyReg
-            (Nothing, values) -> Nothing
+            (Just _ , _ ) -> mReg
+            (Nothing, []) -> Just keyReg
+            (Nothing, _ ) -> Nothing
 
-getRegDescriptor :: Register -> MIPSGenerator RegDescriptor
-getRegDescriptor = flip getsRegDescriptor id
+-- getRegDescriptor :: Register -> MIPSGenerator RegDescriptor
+-- getRegDescriptor = flip getsRegDescriptor id
 
-getsRegDescriptor :: Register -> (RegDescriptor -> a) -> MIPSGenerator a
-getsRegDescriptor reg f = gets registerDescriptors >>= return . f . fromJust . Map.lookup reg
+-- getsRegDescriptor :: Register -> (RegDescriptor -> a) -> MIPSGenerator a
+-- getsRegDescriptor reg f = gets registerDescriptors >>= return . f . fromJust . Map.lookup reg
 
 slaveLocation :: Location -> Register -> MIPSGenerator ()
 slaveLocation ref reg = do
@@ -292,7 +292,7 @@ selectRegisterToSpill avoid = gets registerDescriptors >>= \tab -> return . nonA
         nonAvoid :: RegDescriptorTable -> Maybe Register -> Register
         nonAvoid tab = fromMaybe (fromJust $ Map.foldlWithKey func Nothing tab)
             where
-                func mReg keyReg regDes = case (mReg, keyReg `elem` avoid) of
+                func mReg keyReg _ = case (mReg, keyReg `elem` avoid) of
                     (Just _ , _    ) -> mReg
                     (Nothing, True ) -> Nothing
                     (Nothing, False) -> Just keyReg
@@ -341,7 +341,7 @@ emit = \case
         reg <- getRegister Write dst []
         let imm = case val of
                 ValInt   v -> v
-                ValFloat v -> error "MIPSGenerator.emit.LoadConstant: loading float constant"
+                ValFloat _ -> error "MIPSGenerator.emit.LoadConstant: loading float constant"
                 ValBool  v -> if v then 1 else 0
                 ValChar  v -> ord v
         generate $ Li reg imm
@@ -365,7 +365,7 @@ emit = \case
             MUL -> generate $ Mul rx ry rz
             DIV -> generate (Div ry rz) >> generate (Mflo rx)
             MOD -> generate (Div ry rz) >> generate (Mfhi rx)
-            {-POW   -> "^"-}
+            POW -> error "'^' is not supported"
             OR  -> generate $ Or  rx ry rz
             AND -> generate $ And rx ry rz
             XOR -> generate $ Xor rx ry rz
@@ -373,6 +373,9 @@ emit = \case
                 EQ -> generate $ Seq rx ry rz
                 NE -> generate $ Sne rx ry rz
                 LT -> generate $ Slt rx ry rz
+                LE -> generate $ Sle rx ry rz
+                GT -> generate $ Sgt rx ry rz
+                GE -> generate $ Sge rx ry rz
 
     -- Function related instructions
       BeginFunction w -> do
@@ -393,8 +396,8 @@ emit = \case
         reg <- getRegister Read ref []
         generate $ Sw reg (Indexed 4 SP)    -- Copy param value to stack
 
-      PopParams bytes -> do
-        generate $ Addi SP SP (Const bytes)   -- Pop params of stack
+      PopParams byts -> do
+        generate $ Addi SP SP (Const byts)   -- Pop params of stack
 
       Return mayA -> do
         when (isJust mayA) $ getRegister Read (fromJust mayA) [] >>= generate . Move V0

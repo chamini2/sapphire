@@ -16,6 +16,8 @@ module Language.Sapphire.TAC
     , BinOperator(..)
     , Relation(..)
 
+    , binaryToRelation
+    , binaryToBinOperator
     , hasGoto
     , isPutLabel
     , isComment
@@ -69,32 +71,32 @@ data Instruction
     -- Label
     | PutLabel      { label :: Label }
     -- Loads
-    | LoadConstant  { dst :: Location, val   :: Value }
-    | Load          { dst :: Location, base  :: Base, indirect :: Location }
-    | Store         { src :: Location, base  :: Base, indirect :: Location }
-    | BinaryOp      { dst :: Location, binop :: BinOperator, left :: Location, right :: Location }
+    | LoadConstant  { destin :: Location, value :: Value }
+    | Load          { destin :: Location, base  :: Base, indirect :: Location }
+    | Store         { source :: Location, base  :: Base, indirect :: Location }
+    | BinaryOp      { destin :: Location, binop :: BinOperator, left :: Location, right :: Location }
     -- Jumps
     | Goto          { label :: Label }
     | IfTrueGoto    { test  :: Location, label :: Label}
     -- Functions
     | BeginFunction { frame :: Width }
     | EndFunction
-    | Return        { maySrc :: Maybe Location }
-    | PushParam     { src    :: Location }
+    | Return        { maysource :: Maybe Location }
+    | PushParam     { source    :: Location }
     | PopParams     { bytes  :: Width }
     | PCall         { label  :: Label }
-    | FCall         { label  :: Label, dst :: Location }
+    | FCall         { label  :: Label, destin :: Location }
     -- Print
-    | PrintInt      { src   :: Location }
-    | PrintFloat    { src   :: Location }
-    | PrintChar     { src   :: Location }
-    | PrintBool     { src   :: Location }
+    | PrintInt      { source   :: Location }
+    | PrintFloat    { source   :: Location }
+    | PrintChar     { source   :: Location }
+    | PrintBool     { source   :: Location }
     | PrintString   { label :: Label }
     -- Read
-    | ReadInt       { dst :: Location }
-    | ReadFloat     { dst :: Location }
-    | ReadChar      { dst :: Location }
-    | ReadBool      { dst :: Location }
+    | ReadInt       { destin :: Location }
+    | ReadFloat     { destin :: Location }
+    | ReadChar      { destin :: Location }
+    | ReadBool      { destin :: Location }
 
 instance Show Instruction where
     show = \case
@@ -137,8 +139,11 @@ data BinOperator
     | Rel Relation
     deriving (Eq)
 
-data Relation = EQ | NE | LT
-              deriving (Eq)
+data Relation
+    = EQ | NE
+    | LT | LE
+    | GT | GE
+    deriving (Eq)
 
 instance Show BinOperator where
     show = \case
@@ -160,6 +165,39 @@ instance Show Relation where
         EQ -> "=="
         NE -> "/="
         LT -> "<"
+        LE -> "<="
+        GT -> ">"
+        GE -> ">="
+
+binaryToRelation :: Binary -> Relation
+binaryToRelation = \case
+    OpEqual   -> EQ
+    OpUnequal -> NE
+    OpLess    -> LT
+    OpLessEq  -> LE
+    OpGreat   -> GT
+    OpGreatEq -> GE
+    _         -> error "TAC.binaryToRelation: trying to convert a non-relation binary operator to a intermediate code relation operator"
+
+binaryToBinOperator :: Binary -> BinOperator
+binaryToBinOperator = \case
+    OpPlus    -> ADD
+    OpMinus   -> SUB
+    OpTimes   -> MUL
+    OpDivide  -> DIV
+    OpModulo  -> MOD
+    OpPower   -> POW
+    OpOr      -> OR
+    OpAnd     -> AND
+    OpEqual   -> Rel EQ
+    OpUnequal -> Rel NE
+    OpLess    -> Rel LT
+    OpLessEq  -> Rel LE
+    OpGreat   -> Rel GT
+    OpGreatEq -> Rel GE
+    _         -> error "TAC.binaryToBinOperator: trying to convert '@' or '..' to a intermediate code binary operator"
+    -- OpFromTo
+    -- OpBelongs
 
 hasGoto :: Instruction -> Bool
 hasGoto = \case
