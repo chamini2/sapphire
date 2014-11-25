@@ -231,7 +231,7 @@ linearizeStatement nextLabel (Lex st posn) = do
 
             if expDt == String
                 then getsSymbol idn offset >>=
-                    generate . PrintString . ("_str"++) . show
+                    generate . PrintString . ("_str"++) . show . fromJust
                 else linearizeExpression expL >>= generate . case expDt of
                     Int   -> PrintInt
                     Float -> PrintFloat
