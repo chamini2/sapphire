@@ -147,15 +147,15 @@ arrayInnerDataType = \case
  - dt = identifier +
  -      1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
  -      (identifier * fields) + (identifier * fields) +
- -      (dt * int) +
+ -      (dt * int) + dt
  -
  - identifier = A
  - fields = B
  - int = C
  -
- - dt = A + 9 + 2 * A * B + dt * C
+ - dt = A + 9 + 2 * A * B + dt * C + dt
  -
- - dt' = C
+ - dt' = C + 1
  -}
 
 data DataTypeHistory = HistoryDataTypeArray (Lexeme Int)
