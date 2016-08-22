@@ -57,10 +57,10 @@ $double_quotation = "
 @float  = $digit+(\.$digit+)?
 @char   = \'($printable # [\\'] | \\' | \\$backslash)\'
 
-@string                 = \"@inside_string*\"
-@string_error           = \"@inside_string*
-@multiline_string       = \"\"\"(@inside_multilinestring | \"@inside_multilinestring | \"\"@inside_multilinestring)*\"\"\"
-@multiline_string_error = \"\"\"(@inside_multilinestring | \"@inside_multilinestring | \"\"@inside_multilinestring)*
+@string                 = \"@inside_string*\"           -- "
+@string_error           = \"@inside_string*             -- "
+@multiline_string       = \"\"\"(@inside_multilinestring | \"@inside_multilinestring | \"\"@inside_multilinestring)*\"\"\"      -- "
+@multiline_string_error = \"\"\"(@inside_multilinestring | \"@inside_multilinestring | \"\"@inside_multilinestring)*            -- "
 
 --------------------------------------------------------------------------------
 
