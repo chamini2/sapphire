@@ -2,7 +2,7 @@
 {-|
     Three-address code (TAC) generation module
 -}
-module Language.Sapphire.TAC
+module Language.Safiro.TAC
     ( Reference(..)
     , Value(..)
 
@@ -24,8 +24,8 @@ module Language.Sapphire.TAC
     , isPutLabel
     ) where
 
-import           Language.Sapphire.Program
-import           Language.Sapphire.SymbolTable
+import           Language.Safiro.Program
+import           Language.Safiro.SymbolTable
 
 import           Data.Char                     (toLower)
 import           Data.Sequence                 (Seq)

@@ -1,12 +1,12 @@
 {
 {-# OPTIONS_GHC -w #-}
-module Language.Sapphire.Parser
+module Language.Safiro.Parser
     ( parseProgram
     ) where
 
-import           Language.Sapphire.Error
-import           Language.Sapphire.Lexer
-import           Language.Sapphire.Program
+import           Language.Safiro.Error
+import           Language.Safiro.Lexer
+import           Language.Safiro.Program
 
 import           Control.Monad             (unless)
 import           Data.Foldable             (toList)

@@ -8,7 +8,7 @@
 {- |
     Symbol table based on the LeBlanc-Cook symbol table definition
  -}
-module Language.Sapphire.SymbolTable
+module Language.Safiro.SymbolTable
     ( SymbolTable
     , emptyTable
     , member
@@ -35,13 +35,13 @@ module Language.Sapphire.SymbolTable
     , SymbolCategory(..)
     , symbolCategory
 
-    , module Language.Sapphire.Stack
-    , module Language.Sapphire.Scope
+    , module Language.Safiro.Stack
+    , module Language.Safiro.Scope
     ) where
 
-import           Language.Sapphire.Program
-import           Language.Sapphire.Scope
-import           Language.Sapphire.Stack
+import           Language.Safiro.Program
+import           Language.Safiro.Scope
+import           Language.Safiro.Stack
 
 import           Data.Foldable             (concatMap, find, foldr, msum,
                                             toList)

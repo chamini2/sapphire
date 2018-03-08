@@ -1,12 +1,12 @@
-module Language.Sapphire.Definition
+module Language.Safiro.Definition
     ( DefState(..)
     , processDefinition
     ) where
 
-import           Language.Sapphire.Error
-import           Language.Sapphire.Program
-import           Language.Sapphire.SappMonad
-import           Language.Sapphire.SymbolTable
+import           Language.Safiro.Error
+import           Language.Safiro.Program
+import           Language.Safiro.SappMonad
+import           Language.Safiro.SymbolTable
 
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (liftM, unless, void, when)

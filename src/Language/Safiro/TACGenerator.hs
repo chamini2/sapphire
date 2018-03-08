@@ -7,16 +7,16 @@
  - in this case the three-reference code; store it temporarily as a structure for
  - further processing and send it to a temporary file for debugging purposes.
  -}
-module Language.Sapphire.TACGenerator
+module Language.Safiro.TACGenerator
     ( TACGenerator
     , processTACGenerator
     ) where
 
-import           Language.Sapphire.Program
-import           Language.Sapphire.SappMonad   hiding (initialWriter)
-import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.TAC
-import           Language.Sapphire.TypeChecker (processAccessChecker,
+import           Language.Safiro.Program
+import           Language.Safiro.SappMonad   hiding (initialWriter)
+import           Language.Safiro.SymbolTable
+import           Language.Safiro.TAC
+import           Language.Safiro.TypeChecker (processAccessChecker,
                                                 processExpressionChecker)
 
 import           Control.Arrow                 (second, (&&&))

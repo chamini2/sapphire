@@ -1,4 +1,4 @@
-module Language.Sapphire.TypeChecker
+module Language.Safiro.TypeChecker
     ( TypeState
 
     , TypeChecker
@@ -9,10 +9,10 @@ module Language.Sapphire.TypeChecker
     , processAccessChecker
     ) where
 
-import           Language.Sapphire.Error
-import           Language.Sapphire.Program
-import           Language.Sapphire.SappMonad
-import           Language.Sapphire.SymbolTable
+import           Language.Safiro.Error
+import           Language.Safiro.Program
+import           Language.Safiro.SappMonad
+import           Language.Safiro.SymbolTable
 
 import           Control.Arrow                 ((&&&))
 import           Control.Monad                 (guard, liftM, unless, void,

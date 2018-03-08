@@ -4,7 +4,7 @@
     Lexer for the programming language sapphire
 -}
 
-module Language.Sapphire.Lexer
+module Language.Safiro.Lexer
     ( Alex (..)
     , Token (..)
     , Lexeme (..)
@@ -14,10 +14,10 @@ module Language.Sapphire.Lexer
     , tellPError
     ) where
 
-import           Language.Sapphire.Error
-import           Language.Sapphire.Lexeme
-import           Language.Sapphire.Token
-import           Language.Sapphire.SappMonad (initialWriter)
+import           Language.Safiro.Error
+import           Language.Safiro.Lexeme
+import           Language.Safiro.Token
+import           Language.Safiro.SappMonad (initialWriter)
 
 import           Control.Monad            (liftM)
 import           Data.List                (intercalate, foldl')

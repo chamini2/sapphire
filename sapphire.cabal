@@ -24,7 +24,7 @@ executable sapphire
       -Wall
 
   -- Modules included in this executable, other than Main.
-  other-modules: Language.Sapphire.Lexer, Language.Sapphire.Parser
+  other-modules: Language.Safiro.Lexer, Language.Safiro.Parser
 
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:

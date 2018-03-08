@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.Expression
+module Language.Safiro.Expression
     ( Expression(..)
     , Binary(..)
     , Unary(..)
@@ -22,9 +22,9 @@ module Language.Sapphire.Expression
     , deepAccess
     ) where
 
-import           Language.Sapphire.DataType
-import           Language.Sapphire.Identifier
-import           Language.Sapphire.Lexeme
+import           Language.Safiro.DataType
+import           Language.Safiro.Identifier
+import           Language.Safiro.Lexeme
 
 import           Data.Char                    (toLower)
 import           Data.Foldable                (find, toList)

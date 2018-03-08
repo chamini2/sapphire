@@ -1,13 +1,13 @@
 {-# LANGUAGE TupleSections #-}
 module Main where
 
-import           Language.Sapphire.Definition
-import           Language.Sapphire.MIPSGenerator
-import           Language.Sapphire.Parser
-import           Language.Sapphire.SappMonad
-import           Language.Sapphire.SizeOffset
-import           Language.Sapphire.TACGenerator
-import           Language.Sapphire.TypeChecker
+import           Language.Safiro.Definition
+import           Language.Safiro.MIPSGenerator
+import           Language.Safiro.Parser
+import           Language.Safiro.SappMonad
+import           Language.Safiro.SizeOffset
+import           Language.Safiro.TACGenerator
+import           Language.Safiro.TypeChecker
 
 import           Control.Monad                   (guard, void, when)
 import           Control.Monad.Trans             (liftIO)

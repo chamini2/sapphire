@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.Error
+module Language.Safiro.Error
     ( Error(..)
     , isError
 
@@ -9,9 +9,9 @@ module Language.Sapphire.Error
     , Warning(..)
     ) where
 
-import           Language.Sapphire.Program
-import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.Token
+import           Language.Safiro.Program
+import           Language.Safiro.SymbolTable
+import           Language.Safiro.Token
 
 import           Data.Foldable                 (toList)
 import           Data.Function                 (on)

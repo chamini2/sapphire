@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.DataType
+module Language.Safiro.DataType
     ( DataType(..)
     , Field
 
@@ -23,8 +23,8 @@ module Language.Sapphire.DataType
     , putDataType
     ) where
 
-import           Language.Sapphire.Identifier
-import           Language.Sapphire.Lexeme
+import           Language.Safiro.Identifier
+import           Language.Safiro.Lexeme
 
 import           Data.Functor                 ((<$))
 import           Data.Function                (on)

@@ -1,11 +1,11 @@
-module Language.Sapphire.Lexeme
+module Language.Safiro.Lexeme
     ( Lexeme(..)
     , pure
 
-    , module Language.Sapphire.Position
+    , module Language.Safiro.Position
     ) where
 
-import           Language.Sapphire.Position
+import           Language.Safiro.Position
 
 import           Control.Applicative        (Applicative, pure, (<*>))
 

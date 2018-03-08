@@ -2,16 +2,16 @@
 {-|
     MIPS code generation module
  -}
-module Language.Sapphire.MIPSGenerator
+module Language.Safiro.MIPSGenerator
     ( MIPSGenerator
     , processMIPSGenerator
     ) where
 
-import           Language.Sapphire.MIPS        as MIPS
-import           Language.Sapphire.Program
-import           Language.Sapphire.SappMonad   hiding (initialWriter)
-import           Language.Sapphire.SymbolTable
-import           Language.Sapphire.TAC         as TAC hiding (Label)
+import           Language.Safiro.MIPS        as MIPS
+import           Language.Safiro.Program
+import           Language.Safiro.SappMonad   hiding (initialWriter)
+import           Language.Safiro.SymbolTable
+import           Language.Safiro.TAC         as TAC hiding (Label)
 
 import           Control.Monad                 (liftM, unless, when, void)
 import           Control.Monad.Reader          (asks)

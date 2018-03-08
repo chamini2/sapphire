@@ -1,16 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.Statement
+module Language.Safiro.Statement
     ( Statement(..)
     , StBlock
     , When(..)
     , Signature(..)
     ) where
 
-import           Language.Sapphire.DataType
-import           Language.Sapphire.Declaration
-import           Language.Sapphire.Expression
-import           Language.Sapphire.Identifier
-import           Language.Sapphire.Lexeme
+import           Language.Safiro.DataType
+import           Language.Safiro.Declaration
+import           Language.Safiro.Expression
+import           Language.Safiro.Identifier
+import           Language.Safiro.Lexeme
 
 import           Data.Foldable                 (foldl', toList)
 import           Data.Sequence                 (Seq, null)

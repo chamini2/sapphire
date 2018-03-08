@@ -3,7 +3,7 @@
 {-|
     MIPS related data structures
 -}
-module Language.Sapphire.MIPS
+module Language.Safiro.MIPS
     ( Label
     , Register(..)
     , Value
@@ -108,7 +108,7 @@ instance Show Value where
  -}
 type Code = Int
 
-data Instruction 
+data Instruction
     = Comment String
     | PutLabel Label String
     | PutDirective Directive

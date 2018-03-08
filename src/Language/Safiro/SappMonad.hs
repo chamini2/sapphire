@@ -1,10 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.SappMonad where
+module Language.Safiro.SappMonad where
 
-import           Language.Sapphire.Error
-import           Language.Sapphire.Program
-import           Language.Sapphire.SymbolTable
+import           Language.Safiro.Error
+import           Language.Safiro.Program
+import           Language.Safiro.SymbolTable
 
 import           Control.Monad        (MonadPlus, when, liftM, unless, guard)
 import           Control.Monad.State  (MonadState, gets, modify)

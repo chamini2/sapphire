@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.Token
+module Language.Safiro.Token
     ( Token (..)
     ) where
 

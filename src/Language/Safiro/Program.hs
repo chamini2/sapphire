@@ -1,23 +1,23 @@
 {-# LANGUAGE LambdaCase #-}
-module Language.Sapphire.Program
+module Language.Safiro.Program
     ( Program(..)
 
     , mainName
 
-    , module Language.Sapphire.DataType
-    , module Language.Sapphire.Declaration
-    , module Language.Sapphire.Expression
-    , module Language.Sapphire.Identifier
-    , module Language.Sapphire.Lexeme
-    , module Language.Sapphire.Statement
+    , module Language.Safiro.DataType
+    , module Language.Safiro.Declaration
+    , module Language.Safiro.Expression
+    , module Language.Safiro.Identifier
+    , module Language.Safiro.Lexeme
+    , module Language.Safiro.Statement
     ) where
 
-import           Language.Sapphire.DataType
-import           Language.Sapphire.Declaration
-import           Language.Sapphire.Expression
-import           Language.Sapphire.Identifier
-import           Language.Sapphire.Lexeme
-import           Language.Sapphire.Statement
+import           Language.Safiro.DataType
+import           Language.Safiro.Declaration
+import           Language.Safiro.Expression
+import           Language.Safiro.Identifier
+import           Language.Safiro.Lexeme
+import           Language.Safiro.Statement
 
 import           Control.Monad                 (when)
 import           Control.Monad.State           (StateT, get, modify, runStateT)

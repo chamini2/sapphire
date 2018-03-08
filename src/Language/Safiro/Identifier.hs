@@ -1,4 +1,4 @@
-module Language.Sapphire.Identifier
+module Language.Safiro.Identifier
     ( Identifier
     ) where
 

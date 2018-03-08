@@ -1,4 +1,4 @@
-module Language.Sapphire.Scope
+module Language.Safiro.Scope
     ( Scope
 
     , topScope

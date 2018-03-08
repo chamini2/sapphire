@@ -216,7 +216,7 @@ Ejemplos:
 Sintaxis:
 
 ~~~ruby
-    <id> [, <id>..] : <Type>[<expr Int>] 
+    <id> [, <id>..] : <Type>[<expr Int>]
 ~~~
 
 
@@ -278,7 +278,7 @@ Ejemplos:
         return a == b
     end
 
-    def say_hi_n_times : Int n -> () 
+    def say_hi_n_times : Int n -> ()
         for i in 1..n
             print "hi!\n"
         end
@@ -434,10 +434,10 @@ Ejemplos:
     case age
         when 0, 1, 2, 3 do
             print "bebé"
-        when (4, 5, 6, 7, 8, 
+        when (4, 5, 6, 7, 8,
               9, 10, 11, 12) do
             print "niño"
-        when (10, 11, 12, 13, 
+        when (10, 11, 12, 13,
               14, 15, 16, 17) do
             # notar que el 10,11 y 12 están en "niño" y "joven"
             print "joven"
