@@ -26,6 +26,20 @@ import           System.FilePath                 (replaceExtension,
                                                   takeFileName)
 import           System.Process                  (rawSystem)
 
+exectuable :: String
+exectuable = "safiro"
+
+help :: String
+help = usageInfo message options
+    where
+        message = "usage: " ++ exectuable ++ " [OPTION]... [FILE]\n" ++
+                  "\twhen running " ++ exectuable ++ " without arguments, the compiler " ++
+                  "consumes data it\n\treceives from the standard input until " ++
+                  "it receives an EOF ('^D') character"
+
+version :: String
+version = exectuable ++ " 0.1.0.0"
+
 main :: IO ()
 main = void $ runMaybeT $ do
     (flgs, args) <- liftIO arguments
@@ -93,17 +107,6 @@ options =
     , Option ['m'] ["mips"]         (NoArg ShowMIPS)          "shows the MIPS code generated"
     , Option ['e'] ["execute"]      (NoArg Execute)           "execute the MIPS code directly with the 'spim' command"
     ]
-
-help :: String
-help = usageInfo message options
-    where
-        message = "usage: sapphire [OPTION]... [FILE]\n" ++
-                  "\twhen running sapphire without arguments, the compiler " ++
-                  "consumes data it\n\treceives from the standard input until " ++
-                  "it receives an EOF ('^D') character"
-
-version :: String
-version = "sapphire 0.1.0.0"
 
 arguments :: IO ([Flag], [String])
 arguments = do

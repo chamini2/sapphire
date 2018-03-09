@@ -149,7 +149,7 @@ generateMIPS r = snd . flip (flip execRWS r) initialState
 emitPreamble :: MIPSGenerator ()
 emitPreamble = do
     filePath <- asks file
-    generate $ MIPS.Comment $ filePath ++ " - Sapphire compiler generated MIPS code"
+    generate $ MIPS.Comment $ filePath ++ " - Safiro compiler generated MIPS code"
 
     --  Generate .data section
     generateGlobals

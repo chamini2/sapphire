@@ -1,9 +1,9 @@
-Lenguaje de programación SAPPHIRE
+Lenguaje de programación Safiro
 =================================
 
-SAPPHIRE es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje está parcialmente inspirado en [Ruby](https://www.ruby-lang.org).
+Safiro es un lenguaje de programación de uso general desarrollado para la cadena de Lenguajes de Programación de la USB. El lenguaje está parcialmente inspirado en [Ruby](https://www.ruby-lang.org).
 
-SAPPHIRE es imperativo, fuertemente tipado, con funciones, iteraciones indeterminadas y acotadas, recursividad, comentarios, con soporte para bloques anidados de instrucciones, unioness y estructuras arbitrariamente anidadas y más.
+Safiro es imperativo, fuertemente tipado, con funciones, iteraciones indeterminadas y acotadas, recursividad, comentarios, con soporte para bloques anidados de instrucciones, unioness y estructuras arbitrariamente anidadas y más.
 
 Adicionalmente tiene un tipo de datos que representa un rango de enteros, selector n-ario (case) y arreglos multidimensionales de segunda clase.
 
@@ -39,7 +39,7 @@ Ejemplos:
     barBAZ
 ~~~
 
-Un identificador en SAPPHIRE consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
+Un identificador en Safiro consiste de una cadena de caracteres de cualquier longitud que comienza por una letra minúscula (`a-z`) o el caracter guión bajo (`_`), y es seguido por letras minúsculas (`a-z`), letras mayúscula (`A-Z`), dígitos (`0-9`) o el caracter guión bajo (`_`).
 
 
 ### Comentarios
@@ -50,7 +50,7 @@ Ejemplos:
     # esto es un comentario
 ~~~
 
-En SAPPHIRE se pueden escribir comentarios de una línea al estilo de Ruby. Al escribir `#` se ignorarán todos los caracteres que lo proceden en la línea.
+En Safiro se pueden escribir comentarios de una línea al estilo de Ruby. Al escribir `#` se ignorarán todos los caracteres que lo proceden en la línea.
 
 
 ### Palabras reservadas y Símbolos
