@@ -179,7 +179,7 @@ The binary operators, which take `integer` for the operands and produce an `inte
 - `-` for substraction
 - `*` for multiplication
 - `/` for division
-- `%` for module
+- `%` for modulo
 - `^` for exponentiation
 
 ### `boolean` expressions
@@ -191,8 +191,8 @@ Consist of the boolean literals.
 
 The binary operators, which take `boolean` for the operands and produce a `boolean`.
 
-- `and` for boolean conjunction
 - `or` for boolean disjunction
+- `and` for boolean conjunction
 
 And the unary operator, which takes a `boolean` for the operand and produces a `boolean`.
 
