@@ -21,6 +21,10 @@ description:         Please see the README on Github at <https://github.com/cham
 dependencies:
 - base >= 4.7 && < 5
 - hspec
+- array
+
+build-tools:
+- alex
 
 library:
   source-dirs: src
@@ -35,6 +39,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - sapphire
+    other-modules:
+    - Lexer
+
 
 tests:
   sapphire-test:
