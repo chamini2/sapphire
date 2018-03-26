@@ -1,6 +1,5 @@
 module Lib
-    ( someFunc
+    ( scanTokens
     ) where
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+import Lexer
