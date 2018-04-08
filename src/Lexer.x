@@ -33,6 +33,7 @@ tokens :-
     "begin" { pushToken TkBegin }
     "read" { pushToken TkRead }
     "write" { pushToken TkWrite }
+    "," { pushToken TkComma }
     "if" { pushToken TkIf }
     "then" { pushToken TkThen }
     "else" { pushToken TkElse }
@@ -86,6 +87,7 @@ posn tok = case tok of
     TkBegin p -> p
     TkRead p -> p
     TkWrite p -> p
+    TkComma p -> p
     TkIf p -> p
     TkThen p -> p
     TkElse p -> p
@@ -119,6 +121,7 @@ data Token
     | TkBegin AlexPosn
     | TkRead AlexPosn
     | TkWrite AlexPosn
+    | TkComma AlexPosn
     | TkIf AlexPosn
     | TkThen AlexPosn
     | TkElse AlexPosn
@@ -154,6 +157,7 @@ instance PrettyShow Token where
         TkBegin _ -> "begin"
         TkRead _ -> "read"
         TkWrite _ -> "write"
+        TkComma _ -> ","
         TkIf _ -> "if"
         TkThen _ -> "then"
         TkElse _ -> "else"

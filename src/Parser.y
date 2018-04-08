@@ -23,6 +23,7 @@ import PrettyShow
     "else" { TkElse _ }
     "integer" { TkInteger _ }
     "boolean" { TkBoolean _ }
+    "," { TkComma _ }
     ";" { TkSemicolon _ }
     ":=" { TkAssign _ }
     "+" { TkAddition _ }
