@@ -1,55 +1,52 @@
-name:                sapphire
-version:             0.1.0.0
-github:              "chamini2/sapphire"
-license:             BSD3
-author:              "Matteo Ferrando"
-maintainer:          "matteo.ferrando2@gmail.com"
-copyright:           "2018 Matteo Ferrando"
+name: sapphire
+version: 0.1.0.0
+github: "chamini2/sapphire"
+license: BSD3
+author: "Matteo Ferrando"
+maintainer: "matteo.ferrando2@gmail.com"
+copyright: "2018 Matteo Ferrando"
 
 extra-source-files:
 - README.md
 
 # Metadata used when publishing your package
-synopsis:            Sapphire programming language compiler
-category:            Language
+synopsis: Sapphire programming language compiler
+category: Language
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/chamini2/sapphire#readme>
+description: Please see the README on Github at <https://github.com/chamini2/sapphire#readme>
 
 dependencies:
-- base >= 4.7 && < 5
-- hspec
-- array
+  - base >= 4.7 && < 5
+  - array
 
 build-tools:
-- alex
+  - alex
 
 library:
   source-dirs: src
 
 executables:
-  sapphire:
-    main:                Main.hs
-    source-dirs:         app
+  sapp:
+    main: Main.hs
+    source-dirs: app
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
-    - sapphire
-    other-modules:
-    - Lexer
-
+      - sapphire
 
 tests:
   sapphire-test:
-    main:                Spec.hs
-    source-dirs:         test
+    main: Spec.hs
+    source-dirs: test
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
-    - sapphire
+      - sapphire
+      - hspec
