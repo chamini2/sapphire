@@ -2,6 +2,7 @@
 module Lexer
     ( scanTokens
     , Token(..)
+    , posn
     ) where
 }
 
@@ -71,6 +72,43 @@ pushToken tok posn _ = tok posn
 consumeToken :: (String -> AlexPosn -> Token) -> AlexPosn -> String -> Token
 consumeToken tok posn inp = tok inp posn
 
+scanTokens :: String -> [Token]
+scanTokens = alexScanTokens
+
+posn :: Token -> AlexPosn
+posn tok = case tok of
+    TkMain p -> p
+    TkEnd p -> p
+    TkSemicolon p -> p
+    TkAssign p -> p
+    TkBegin p -> p
+    TkRead p -> p
+    TkWrite p -> p
+    TkIf p -> p
+    TkThen p -> p
+    TkElse p -> p
+    TkLitCharString _ p -> p
+    TkLitInteger _ p -> p
+    TkLitBoolean _ p -> p
+    TkAddition p -> p
+    TkSubtraction p -> p
+    TkMultiplication p -> p
+    TkDivision p -> p
+    TkModulo p -> p
+    TkExponentiation p -> p
+    TkDisjunction p -> p
+    TkConjuction p -> p
+    TkNegation p -> p
+    TkEqualsTo p -> p
+    TkDifferentFrom p -> p
+    TkGreaterThan p -> p
+    TkGreaterThanOrEquals p -> p
+    TkLessThan p -> p
+    TkLessThanOrEquals p -> p
+    TkInteger p -> p
+    TkBoolean p -> p
+    TkIdentifier _ p -> p
+
 data Token
     = TkMain AlexPosn
     | TkEnd AlexPosn
@@ -105,6 +143,4 @@ data Token
     | TkIdentifier String AlexPosn
     deriving (Show, Eq)
 
-scanTokens :: String -> [Token]
-scanTokens = alexScanTokens
 }
