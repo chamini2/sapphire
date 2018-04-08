@@ -1,9 +1,7 @@
-import Lib
 import Test.Hspec
+
+import LexerSpec
 
 main :: IO ()
 main = hspec $ do
-    describe "someFunc" $ do
-        it "return  ()" $ do
-            res <- someFunc
-            shouldBe res ()
+    lexer
