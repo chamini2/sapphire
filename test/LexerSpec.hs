@@ -75,7 +75,11 @@ identifiers = describe "identifiers" $ do
             )
 
 expressionLiterals = describe "expression literals" $ do
-    describe "character strings" $ do
+    charStrings
+    integers
+    booleans
+  where
+    charStrings = describe "character strings" $ do
         it "should consume the empty string" $ do
             let res = scanTokens $
                     "\"\""
@@ -105,7 +109,7 @@ expressionLiterals = describe "expression literals" $ do
                     "right?\""
             evaluate res `shouldThrow` anyErrorCall
 
-    describe "integers" $ do
+    integers = describe "integers" $ do
         it "should consume integer numbers" $ do
             let res = scanTokens $
                     "123"
@@ -122,7 +126,7 @@ expressionLiterals = describe "expression literals" $ do
                     _ -> False
                 )
 
-    describe "booleans" $ do
+    booleans = describe "booleans" $ do
         it "should consume 'true'" $ do
             let res = scanTokens $
                     "true"
