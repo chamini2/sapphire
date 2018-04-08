@@ -104,3 +104,20 @@ expressionLiterals = describe "expression literals" $ do
                     "This is how they work,\n" ++
                     "right?\""
             evaluate res `shouldThrow` anyErrorCall
+
+    describe "integers" $ do
+        it "should consume integer numbers" $ do
+            let res = scanTokens $
+                    "123"
+            res `shouldSatisfy` (\res -> case res of
+                    [TkLitInteger val _] -> val == 123
+                    _ -> False
+                )
+
+        it "should accept integers that start with 0" $ do
+            let res = scanTokens $
+                    "0123"
+            res `shouldSatisfy` (\res -> case res of
+                    [TkLitInteger val _] -> val == 123
+                    _ -> False
+                )
