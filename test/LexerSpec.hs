@@ -121,3 +121,20 @@ expressionLiterals = describe "expression literals" $ do
                     [TkLitInteger val _] -> val == 123
                     _ -> False
                 )
+
+    describe "booleans" $ do
+        it "should consume 'true'" $ do
+            let res = scanTokens $
+                    "true"
+            res `shouldSatisfy` (\res -> case res of
+                    [TkLitBoolean val _] -> val == True
+                    _ -> False
+                )
+
+        it "should consume 'false'" $ do
+            let res = scanTokens $
+                    "false"
+            res `shouldSatisfy` (\res -> case res of
+                    [TkLitBoolean val _] -> val == False
+                    _ -> False
+                )
