@@ -11,6 +11,7 @@ lexer = describe "lexer" $ do
     skippedChars
     comments
     identifiers
+    expressionLiterals
 
 skippedChars = describe "skipped chars" $ do
     it "should skip spaces ' '" $ do
@@ -72,3 +73,34 @@ identifiers = describe "identifiers" $ do
                 [_, TkIdentifier val _] -> val == "iden"
                 _ -> False
             )
+
+expressionLiterals = describe "expression literals" $ do
+    describe "character strings" $ do
+        it "should consume the empty string" $ do
+            let res = scanTokens $
+                    "\"\""
+            res `shouldSatisfy` (\res -> case res of
+                    [TkLitCharString val _] -> val == ""
+                    _ -> False
+                )
+
+        it "should consume a string with backspaced parts" $ do
+            let res = scanTokens $
+                    "\" \\\" \\t \\n \\\\ \""
+            res `shouldSatisfy` (\res -> case res of
+                    [TkLitCharString val _] -> val == " \" \t \n \\ "
+                    _ -> False
+                )
+
+        it "should fail for non-closed strings" $ do
+            let res = scanTokens $
+                    "\"Hello world!"
+            evaluate res `shouldThrow` anyErrorCall
+
+        it "should fail for multiple-line strings" $ do
+            let res = scanTokens $
+                    "\"This is my\n" ++
+                    "Haiku.\n" ++
+                    "This is how they work,\n" ++
+                    "right?\""
+            evaluate res `shouldThrow` anyErrorCall
