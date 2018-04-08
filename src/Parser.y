@@ -1,6 +1,10 @@
 {
 module Parser
     ( parseProgram
+    , parseStatement
+    , parseExpression
+    , SappStatement(..)
+    , SappExpression(..)
     ) where
 
 import Lexer
@@ -8,6 +12,8 @@ import PrettyShow
 }
 
 %name parseProgram Program_
+%name parseStatement Statement_
+%name parseExpression Expression_
 %tokentype { Token }
 %error { parseError }
 
@@ -47,22 +53,55 @@ import PrettyShow
     identifier_ { TkIdentifier $$ _ }
 %%
 
+-- general parsers
+EITHER(lft,rgt)
+    : lft { Left $1 }
+    | rgt { Right $1 }
+
+LIST_END_SEP0(elm,sep)
+    : {- empty -} { mempty }
+    | elm sep LIST_END_SEP0(elm,sep) { pure $1 `mappend` $3 }
+
+LIST_SEP1(elm,sep)
+    : elm { pure $1 }
+    | LIST_SEP1(elm,sep) sep elm { $1 `mappend` pure $3 }
+
+--------------------------------------------------------------------------------
+
 Program_
-    : "main" StatementList_ "end" { ASTStmtBlock $2 }
+    : "main" StatementList_ "end" { SappStmtBlock $2 }
 
 StatementList_
-    : {- empty -} { mempty }
-    | Statement_ ";" StatementList_ { $1 : $3 }
+    : LIST_END_SEP0(Statement_, ";") { $1 }
 
 Statement_
-    : "begin" StatementList_ "end" { ASTStmtBlock $2 }
+    : "begin" StatementList_ "end" { SappStmtBlock $2 }
+    | "write" LIST_SEP1(EITHER(charstring_, Expression_), ",") { SappStmtWrite $2 }
 
+Expression_
+    : integer_ { SappExpLitInteger $1 }
+    | boolean_ { SappExpLitBoolean $1 }
 {
 parseError :: [Token] -> a
 parseError (tok:_) = error $ (prettyShow $ posn tok) ++ ": " ++ (prettyShow tok)
 
-data ASTStatement
-    = ASTStmtBlock [ASTStatement]
-    | ASTStmtVariableDeclaration String String
-    deriving (Show)
+data SappStatement
+    = SappStmtBlock [SappStatement]
+    | SappStmtVariableDeclaration SappDataType String
+    | SappStmtAssignment SappVariable SappExpression
+    | SappStmtWrite [Either String SappExpression]
+    deriving (Show, Eq)
+
+data SappDataType
+    = SappDTInteger
+    | SappDTBoolean
+    deriving (Show, Eq)
+
+data SappVariable = SappVar String
+    deriving (Show, Eq)
+
+data SappExpression
+    = SappExpLitInteger Integer
+    | SappExpLitBoolean Bool
+    deriving (Show, Eq)
 }
