@@ -46,9 +46,9 @@ tokens :-
     "/" { pushToken TkDivision }
     "%" { pushToken TkModulo }
     "^" { pushToken TkExponentiation }
-    "or" { pushToken TkOr }
-    "and" { pushToken TkAnd }
-    "not" { pushToken TkNot }
+    "or" { pushToken TkDisjunction }
+    "and" { pushToken TkConjuction }
+    "not" { pushToken TkNegation }
     "=" { pushToken TkEqualsTo }
     "/=" { pushToken TkDifferentFrom }
     ">" { pushToken TkGreaterThan }
@@ -90,9 +90,9 @@ data Token
     | TkDivision AlexPosn
     | TkModulo AlexPosn
     | TkExponentiation AlexPosn
-    | TkOr AlexPosn
-    | TkAnd AlexPosn
-    | TkNot AlexPosn
+    | TkDisjunction AlexPosn
+    | TkConjuction AlexPosn
+    | TkNegation AlexPosn
     | TkEqualsTo AlexPosn
     | TkDifferentFrom AlexPosn
     | TkGreaterThan AlexPosn
