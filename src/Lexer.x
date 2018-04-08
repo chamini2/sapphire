@@ -1,6 +1,7 @@
 {
 module Lexer
     ( scanTokens
+    , Token(..)
     ) where
 }
 
