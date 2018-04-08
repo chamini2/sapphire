@@ -4,6 +4,7 @@ module Parser
     ) where
 
 import Lexer
+import PrettyShow
 }
 
 %name parseProgram Program_
@@ -47,7 +48,6 @@ import Lexer
 
 Program_
     : "main" StatementList_ "end" { ASTStmtBlock $2 }
-    | StatementList_ { ASTStmtBlock $1 }
 
 StatementList_
     : {- empty -} { mempty }
@@ -57,7 +57,8 @@ Statement_
     : "begin" StatementList_ "end" { ASTStmtBlock $2 }
 
 {
-parseError = undefined
+parseError :: [Token] -> a
+parseError (tok:_) = error $ (prettyShow $ posn tok) ++ ": " ++ (prettyShow tok)
 
 data ASTStatement
     = ASTStmtBlock [ASTStatement]
