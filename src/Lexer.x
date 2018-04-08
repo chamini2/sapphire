@@ -4,6 +4,8 @@ module Lexer
     , Token(..)
     , posn
     ) where
+
+import PrettyShow
 }
 
 %wrapper "posn"
@@ -142,5 +144,42 @@ data Token
     | TkBoolean AlexPosn
     | TkIdentifier String AlexPosn
     deriving (Show, Eq)
+
+instance PrettyShow Token where
+    prettyShow tok = case tok of
+        TkMain _ -> "main"
+        TkEnd _ -> "end"
+        TkSemicolon _ -> ";"
+        TkAssign _ -> ":="
+        TkBegin _ -> "begin"
+        TkRead _ -> "read"
+        TkWrite _ -> "write"
+        TkIf _ -> "if"
+        TkThen _ -> "then"
+        TkElse _ -> "else"
+        TkLitCharString v _ -> v
+        TkLitInteger v _ -> show v
+        TkLitBoolean v _ -> if v then "true" else "false"
+        TkAddition _ -> "+"
+        TkSubtraction _ -> "-"
+        TkMultiplication _ -> "*"
+        TkDivision _ -> "/"
+        TkModulo _ -> "%"
+        TkExponentiation _ -> "^"
+        TkDisjunction _ -> "or"
+        TkConjuction _ -> "and"
+        TkNegation _ -> "not"
+        TkEqualsTo _ -> "="
+        TkDifferentFrom _ -> "/="
+        TkGreaterThan _ -> ">"
+        TkGreaterThanOrEquals _ -> ">="
+        TkLessThan _ -> "<"
+        TkLessThanOrEquals _ -> ">="
+        TkInteger _ -> "integer"
+        TkBoolean _ -> "boolean"
+        TkIdentifier v _ -> v
+
+instance PrettyShow AlexPosn where
+    prettyShow (AlexPn abs lin col) = "(" ++ show lin ++ ":" ++ show col ++ ")"
 
 }
