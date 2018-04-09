@@ -106,6 +106,37 @@ statement = describe "Statement_" $ do
                     "write \"A number:\", 6"
             res `shouldBe` SappStmtWrite [Left "A number:", Right (SappExpLitInteger 6)]
 
+    describe "if" $ do
+        it "should accept an if-then statement" $ do
+            let res = parseStatement . scanTokens $
+                    "if true\n" ++
+                    "then write \"Hello world\""
+            res `shouldSatisfy` (\res -> case res of
+                    SappStmtIf expr tStmt Nothing -> True
+                    _ -> False
+                )
+
+        it "should accept an if-then-else statement" $ do
+            let res = parseStatement . scanTokens $
+                    "if true\n" ++
+                    "then write \"Hello world\"\n" ++
+                    "else write \"Goodbye world\""
+            res `shouldSatisfy` (\res -> case res of
+                    SappStmtIf expr tStmt (Just eStmt) -> True
+                    _ -> False
+                )
+
+        it "should parse if-then-if-then-else case as if-then(if-then-else)" $ do
+            let res = parseStatement . scanTokens $
+                    "if true\n" ++
+                    "then if false\n" ++
+                        "then write \"Hello world\"\n" ++
+                        "else write \"Goodbye world\""
+            res `shouldSatisfy` (\res -> case res of
+                    SappStmtIf oExpr (SappStmtIf iExpr tStmt (Just eStmt)) Nothing -> True
+                    _ -> False
+                )
+
 
 program = describe "Program_" $ do
     it "should parse an empty program" $ do

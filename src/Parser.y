@@ -55,6 +55,13 @@ import PrettyShow
 %%
 
 -- general parsers
+SND(fst, snd)
+    : fst snd { $2 }
+
+MAYBE(val)
+    : {- empty -} { Nothing }
+    | val { Just $1 }
+
 EITHER(lft,rgt)
     : lft { Left $1 }
     | rgt { Right $1 }
@@ -79,6 +86,7 @@ Statement_
     : "begin" StatementList_ "end" { SappStmtBlock $2 }
     | "read" Variable_ { SappStmtRead $2 }
     | "write" LIST_SEP1(EITHER(charstring_, Expression_), ",") { SappStmtWrite $2 }
+    | "if" Expression_ "then" Statement_ MAYBE(SND("else", Statement_)) { SappStmtIf $2 $4 $5 }
 
 Expression_
     : integer_ { SappExpLitInteger $1 }
@@ -97,6 +105,7 @@ data SappStatement
     | SappStmtAssignment SappVariable SappExpression
     | SappStmtRead SappVariable
     | SappStmtWrite [Either String SappExpression]
+    | SappStmtIf SappExpression SappStatement (Maybe SappStatement)
     deriving (Show, Eq)
 
 data SappDataType
