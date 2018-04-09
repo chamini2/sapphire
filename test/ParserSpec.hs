@@ -44,11 +44,21 @@ expression = describe "Expression_" $ do
                         "+ left right"
                 res `shouldBe` SappExpAddition (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "+ 7 3"
+                res `shouldBe` SappExpLitInteger 10
+
         describe "substraction" $ do
             it "should parse a substraction as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "- left right"
                 res `shouldBe` SappExpSubstraction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "- 7 3"
+                res `shouldBe` SappExpLitInteger 4
 
         describe "multiplication" $ do
             it "should parse a multiplication as an expression" $ do
@@ -56,11 +66,26 @@ expression = describe "Expression_" $ do
                         "* left right"
                 res `shouldBe` SappExpMultiplication (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "* 7 3"
+                res `shouldBe` SappExpLitInteger 21
+
         describe "division" $ do
             it "should parse a division as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "/ left right"
                 res `shouldBe` SappExpDivision (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "/ 7 3"
+                res `shouldBe` SappExpLitInteger 2
+
+            it "should not evaluate literals when right operand is 0" $ do
+                let res = parseExpression . scanTokens $
+                        "/ 7 0"
+                res `shouldBe` SappExpDivision (SappExpLitInteger 7) (SappExpLitInteger 0)
 
         describe "modulo" $ do
             it "should parse a modulo as an expression" $ do
@@ -68,11 +93,31 @@ expression = describe "Expression_" $ do
                         "% left right"
                 res `shouldBe` SappExpModulo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "% 7 3"
+                res `shouldBe` SappExpLitInteger 1
+
+            it "should not evaluate literals when right operand is 0" $ do
+                let res = parseExpression . scanTokens $
+                        "% 7 0"
+                res `shouldBe` SappExpModulo (SappExpLitInteger 7) (SappExpLitInteger 0)
+
         describe "exponentiation" $ do
             it "should parse an exponentiation as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "^ left right"
                 res `shouldBe` SappExpExponentiation (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "^ 7 3"
+                res `shouldBe` SappExpLitInteger 343
+
+            it "should not evaluate literals when right operand is negative" $ do
+                let res = parseExpression . scanTokens $
+                        "^ 7 - 0 2"
+                res `shouldBe` SappExpExponentiation (SappExpLitInteger 7) (SappExpLitInteger (-2))
 
         describe "conjuction" $ do
             it "should parse a conjuction as an expression" $ do
@@ -80,11 +125,21 @@ expression = describe "Expression_" $ do
                         "or left right"
                 res `shouldBe` SappExpConjuction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "or false true"
+                res `shouldBe` SappExpLitBoolean True
+
         describe "disjunction" $ do
             it "should parse a disjunction as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "and left right"
                 res `shouldBe` SappExpDisjunction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+            it "should evaluate integer literals" $ do
+                let res = parseExpression . scanTokens $
+                        "and false true"
+                res `shouldBe` SappExpLitBoolean False
 
         describe "negation" $ do
             it "should parse a negation as an expression" $ do
@@ -92,6 +147,14 @@ expression = describe "Expression_" $ do
                         "not val"
                 res `shouldBe` SappExpNegation (SappExpVariable (SappVar "val"))
 
+            it "should evaluate true literal" $ do
+                let res = parseExpression . scanTokens $
+                        "not true"
+                res `shouldBe` SappExpLitBoolean False
+            it "should evaluate false literal" $ do
+                let res = parseExpression . scanTokens $
+                        "not false"
+                res `shouldBe` SappExpLitBoolean True
 
         describe "equals to" $ do
             it "should parse an equals to as an expression" $ do
@@ -99,11 +162,55 @@ expression = describe "Expression_" $ do
                         "= left right"
                 res `shouldBe` SappExpEqualsTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            describe "should evaluate integer literals" $ do
+                it "should evaluate equals to true" $ do
+                    let res = parseExpression . scanTokens $
+                            "= 1 1"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate unequals to false" $ do
+                    let res = parseExpression . scanTokens $
+                            "= 1 2"
+                    res `shouldBe` SappExpLitBoolean False
+
+            describe "should evaluate boolean literals" $ do
+                it "should evaluate equals to true" $ do
+                    let res = parseExpression . scanTokens $
+                            "= false false"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate unequals to false" $ do
+                    let res = parseExpression . scanTokens $
+                            "= true false"
+                    res `shouldBe` SappExpLitBoolean False
+
         describe "different from" $ do
             it "should parse an different from as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "/= left right"
                 res `shouldBe` SappExpDifferentFrom (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+            describe "should evaluate integer literals" $ do
+                it "should evaluate unequals to true" $ do
+                    let res = parseExpression . scanTokens $
+                            "/= 1 2"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate equals to false" $ do
+                    let res = parseExpression . scanTokens $
+                            "/= 1 1"
+                    res `shouldBe` SappExpLitBoolean False
+
+            describe "should evaluate boolean literals" $ do
+                it "should evaluate equals to true" $ do
+                    let res = parseExpression . scanTokens $
+                            "/= false true"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate unequals to false" $ do
+                    let res = parseExpression . scanTokens $
+                            "/= true true"
+                    res `shouldBe` SappExpLitBoolean False
 
         describe "greater than" $ do
             it "should parse an greater than as an expression" $ do
@@ -111,11 +218,43 @@ expression = describe "Expression_" $ do
                         "> left right"
                 res `shouldBe` SappExpGreaterThan (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            describe "should evaluate integer literals" $ do
+                it "should evaluate greater to true" $ do
+                    let res = parseExpression . scanTokens $
+                            "> 2 1"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate equal to false" $ do
+                    let res = parseExpression . scanTokens $
+                            "> 1 1"
+                    res `shouldBe` SappExpLitBoolean False
+
+                it "should evaluate less to false" $ do
+                    let res = parseExpression . scanTokens $
+                            "> 0 1"
+                    res `shouldBe` SappExpLitBoolean False
+
         describe "greater than or equal to" $ do
             it "should parse an greater than or equal to as an expression" $ do
                 let res = parseExpression . scanTokens $
                         ">= left right"
                 res `shouldBe` SappExpGreaterThanOrEqualTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+            describe "should evaluate integer literals" $ do
+                it "should evaluate greater to true" $ do
+                    let res = parseExpression . scanTokens $
+                            ">= 2 1"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate equal to true" $ do
+                    let res = parseExpression . scanTokens $
+                            ">= 1 1"
+                    res `shouldBe` SappExpLitBoolean True
+
+                it "should evaluate less to false" $ do
+                    let res = parseExpression . scanTokens $
+                            ">= 0 1"
+                    res `shouldBe` SappExpLitBoolean False
 
         describe "less than" $ do
             it "should parse an less than as an expression" $ do
@@ -123,13 +262,41 @@ expression = describe "Expression_" $ do
                         "< left right"
                 res `shouldBe` SappExpLessThan (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            it "should evaluate less to true" $ do
+                let res = parseExpression . scanTokens $
+                        "< 0 1"
+                res `shouldBe` SappExpLitBoolean True
+
+            it "should evaluate equal to false" $ do
+                let res = parseExpression . scanTokens $
+                        "< 1 1"
+                res `shouldBe` SappExpLitBoolean False
+
+            it "should evaluate greater to false" $ do
+                let res = parseExpression . scanTokens $
+                        "< 2 1"
+                res `shouldBe` SappExpLitBoolean False
+
         describe "less than or equal to" $ do
             it "should parse an less than or equal to as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "<= left right"
                 res `shouldBe` SappExpLessThanOrEqualto (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
+            it "should evaluate less to true" $ do
+                let res = parseExpression . scanTokens $
+                        "<= 0 1"
+                res `shouldBe` SappExpLitBoolean True
 
+            it "should evaluate equal to true" $ do
+                let res = parseExpression . scanTokens $
+                        "<= 1 1"
+                res `shouldBe` SappExpLitBoolean True
+
+            it "should evaluate greater to false" $ do
+                let res = parseExpression . scanTokens $
+                        "<= 2 1"
+                res `shouldBe` SappExpLitBoolean False
 
 statement = describe "Statement_" $ do
     describe "block" $ do

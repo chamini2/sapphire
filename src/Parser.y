@@ -99,27 +99,49 @@ Expression_
     : integer_ { SappExpLitInteger $1 }
     | boolean_ { SappExpLitBoolean $1 }
     | Variable_ { SappExpVariable $1 }
-    | "+" Expression_ Expression_ { SappExpAddition $2 $3 }
-    | "-" Expression_ Expression_ { SappExpSubstraction $2 $3 }
-    | "*" Expression_ Expression_ { SappExpMultiplication $2 $3 }
-    | "/" Expression_ Expression_ { SappExpDivision $2 $3 }
-    | "%" Expression_ Expression_ { SappExpModulo $2 $3 }
-    | "^" Expression_ Expression_ { SappExpExponentiation $2 $3 }
-    | "or" Expression_ Expression_ { SappExpConjuction $2 $3 }
-    | "and" Expression_ Expression_ { SappExpDisjunction $2 $3 }
-    | "not" Expression_ { SappExpNegation $2 }
-    | "=" Expression_ Expression_ { SappExpEqualsTo $2 $3 }
-    | "/=" Expression_ Expression_ { SappExpDifferentFrom $2 $3 }
-    | ">" Expression_ Expression_ { SappExpGreaterThan $2 $3 }
-    | ">=" Expression_ Expression_ { SappExpGreaterThanOrEqualTo $2 $3 }
-    | "<" Expression_ Expression_ { SappExpLessThan $2 $3 }
-    | "<=" Expression_ Expression_ { SappExpLessThanOrEqualto $2 $3 }
+    | "+" Expression_ Expression_ { evaluateToLitExp $ SappExpAddition $2 $3 }
+    | "-" Expression_ Expression_ { evaluateToLitExp $ SappExpSubstraction $2 $3 }
+    | "*" Expression_ Expression_ { evaluateToLitExp $ SappExpMultiplication $2 $3 }
+    | "/" Expression_ Expression_ { evaluateToLitExp $ SappExpDivision $2 $3 }
+    | "%" Expression_ Expression_ { evaluateToLitExp $ SappExpModulo $2 $3 }
+    | "^" Expression_ Expression_ { evaluateToLitExp $ SappExpExponentiation $2 $3 }
+    | "or" Expression_ Expression_ { evaluateToLitExp $ SappExpConjuction $2 $3 }
+    | "and" Expression_ Expression_ { evaluateToLitExp $ SappExpDisjunction $2 $3 }
+    | "not" Expression_ { evaluateToLitExp $ SappExpNegation $2 }
+    | "=" Expression_ Expression_ { evaluateToLitExp $ SappExpEqualsTo $2 $3 }
+    | "/=" Expression_ Expression_ { evaluateToLitExp $ SappExpDifferentFrom $2 $3 }
+    | ">" Expression_ Expression_ { evaluateToLitExp $ SappExpGreaterThan $2 $3 }
+    | ">=" Expression_ Expression_ { evaluateToLitExp $ SappExpGreaterThanOrEqualTo $2 $3 }
+    | "<" Expression_ Expression_ { evaluateToLitExp $ SappExpLessThan $2 $3 }
+    | "<=" Expression_ Expression_ { evaluateToLitExp $ SappExpLessThanOrEqualto $2 $3 }
 
 Variable_
     : identifier_ { SappVar $1 }
 {
 parseError :: [Token] -> a
 parseError (tok:_) = error $ (prettyShow $ posn tok) ++ ": " ++ (prettyShow tok)
+
+-- XXX: This _optimization_ could be removed later
+evaluateToLitExp :: SappExpression -> SappExpression
+evaluateToLitExp integerExp = case integerExp of
+    SappExpAddition (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l + r)
+    SappExpSubstraction (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l - r)
+    SappExpMultiplication (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l * r)
+    SappExpDivision (SappExpLitInteger l) (SappExpLitInteger r) | r /= 0 -> SappExpLitInteger (l `div` r)
+    SappExpModulo (SappExpLitInteger l) (SappExpLitInteger r) | r /= 0  -> SappExpLitInteger (l `mod` r)
+    SappExpExponentiation (SappExpLitInteger l) (SappExpLitInteger r) | r >= 0  -> SappExpLitInteger (l ^ r)
+    SappExpConjuction (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l || r)
+    SappExpDisjunction (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l && r)
+    SappExpNegation (SappExpLitBoolean v) -> SappExpLitBoolean (not v)
+    SappExpEqualsTo (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l == r)
+    SappExpDifferentFrom (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l /= r)
+    SappExpGreaterThan (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l > r)
+    SappExpGreaterThanOrEqualTo (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l >= r)
+    SappExpLessThan (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l < r)
+    SappExpLessThanOrEqualto (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l <= r)
+    SappExpEqualsTo (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l == r)
+    SappExpDifferentFrom (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l /= r)
+    _ -> integerExp
 
 data SappStatement
     = SappStmtBlock [SappStatement]
