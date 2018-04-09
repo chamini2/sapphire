@@ -4,6 +4,7 @@ module Parser
     , parseStatement
     , parseExpression
     , SappStatement(..)
+    , SappDataType(..)
     , SappExpression(..)
     , SappVariable(..)
     ) where
@@ -84,9 +85,14 @@ StatementList_
 
 Statement_
     : "begin" StatementList_ "end" { SappStmtBlock $2 }
+    | DataType_ identifier_ { SappStmtVariableDeclaration $1 $2 }
     | "read" Variable_ { SappStmtRead $2 }
     | "write" LIST_SEP1(EITHER(charstring_, Expression_), ",") { SappStmtWrite $2 }
     | "if" Expression_ "then" Statement_ MAYBE(SND("else", Statement_)) { SappStmtIf $2 $4 $5 }
+
+DataType_
+    : "integer" { SappDTInteger }
+    | "boolean" { SappDTBoolean }
 
 Expression_
     : integer_ { SappExpLitInteger $1 }

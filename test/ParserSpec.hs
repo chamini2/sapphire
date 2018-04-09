@@ -65,6 +65,22 @@ statement = describe "Statement_" $ do
                     "end"
             evaluate res `shouldThrow` anyErrorCall
 
+    describe "variable declaration" $ do
+        it "should parse an integer variable declaration" $ do
+            let res = parseStatement . scanTokens $
+                    "integer num"
+            res `shouldBe` SappStmtVariableDeclaration SappDTInteger "num"
+
+        it "should parse a boolean variable declaration" $ do
+            let res = parseStatement . scanTokens $
+                    "boolean flag"
+            res `shouldBe` SappStmtVariableDeclaration SappDTBoolean "flag"
+
+        it "should reject a variable declaration with multiple variables" $ do
+            let res = parseStatement . scanTokens $
+                    "integer year, height, width"
+            evaluate res `shouldThrow` anyErrorCall
+
     describe "read" $ do
         it "should parse a read for an identifier" $ do
             let res = parseStatement . scanTokens $
