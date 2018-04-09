@@ -31,6 +31,106 @@ expression = describe "Expression_" $ do
                     "false"
             res `shouldBe` SappExpLitBoolean False
 
+    describe "variable" $ do
+        it "should parse a variable as an expression" $ do
+            let res = parseExpression . scanTokens $
+                    "flag"
+            res `shouldBe` SappExpVariable (SappVar "flag")
+
+    describe "operators" $ do
+        describe "addition" $ do
+            it "should parse an addition as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "+ left right"
+                res `shouldBe` SappExpAddition (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "substraction" $ do
+            it "should parse a substraction as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "- left right"
+                res `shouldBe` SappExpSubstraction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "multiplication" $ do
+            it "should parse a multiplication as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "* left right"
+                res `shouldBe` SappExpMultiplication (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "division" $ do
+            it "should parse a division as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "/ left right"
+                res `shouldBe` SappExpDivision (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "modulo" $ do
+            it "should parse a modulo as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "% left right"
+                res `shouldBe` SappExpModulo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "exponentiation" $ do
+            it "should parse an exponentiation as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "^ left right"
+                res `shouldBe` SappExpExponentiation (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "conjuction" $ do
+            it "should parse a conjuction as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "or left right"
+                res `shouldBe` SappExpConjuction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "disjunction" $ do
+            it "should parse a disjunction as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "and left right"
+                res `shouldBe` SappExpDisjunction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "negation" $ do
+            it "should parse a negation as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "not val"
+                res `shouldBe` SappExpNegation (SappExpVariable (SappVar "val"))
+
+
+        describe "equals to" $ do
+            it "should parse an equals to as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "= left right"
+                res `shouldBe` SappExpEqualsTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "different from" $ do
+            it "should parse an different from as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "/= left right"
+                res `shouldBe` SappExpDifferentFrom (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "greater than" $ do
+            it "should parse an greater than as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "> left right"
+                res `shouldBe` SappExpGreaterThan (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "greater than or equal to" $ do
+            it "should parse an greater than or equal to as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        ">= left right"
+                res `shouldBe` SappExpGreaterThanOrEqualTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "less than" $ do
+            it "should parse an less than as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "< left right"
+                res `shouldBe` SappExpLessThan (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+        describe "less than or equal to" $ do
+            it "should parse an less than or equal to as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "<= left right"
+                res `shouldBe` SappExpLessThanOrEqualto (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+
+
+
 statement = describe "Statement_" $ do
     describe "block" $ do
         it "should parse an empty block" $ do
