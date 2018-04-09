@@ -86,6 +86,7 @@ StatementList_
 Statement_
     : "begin" StatementList_ "end" { SappStmtBlock $2 }
     | DataType_ identifier_ { SappStmtVariableDeclaration $1 $2 }
+    | Variable_ ":=" Expression_ { SappStmtAssignment $1 $3 }
     | "read" Variable_ { SappStmtRead $2 }
     | "write" LIST_SEP1(EITHER(charstring_, Expression_), ",") { SappStmtWrite $2 }
     | "if" Expression_ "then" Statement_ MAYBE(SND("else", Statement_)) { SappStmtIf $2 $4 $5 }

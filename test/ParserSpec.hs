@@ -14,13 +14,13 @@ parser = describe "parser" $ do
     program
 
 expression = describe "Expression_" $ do
-    describe "integer" $ do
+    describe "literal integer" $ do
         it "should return an integer expression" $ do
             let res = parseExpression . scanTokens $
                     "123"
             res `shouldBe` SappExpLitInteger 123
 
-    describe "boolean" $ do
+    describe "literal boolean" $ do
         it "should return a True boolean expression" $ do
             let res = parseExpression . scanTokens $
                     "true"
@@ -70,6 +70,22 @@ statement = describe "Statement_" $ do
             let res = parseStatement . scanTokens $
                     "integer num"
             res `shouldBe` SappStmtVariableDeclaration SappDTInteger "num"
+
+        it "should parse a boolean variable declaration" $ do
+            let res = parseStatement . scanTokens $
+                    "boolean flag"
+            res `shouldBe` SappStmtVariableDeclaration SappDTBoolean "flag"
+
+        it "should reject a variable declaration with multiple variables" $ do
+            let res = parseStatement . scanTokens $
+                    "integer year, height, width"
+            evaluate res `shouldThrow` anyErrorCall
+
+    describe "assignment" $ do
+        it "should parse an assignment" $ do
+            let res = parseStatement . scanTokens $
+                    "num := 42"
+            res `shouldBe` SappStmtAssignment (SappVar "num") (SappExpLitInteger 42)
 
         it "should parse a boolean variable declaration" $ do
             let res = parseStatement . scanTokens $
