@@ -182,6 +182,10 @@ The binary operators, which take `integer` for the operands and produce an `inte
 - `%` for modulo
 - `^` for exponentiation; the right operand must be positive, there are no floating-point numbers
 
+A unary operator, which takes an `integer` and produes an `integer`.
+
+- `~` for negating an integer (e.g. _~5 = - 0 5_)
+
 ### `boolean` expressions
 
 Consist of the boolean literals.

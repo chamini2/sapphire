@@ -116,8 +116,23 @@ expression = describe "Expression_" $ do
 
             it "should not evaluate literals when right operand is negative" $ do
                 let res = parseExpression . scanTokens $
-                        "^ 7 - 0 2"
+                        "^ 7 ~ 2"
                 res `shouldBe` SappExpExponentiation (SappExpLitInteger 7) (SappExpLitInteger (-2))
+
+        describe "integer negation" $ do
+            it "should parse a negation as an expression" $ do
+                let res = parseExpression . scanTokens $
+                        "~ val"
+                res `shouldBe` SappExpIntNegation (SappExpVariable (SappVar "val"))
+
+            it "should evaluate positive literal" $ do
+                let res = parseExpression . scanTokens $
+                        "~ 5"
+                res `shouldBe` SappExpLitInteger (-5)
+            it "should evaluate negated literal" $ do
+                let res = parseExpression . scanTokens $
+                        "~ ~ 5"
+                res `shouldBe` SappExpLitInteger 5
 
         describe "conjuction" $ do
             it "should parse a conjuction as an expression" $ do

@@ -40,6 +40,7 @@ import PrettyShow
     "/" { TkDivision _ }
     "%" { TkModulo _ }
     "^" { TkExponentiation _ }
+    "~" { TkIntNegation _ }
     "or" { TkDisjunction _ }
     "and" { TkConjuction _ }
     "not" { TkNegation _ }
@@ -105,6 +106,7 @@ Expression_
     | "/" Expression_ Expression_ { evaluateToLitExp $ SappExpDivision $2 $3 }
     | "%" Expression_ Expression_ { evaluateToLitExp $ SappExpModulo $2 $3 }
     | "^" Expression_ Expression_ { evaluateToLitExp $ SappExpExponentiation $2 $3 }
+    | "~" Expression_ { evaluateToLitExp $ SappExpIntNegation $2 }
     | "or" Expression_ Expression_ { evaluateToLitExp $ SappExpConjuction $2 $3 }
     | "and" Expression_ Expression_ { evaluateToLitExp $ SappExpDisjunction $2 $3 }
     | "not" Expression_ { evaluateToLitExp $ SappExpNegation $2 }
@@ -130,6 +132,7 @@ evaluateToLitExp integerExp = case integerExp of
     SappExpDivision (SappExpLitInteger l) (SappExpLitInteger r) | r /= 0 -> SappExpLitInteger (l `div` r)
     SappExpModulo (SappExpLitInteger l) (SappExpLitInteger r) | r /= 0  -> SappExpLitInteger (l `mod` r)
     SappExpExponentiation (SappExpLitInteger l) (SappExpLitInteger r) | r >= 0  -> SappExpLitInteger (l ^ r)
+    SappExpIntNegation (SappExpLitInteger v) -> SappExpLitInteger (negate v)
     SappExpConjuction (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l || r)
     SappExpDisjunction (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l && r)
     SappExpNegation (SappExpLitBoolean v) -> SappExpLitBoolean (not v)
@@ -167,6 +170,7 @@ data SappExpression
     | SappExpDivision SappExpression SappExpression
     | SappExpModulo SappExpression SappExpression
     | SappExpExponentiation SappExpression SappExpression
+    | SappExpIntNegation SappExpression
     | SappExpConjuction SappExpression SappExpression
     | SappExpDisjunction SappExpression SappExpression
     | SappExpNegation SappExpression

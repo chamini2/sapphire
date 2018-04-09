@@ -51,6 +51,7 @@ tokens :-
     "/" { pushToken TkDivision }
     "%" { pushToken TkModulo }
     "^" { pushToken TkExponentiation }
+    "~" { pushToken TkIntNegation }
     "or" { pushToken TkDisjunction }
     "and" { pushToken TkConjuction }
     "not" { pushToken TkNegation }
@@ -100,6 +101,7 @@ posn tok = case tok of
     TkDivision p -> p
     TkModulo p -> p
     TkExponentiation p -> p
+    TkIntNegation p -> p
     TkDisjunction p -> p
     TkConjuction p -> p
     TkNegation p -> p
@@ -134,6 +136,7 @@ data Token
     | TkDivision AlexPosn
     | TkModulo AlexPosn
     | TkExponentiation AlexPosn
+    | TkIntNegation AlexPosn
     | TkDisjunction AlexPosn
     | TkConjuction AlexPosn
     | TkNegation AlexPosn
@@ -170,6 +173,7 @@ instance PrettyShow Token where
         TkDivision _ -> "/"
         TkModulo _ -> "%"
         TkExponentiation _ -> "^"
+        TkIntNegation _ -> "~"
         TkDisjunction _ -> "or"
         TkConjuction _ -> "and"
         TkNegation _ -> "not"
