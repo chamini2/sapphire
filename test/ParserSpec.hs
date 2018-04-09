@@ -32,9 +32,38 @@ expression = describe "Expression_" $ do
             res `shouldBe` SappExpLitBoolean False
 
 statement = describe "Statement_" $ do
-    describe "begin ... end" $ do
-        it "" $
-            pending
+    describe "block" $ do
+        it "should parse an empty block" $ do
+            let res = parseStatement . scanTokens $
+                    "begin end"
+            res `shouldBe` SappStmtBlock []
+
+        it "should parse nested blocks" $ do
+            let res = parseStatement . scanTokens $
+                    "begin\n" ++
+                    "  begin\n" ++
+                    "    begin end;" ++
+                    "  end;\n" ++
+                    "end"
+            res `shouldBe` SappStmtBlock [ SappStmtBlock [ SappStmtBlock [] ] ]
+
+        it "should parse multiple statements" $ do
+            let res = parseStatement . scanTokens $
+                    "begin\n" ++
+                    "  write \"Hello world\";\n" ++
+                    "  write \"Hello again!\";\n" ++
+                    "end"
+            res `shouldSatisfy` (\res -> case res of
+                    SappStmtBlock stms -> length stms == 2
+                    _ -> False
+                )
+
+        it "should reject statements without an ending ';'" $ do
+            let res = parseStatement . scanTokens $
+                    "begin\n" ++
+                    "  write \"Hello world\"\n" ++
+                    "end"
+            evaluate res `shouldThrow` anyErrorCall
 
     describe "write" $ do
         it "should accept a string" $ do
@@ -43,8 +72,8 @@ statement = describe "Statement_" $ do
             res `shouldBe` SappStmtWrite [Left "Hello world"]
         it "should accept multiple strings" $ do
             let res = parseStatement . scanTokens $
-                    "write \"Hello world\\n\", \"Hello again!\""
-            res `shouldBe` SappStmtWrite [Left "Hello world\n", Left "Hello again!"]
+                    "write \"Hello world\", \"Hello again!\""
+            res `shouldBe` SappStmtWrite [Left "Hello world", Left "Hello again!"]
 
         it "should accept an expression" $ do
             let res = parseStatement . scanTokens $
@@ -70,7 +99,10 @@ program = describe "Program_" $ do
 
     it "should parse a program with statemets" $ do
         let res = parseProgram . scanTokens $
-                "main write \"Hello\"; write \"world\"; end"
+                "main\n" ++
+                "  write \"Hello world\";\n" ++
+                "  write \"Hello again!\";\n" ++
+                "end"
         res `shouldSatisfy` (\res -> case res of
                 SappStmtBlock stms -> length stms == 2
                 _ -> False
