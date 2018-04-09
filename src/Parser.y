@@ -5,6 +5,7 @@ module Parser
     , parseExpression
     , SappStatement(..)
     , SappExpression(..)
+    , SappVariable(..)
     ) where
 
 import Lexer
@@ -76,11 +77,16 @@ StatementList_
 
 Statement_
     : "begin" StatementList_ "end" { SappStmtBlock $2 }
+    | "read" Variable_ { SappStmtRead $2 }
     | "write" LIST_SEP1(EITHER(charstring_, Expression_), ",") { SappStmtWrite $2 }
 
 Expression_
     : integer_ { SappExpLitInteger $1 }
     | boolean_ { SappExpLitBoolean $1 }
+    | Variable_ { SappExpVariable $1 }
+
+Variable_
+    : identifier_ { SappVar $1 }
 {
 parseError :: [Token] -> a
 parseError (tok:_) = error $ (prettyShow $ posn tok) ++ ": " ++ (prettyShow tok)
@@ -89,6 +95,7 @@ data SappStatement
     = SappStmtBlock [SappStatement]
     | SappStmtVariableDeclaration SappDataType String
     | SappStmtAssignment SappVariable SappExpression
+    | SappStmtRead SappVariable
     | SappStmtWrite [Either String SappExpression]
     deriving (Show, Eq)
 
@@ -97,11 +104,13 @@ data SappDataType
     | SappDTBoolean
     deriving (Show, Eq)
 
-data SappVariable = SappVar String
-    deriving (Show, Eq)
-
 data SappExpression
     = SappExpLitInteger Integer
     | SappExpLitBoolean Bool
+    | SappExpVariable SappVariable
     deriving (Show, Eq)
+
+data SappVariable = SappVar String
+    deriving (Show, Eq)
+
 }

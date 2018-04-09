@@ -65,6 +65,22 @@ statement = describe "Statement_" $ do
                     "end"
             evaluate res `shouldThrow` anyErrorCall
 
+    describe "read" $ do
+        it "should parse a read for an identifier" $ do
+            let res = parseStatement . scanTokens $
+                    "read num"
+            res `shouldBe` SappStmtRead (SappVar "num")
+
+        it "should reject a read for a literal" $ do
+            let res = parseStatement . scanTokens $
+                    "read 3"
+            evaluate res `shouldThrow` anyErrorCall
+
+        it "should reject a read for multiple identifiers" $ do
+            let res = parseStatement . scanTokens $
+                    "read num, nam"
+            evaluate res `shouldThrow` anyErrorCall
+
     describe "write" $ do
         it "should accept a string" $ do
             let res = parseStatement . scanTokens $
