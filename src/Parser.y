@@ -34,6 +34,8 @@ import PrettyShow
     "," { TkComma _ }
     ";" { TkSemicolon _ }
     ":=" { TkAssign _ }
+    "(" { TkParenthesisL _ }
+    ")" { TkParenthesisR _ }
     "+" { TkAddition _ }
     "-" { TkSubtraction _ }
     "*" { TkMultiplication _ }
@@ -100,6 +102,7 @@ Expression_
     : integer_ { SappExpLitInteger $1 }
     | boolean_ { SappExpLitBoolean $1 }
     | Variable_ { SappExpVariable $1 }
+    | "(" Expression_ ")" { $2 }
     | "+" Expression_ Expression_ { evaluateToLitExp $ SappExpAddition $2 $3 }
     | "-" Expression_ Expression_ { evaluateToLitExp $ SappExpSubstraction $2 $3 }
     | "*" Expression_ Expression_ { evaluateToLitExp $ SappExpMultiplication $2 $3 }

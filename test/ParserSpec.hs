@@ -37,6 +37,22 @@ expression = describe "Expression_" $ do
                     "flag"
             res `shouldBe` SappExpVariable (SappVar "flag")
 
+    describe "parentheses" $ do
+        it "should ignore parentheses" $ do
+            let res = parseExpression . scanTokens $
+                    "(84)"
+            res `shouldBe` SappExpLitInteger 84
+
+        it "should reject an unmatched left parenthesis" $ do
+            let res = parseExpression . scanTokens $
+                    "(84"
+            evaluate res `shouldThrow` anyErrorCall
+
+        it "should reject an unmatched right parenthesis" $ do
+            let res = parseExpression . scanTokens $
+                    "84)"
+            evaluate res `shouldThrow` anyErrorCall
+
     describe "operators" $ do
         describe "addition" $ do
             it "should parse an addition as an expression" $ do

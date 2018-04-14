@@ -44,6 +44,9 @@ tokens :-
     "true" { pushToken (TkLitBoolean True) }
     "false" { pushToken (TkLitBoolean False) }
 
+    "(" { pushToken TkParenthesisL }
+    ")" { pushToken TkParenthesisR }
+
     -- Operators
     "+" { pushToken TkAddition }
     "-" { pushToken TkSubtraction }
@@ -95,6 +98,8 @@ posn tok = case tok of
     TkLitCharString _ p -> p
     TkLitInteger _ p -> p
     TkLitBoolean _ p -> p
+    TkParenthesisL p -> p
+    TkParenthesisR p -> p
     TkAddition p -> p
     TkSubtraction p -> p
     TkMultiplication p -> p
@@ -130,6 +135,8 @@ data Token
     | TkLitCharString String AlexPosn
     | TkLitInteger Integer AlexPosn
     | TkLitBoolean Bool AlexPosn
+    | TkParenthesisL AlexPosn
+    | TkParenthesisR AlexPosn
     | TkAddition AlexPosn
     | TkSubtraction AlexPosn
     | TkMultiplication AlexPosn
