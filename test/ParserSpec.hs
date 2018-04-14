@@ -140,7 +140,7 @@ expression = describe "Expression_" $ do
                         "or left right"
                 res `shouldBe` SappExpConjuction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
-            it "should evaluate integer literals" $ do
+            it "should evaluate boolean literals" $ do
                 let res = parseExpression . scanTokens $
                         "or false true"
                 res `shouldBe` SappExpLitBoolean True
@@ -151,7 +151,7 @@ expression = describe "Expression_" $ do
                         "and left right"
                 res `shouldBe` SappExpDisjunction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
-            it "should evaluate integer literals" $ do
+            it "should evaluate boolean literals" $ do
                 let res = parseExpression . scanTokens $
                         "and false true"
                 res `shouldBe` SappExpLitBoolean False
@@ -364,19 +364,14 @@ statement = describe "Statement_" $ do
             evaluate res `shouldThrow` anyErrorCall
 
     describe "assignment" $ do
-        it "should parse an assignment" $ do
+        it "should parse an expression assignment" $ do
             let res = parseStatement . scanTokens $
                     "num := 42"
             res `shouldBe` SappStmtAssignment (SappVar "num") (SappExpLitInteger 42)
 
-        it "should parse a boolean variable declaration" $ do
+        it "should reject a multiple variables assignment" $ do
             let res = parseStatement . scanTokens $
-                    "boolean flag"
-            res `shouldBe` SappStmtVariableDeclaration SappDTBoolean "flag"
-
-        it "should reject a variable declaration with multiple variables" $ do
-            let res = parseStatement . scanTokens $
-                    "integer year, height, width"
+                    "year, month, day := 1992, 5, 22"
             evaluate res `shouldThrow` anyErrorCall
 
     describe "read" $ do
@@ -385,7 +380,7 @@ statement = describe "Statement_" $ do
                     "read num"
             res `shouldBe` SappStmtRead (SappVar "num")
 
-        it "should reject a read for a literal" $ do
+        it "should reject a read for an expression" $ do
             let res = parseStatement . scanTokens $
                     "read 3"
             evaluate res `shouldThrow` anyErrorCall
@@ -400,6 +395,7 @@ statement = describe "Statement_" $ do
             let res = parseStatement . scanTokens $
                     "write \"Hello world\""
             res `shouldBe` SappStmtWrite [Left "Hello world"]
+
         it "should accept multiple strings" $ do
             let res = parseStatement . scanTokens $
                     "write \"Hello world\", \"Hello again!\""
