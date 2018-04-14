@@ -124,7 +124,9 @@ Variable_
     : identifier_ { SappVar $1 }
 {
 parseError :: [Token] -> a
-parseError (tok:_) = error $ (prettyShow $ posn tok) ++ ": " ++ (prettyShow tok)
+parseError tks = case tks of
+    tk:_ -> error $ (prettyShow $ posn tk) ++ ": " ++ (prettyShow tk)
+    [] -> error $ endOfFile ++ ": error"
 
 -- XXX: This _optimization_ could be removed later
 evaluateToLitExp :: SappExpression -> SappExpression

@@ -3,6 +3,7 @@ module Lexer
     ( scanTokens
     , Token(..)
     , posn
+    , endOfFile
     ) where
 
 import PrettyShow
@@ -81,6 +82,9 @@ consumeToken tok posn inp = tok inp posn
 
 scanTokens :: String -> [Token]
 scanTokens = alexScanTokens
+
+endOfFile :: String
+endOfFile = "end of file"
 
 posn :: Token -> AlexPosn
 posn tok = case tok of
