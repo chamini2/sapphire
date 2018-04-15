@@ -69,7 +69,7 @@ expression = describe "Expression_" $ do
             it "should parse a substraction as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "- left right"
-                res `shouldBe` SappExpSubstraction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+                res `shouldBe` SappExpSubtraction (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
             it "should evaluate integer literals" $ do
                 let res = parseExpression . scanTokens $
@@ -269,7 +269,7 @@ expression = describe "Expression_" $ do
             it "should parse an greater than or equal to as an expression" $ do
                 let res = parseExpression . scanTokens $
                         ">= left right"
-                res `shouldBe` SappExpGreaterThanOrEqualTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+                res `shouldBe` SappExpGreaterThanOrEqualsTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
             describe "should evaluate integer literals" $ do
                 it "should evaluate greater to true" $ do
@@ -312,7 +312,7 @@ expression = describe "Expression_" $ do
             it "should parse an less than or equal to as an expression" $ do
                 let res = parseExpression . scanTokens $
                         "<= left right"
-                res `shouldBe` SappExpLessThanOrEqualto (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
+                res `shouldBe` SappExpLessThanOrEqualsTo (SappExpVariable (SappVar "left")) (SappExpVariable (SappVar "right"))
 
             it "should evaluate less to true" $ do
                 let res = parseExpression . scanTokens $

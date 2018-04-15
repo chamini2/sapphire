@@ -104,7 +104,7 @@ Expression_
     | Variable_ { SappExpVariable $1 }
     | "(" Expression_ ")" { $2 }
     | "+" Expression_ Expression_ { evaluateToLitExp $ SappExpAddition $2 $3 }
-    | "-" Expression_ Expression_ { evaluateToLitExp $ SappExpSubstraction $2 $3 }
+    | "-" Expression_ Expression_ { evaluateToLitExp $ SappExpSubtraction $2 $3 }
     | "*" Expression_ Expression_ { evaluateToLitExp $ SappExpMultiplication $2 $3 }
     | "/" Expression_ Expression_ { evaluateToLitExp $ SappExpDivision $2 $3 }
     | "%" Expression_ Expression_ { evaluateToLitExp $ SappExpModulo $2 $3 }
@@ -116,9 +116,9 @@ Expression_
     | "=" Expression_ Expression_ { evaluateToLitExp $ SappExpEqualsTo $2 $3 }
     | "/=" Expression_ Expression_ { evaluateToLitExp $ SappExpDifferentFrom $2 $3 }
     | ">" Expression_ Expression_ { evaluateToLitExp $ SappExpGreaterThan $2 $3 }
-    | ">=" Expression_ Expression_ { evaluateToLitExp $ SappExpGreaterThanOrEqualTo $2 $3 }
+    | ">=" Expression_ Expression_ { evaluateToLitExp $ SappExpGreaterThanOrEqualsTo $2 $3 }
     | "<" Expression_ Expression_ { evaluateToLitExp $ SappExpLessThan $2 $3 }
-    | "<=" Expression_ Expression_ { evaluateToLitExp $ SappExpLessThanOrEqualto $2 $3 }
+    | "<=" Expression_ Expression_ { evaluateToLitExp $ SappExpLessThanOrEqualsTo $2 $3 }
 
 Variable_
     : identifier_ { SappVar $1 }
@@ -132,7 +132,7 @@ parseError tks = case tks of
 evaluateToLitExp :: SappExpression -> SappExpression
 evaluateToLitExp integerExp = case integerExp of
     SappExpAddition (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l + r)
-    SappExpSubstraction (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l - r)
+    SappExpSubtraction (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l - r)
     SappExpMultiplication (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitInteger (l * r)
     SappExpDivision (SappExpLitInteger l) (SappExpLitInteger r) | r /= 0 -> SappExpLitInteger (l `div` r)
     SappExpModulo (SappExpLitInteger l) (SappExpLitInteger r) | r /= 0  -> SappExpLitInteger (l `mod` r)
@@ -144,9 +144,9 @@ evaluateToLitExp integerExp = case integerExp of
     SappExpEqualsTo (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l == r)
     SappExpDifferentFrom (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l /= r)
     SappExpGreaterThan (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l > r)
-    SappExpGreaterThanOrEqualTo (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l >= r)
+    SappExpGreaterThanOrEqualsTo (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l >= r)
     SappExpLessThan (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l < r)
-    SappExpLessThanOrEqualto (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l <= r)
+    SappExpLessThanOrEqualsTo (SappExpLitInteger l) (SappExpLitInteger r) -> SappExpLitBoolean (l <= r)
     SappExpEqualsTo (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l == r)
     SappExpDifferentFrom (SappExpLitBoolean l) (SappExpLitBoolean r) -> SappExpLitBoolean (l /= r)
     _ -> integerExp
@@ -170,7 +170,7 @@ data SappExpression
     | SappExpLitBoolean Bool
     | SappExpVariable SappVariable
     | SappExpAddition SappExpression SappExpression
-    | SappExpSubstraction SappExpression SappExpression
+    | SappExpSubtraction SappExpression SappExpression
     | SappExpMultiplication SappExpression SappExpression
     | SappExpDivision SappExpression SappExpression
     | SappExpModulo SappExpression SappExpression
@@ -182,9 +182,9 @@ data SappExpression
     | SappExpEqualsTo SappExpression SappExpression
     | SappExpDifferentFrom SappExpression SappExpression
     | SappExpGreaterThan SappExpression SappExpression
-    | SappExpGreaterThanOrEqualTo SappExpression SappExpression
+    | SappExpGreaterThanOrEqualsTo SappExpression SappExpression
     | SappExpLessThan SappExpression SappExpression
-    | SappExpLessThanOrEqualto SappExpression SappExpression
+    | SappExpLessThanOrEqualsTo SappExpression SappExpression
     deriving (Show, Eq)
 
 data SappVariable = SappVar String
