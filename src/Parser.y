@@ -9,8 +9,11 @@ module Parser
     , SappVariable(..)
     ) where
 
+import Control.Monad
+
 import Lexer
 import PrettyShow
+import IndentedShow
 }
 
 %name parseProgram Program_
@@ -158,12 +161,92 @@ data SappStatement
     | SappStmtRead SappVariable
     | SappStmtWrite [Either String SappExpression]
     | SappStmtIf SappExpression SappStatement (Maybe SappStatement)
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show SappStatement where
+    show = indentShow
+
+instance IndentedShow SappStatement where
+    ishow stmt = do
+        string "STATEMENT: "
+        case stmt of
+            SappStmtBlock stmts -> do
+                string "BLOCK"
+                indent $ forM_ stmts $ \stmt -> line >> ishow stmt
+
+            SappStmtVariableDeclaration dt nam -> do
+                string "DECALRE VARIABLE"
+                indent $ do
+                    string "DATA TYPE"
+                    indent $ string (prettyShow dt)
+                    line
+
+                    string "NAME"
+                    indent $ string nam
+                    line
+
+            SappStmtAssignment var exp -> do
+                string "ASSIGNMENT"
+                indent $ do
+                    string "VARIABLE"
+                    indent $ ishow var
+                    line
+
+                    string "EXPRESSION"
+                    indent $ ishow exp
+                    line
+
+            SappStmtRead var -> do
+                string "READ"
+                indent $ ishow var
+                line
+
+            SappStmtWrite exps -> do
+                string "WRITE"
+                indent $
+                    forM_ exps $ \eit -> do
+                        case eit of
+                            Left str -> do
+                                string "STRING"
+                                indent $ string (show str)
+                            Right exp -> do
+                                string "EXPRESSION"
+                                indent $ ishow exp
+                        line
+
+            SappStmtIf exp thn Nothing -> do
+                string "IF-THEN"
+                indent $ do
+                    string "CONDITION"
+                    indent $ ishow exp
+                    line
+
+                    string "THEN"
+                    indent $ ishow thn
+
+            SappStmtIf exp thn (Just els) -> do
+                string "IF-THEN-ELSE"
+                indent $ do
+                    string "CONDITION"
+                    indent $ ishow exp
+                    line
+
+                    string "THEN"
+                    indent $ ishow thn
+                    line
+
+                    string "ELSE"
+                    indent $ ishow els
 
 data SappDataType
     = SappDTInteger
     | SappDTBoolean
     deriving (Show, Eq)
+
+instance PrettyShow SappDataType where
+    prettyShow dt = case dt of
+        SappDTInteger -> "integer"
+        SappDTBoolean -> "boolean"
 
 data SappExpression
     = SappExpLitInteger Integer
@@ -187,7 +270,85 @@ data SappExpression
     | SappExpLessThanOrEqualsTo SappExpression SappExpression
     deriving (Show, Eq)
 
+instance IndentedShow SappExpression where
+    ishow exp = case exp of
+        SappExpLitInteger num -> do
+            string "INTEGER LITERAL"
+            indent $ string (show num)
+        SappExpLitBoolean bool -> do
+            string "BOOLEAN LITERAL"
+            indent $ string (if bool then "true" else "false")
+        SappExpVariable var -> do
+            string "VARIABLE ACCESS"
+            indent $ ishow var
+        SappExpAddition opl opr -> do
+            string "ADDITION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpSubtraction opl opr -> do
+            string "SUBTRACTION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpMultiplication opl opr -> do
+            string "MULTIPLICATION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpDivision opl opr -> do
+            string "DIVISION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpModulo opl opr -> do
+            string "MODULO"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpExponentiation opl opr -> do
+            string "EXPONENTIATION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpIntNegation op -> do
+            string "INTEGER NEGATION"
+            indent (ishow op)
+        SappExpConjuction opl opr -> do
+            string "CONJUCTION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpDisjunction opl opr -> do
+            string "DISJUNCTION"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpNegation op -> do
+            string "BOOLEAN NEGATION"
+            indent (ishow op)
+        SappExpEqualsTo opl opr -> do
+            string "EQUALS TO"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpDifferentFrom opl opr -> do
+            string "DIFFERENT FROM"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpGreaterThan opl opr -> do
+            string "GREATER THAN"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpGreaterThanOrEqualsTo opl opr -> do
+            string "GREATER THAN OR EQUALS TO"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpLessThan opl opr -> do
+            string "LESS THAN"
+            indent (ishow opl)
+            indent (ishow opr)
+        SappExpLessThanOrEqualsTo opl opr -> do
+            string "LESS THAN OR EQUALS TO"
+            indent (ishow opl)
+            indent (ishow opr)
+
 data SappVariable = SappVar String
     deriving (Show, Eq)
+
+instance IndentedShow SappVariable where
+    ishow var = case var of
+        SappVar str -> string str
 
 }
