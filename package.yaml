@@ -21,12 +21,16 @@ description: Please see the README on Github at <https://github.com/chamini2/sap
 dependencies:
   - base >= 4.7 && < 5
   - array
+  - mtl
+  - lens
 
 build-tools:
   - alex
+  - happy
 
 library:
   source-dirs: src
+  default-extensions: TemplateHaskell
 
 executables:
   sapp:

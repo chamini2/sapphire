@@ -2,7 +2,11 @@
 module Lexer
     ( scanTokens
     , Token(..)
+    , posn
+    , endOfFile
     ) where
+
+import PrettyShow
 }
 
 %wrapper "posn"
@@ -30,6 +34,7 @@ tokens :-
     "begin" { pushToken TkBegin }
     "read" { pushToken TkRead }
     "write" { pushToken TkWrite }
+    "," { pushToken TkComma }
     "if" { pushToken TkIf }
     "then" { pushToken TkThen }
     "else" { pushToken TkElse }
@@ -40,6 +45,9 @@ tokens :-
     "true" { pushToken (TkLitBoolean True) }
     "false" { pushToken (TkLitBoolean False) }
 
+    "(" { pushToken TkParenthesisL }
+    ")" { pushToken TkParenthesisR }
+
     -- Operators
     "+" { pushToken TkAddition }
     "-" { pushToken TkSubtraction }
@@ -47,6 +55,7 @@ tokens :-
     "/" { pushToken TkDivision }
     "%" { pushToken TkModulo }
     "^" { pushToken TkExponentiation }
+    "~" { pushToken TkIntNegation }
     "or" { pushToken TkDisjunction }
     "and" { pushToken TkConjuction }
     "not" { pushToken TkNegation }
@@ -71,6 +80,50 @@ pushToken tok posn _ = tok posn
 consumeToken :: (String -> AlexPosn -> Token) -> AlexPosn -> String -> Token
 consumeToken tok posn inp = tok inp posn
 
+scanTokens :: String -> [Token]
+scanTokens = alexScanTokens
+
+endOfFile :: String
+endOfFile = "end of file"
+
+posn :: Token -> AlexPosn
+posn tok = case tok of
+    TkMain p -> p
+    TkEnd p -> p
+    TkSemicolon p -> p
+    TkAssign p -> p
+    TkBegin p -> p
+    TkRead p -> p
+    TkWrite p -> p
+    TkComma p -> p
+    TkIf p -> p
+    TkThen p -> p
+    TkElse p -> p
+    TkLitCharString _ p -> p
+    TkLitInteger _ p -> p
+    TkLitBoolean _ p -> p
+    TkParenthesisL p -> p
+    TkParenthesisR p -> p
+    TkAddition p -> p
+    TkSubtraction p -> p
+    TkMultiplication p -> p
+    TkDivision p -> p
+    TkModulo p -> p
+    TkExponentiation p -> p
+    TkIntNegation p -> p
+    TkDisjunction p -> p
+    TkConjuction p -> p
+    TkNegation p -> p
+    TkEqualsTo p -> p
+    TkDifferentFrom p -> p
+    TkGreaterThan p -> p
+    TkGreaterThanOrEquals p -> p
+    TkLessThan p -> p
+    TkLessThanOrEquals p -> p
+    TkInteger p -> p
+    TkBoolean p -> p
+    TkIdentifier _ p -> p
+
 data Token
     = TkMain AlexPosn
     | TkEnd AlexPosn
@@ -79,18 +132,22 @@ data Token
     | TkBegin AlexPosn
     | TkRead AlexPosn
     | TkWrite AlexPosn
+    | TkComma AlexPosn
     | TkIf AlexPosn
     | TkThen AlexPosn
     | TkElse AlexPosn
     | TkLitCharString String AlexPosn
     | TkLitInteger Integer AlexPosn
     | TkLitBoolean Bool AlexPosn
+    | TkParenthesisL AlexPosn
+    | TkParenthesisR AlexPosn
     | TkAddition AlexPosn
     | TkSubtraction AlexPosn
     | TkMultiplication AlexPosn
     | TkDivision AlexPosn
     | TkModulo AlexPosn
     | TkExponentiation AlexPosn
+    | TkIntNegation AlexPosn
     | TkDisjunction AlexPosn
     | TkConjuction AlexPosn
     | TkNegation AlexPosn
@@ -105,6 +162,43 @@ data Token
     | TkIdentifier String AlexPosn
     deriving (Show, Eq)
 
-scanTokens :: String -> [Token]
-scanTokens = alexScanTokens
+instance PrettyShow Token where
+    prettyShow tok = case tok of
+        TkMain _ -> "main"
+        TkEnd _ -> "end"
+        TkSemicolon _ -> ";"
+        TkAssign _ -> ":="
+        TkBegin _ -> "begin"
+        TkRead _ -> "read"
+        TkWrite _ -> "write"
+        TkComma _ -> ","
+        TkIf _ -> "if"
+        TkThen _ -> "then"
+        TkElse _ -> "else"
+        TkLitCharString v _ -> v
+        TkLitInteger v _ -> show v
+        TkLitBoolean v _ -> if v then "true" else "false"
+        TkAddition _ -> "+"
+        TkSubtraction _ -> "-"
+        TkMultiplication _ -> "*"
+        TkDivision _ -> "/"
+        TkModulo _ -> "%"
+        TkExponentiation _ -> "^"
+        TkIntNegation _ -> "~"
+        TkDisjunction _ -> "or"
+        TkConjuction _ -> "and"
+        TkNegation _ -> "not"
+        TkEqualsTo _ -> "="
+        TkDifferentFrom _ -> "/="
+        TkGreaterThan _ -> ">"
+        TkGreaterThanOrEquals _ -> ">="
+        TkLessThan _ -> "<"
+        TkLessThanOrEquals _ -> ">="
+        TkInteger _ -> "integer"
+        TkBoolean _ -> "boolean"
+        TkIdentifier v _ -> v
+
+instance PrettyShow AlexPosn where
+    prettyShow (AlexPn abs lin col) = "(" ++ show lin ++ ":" ++ show col ++ ")"
+
 }

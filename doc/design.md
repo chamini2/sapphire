@@ -180,7 +180,11 @@ The binary operators, which take `integer` for the operands and produce an `inte
 - `*` for multiplication
 - `/` for division
 - `%` for modulo
-- `^` for exponentiation
+- `^` for exponentiation; the right operand must be positive, there are no floating-point numbers
+
+A unary operator, which takes an `integer` and produes an `integer`.
+
+- `~` for negating an integer (e.g. _~5 = - 0 5_)
 
 ### `boolean` expressions
 
